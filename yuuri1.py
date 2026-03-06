@@ -332,93 +332,72 @@ async def kill(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"💰 Eᴀʀɴᴇᴅ ᴇxᴛʀᴀ: {bounty_reward} Cᴏɪɴs!"
         )
 
-#======================== ROB (FIXED FOR YOUR PROFILE SYSTEM) ========================
+# ================= ROB SYSTEM =================
 import time
 
-MAX_ROB_PER_ATTEMPT = 10000  # max coins per rob
+MAX_ROB_PER_ATTEMPT = 10000
 
 async def robe(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message:
-        return
 
     msg = update.message
     robber_user = update.effective_user
 
     if not msg.reply_to_message:
-        return await msg.reply_text("⚠️ Rᴇᴘʟʏ Tᴏ Sᴏᴍᴇᴏɴᴇ Yᴏᴜ Wᴀɴᴛ Tᴏ Rᴏʙ.")
+        await msg.reply_text("⚠️ Rᴇᴘʟʏ Tᴏ Sᴏᴍᴇᴏɴᴇ Yᴏᴜ Wᴀɴᴛ Tᴏ Rᴏʙ.")
+        return
 
     target_user = msg.reply_to_message.from_user
 
-    # ❌ Cannot rob bots
-    if not target_user or target_user.is_bot:
-        return await msg.reply_text("🤖 Yᴏᴜ Cᴀɴɴᴏᴛ Rᴏʙ Tʜɪs Usᴇʀ.")
+    # ❌ cannot rob bot
+    if target_user.is_bot:
+        await msg.reply_text("🤖 Yᴏᴜ Cᴀɴɴᴏᴛ Rᴏʙ A Bᴏᴛ.")
+        return
 
-    # ❌ Cannot rob yourself
+    # ❌ cannot rob yourself
     if target_user.id == robber_user.id:
-        return await msg.reply_text("❌ Yᴏᴜ Cᴀɴ'ᴛ Rᴏʙ Yᴏᴜʀsᴇʟғ.")
+        await msg.reply_text("❌ Yᴏᴜ Cᴀɴ'ᴛ Rᴏʙ Yᴏᴜʀsᴇʟғ.")
+        return
 
-    # 👑 OWNER PROTECTION
+    # 👑 owner protection
     if target_user.id == OWNER_ID:
-        return await msg.reply_text("👑 Yᴏᴜ Cᴀɴ'ᴛ Rᴏʙ Mʏ Dᴇᴀʀᴇsᴛ Oᴡɴᴇʀ 😒")
+        await msg.reply_text("👑 Yᴏᴜ Cᴀɴ'ᴛ Rᴏʙ Mʏ Dᴇᴀʀᴇsᴛ Oᴡɴᴇʀ 😒")
+        return
 
-    # ❌ Missing amount
     if not context.args:
-        return await msg.reply_text("Usage: /rob <amount>")
+        await msg.reply_text("Usage: /rob <amount>")
+        return
 
-    # 💰 Parse amount
     try:
         amount = int(context.args[0])
-    except ValueError:
-        return await msg.reply_text("❌ Eɴᴛᴇʀ Vᴀʟɪᴅ Aᴍᴏᴜɴᴛ.")
+    except:
+        await msg.reply_text("❌ Iɴᴠᴀʟɪᴅ Aᴍᴏᴜɴᴛ.")
+        return
 
-    if amount <= 0:
-        return await msg.reply_text("❌ Aᴍᴏᴜɴᴛ Mᴜsᴛ Bᴇ Pᴏsɪᴛɪᴠᴇ.")
+    robber = get_user(robber_user)
+    target = get_user(target_user)
 
-    # 🔹 Fetch users from SAME collection as profile
-    robber = users.find_one({"id": robber_user.id})
-    target = users.find_one({"id": target_user.id})
-
-    if not robber:
-        robber = {"id": robber_user.id, "coins": 0}
-        users.insert_one(robber)
-
-    if not target:
-        target = {"id": target_user.id, "coins": 0}
-        users.insert_one(target)
-
-    robber_coins = robber.get("coins", 0)
-    target_coins = target.get("coins", 0)
-
-    # 💰 Check robber minimum coins
-    if robber_coins < 50:
-        return await msg.reply_text(
-            "💰 Yᴏᴜ Nᴇᴇᴅ Aᴛ Lᴇᴀsᴛ 50 Cᴏɪɴs Tᴏ Rᴏʙ Sᴏᴍᴇᴏɴᴇ.\n"
-            "💡 Usᴇ /ᴅᴀɪʟʏ Tᴏ Gᴇᴛ Cᴏɪɴs."
+    # 💰 minimum coins check
+    if robber["coins"] < 50:
+        await msg.reply_text(
+            "💰 Yᴏᴜ Nᴇᴇᴅ Aᴛ Lᴇᴀsᴛ 50 Cᴏɪɴs Tᴏ Rᴏʙ Sᴏᴍᴇᴏɴᴇ."
         )
+        return
 
-    # 💸 Limit rob amount
-    actual_rob_amount = min(amount, target_coins, MAX_ROB_PER_ATTEMPT)
+    steal = min(amount, target["coins"], MAX_ROB_PER_ATTEMPT)
 
-    if actual_rob_amount <= 0:
-        return await msg.reply_text(
-            f"💸 {target_user.first_name} Hᴀs Nᴏ Cᴏɪɴs Tᴏ Rᴏʙ."
-        )
+    if steal <= 0:
+        await msg.reply_text(f"💸 {target_user.first_name} Hᴀs Nᴏ Cᴏɪɴs.")
+        return
 
-    # ✅ Update coins
-    users.update_one(
-        {"id": robber_user.id},
-        {"$inc": {"coins": actual_rob_amount}}
-    )
+    robber["coins"] += steal
+    target["coins"] -= steal
 
-    users.update_one(
-        {"id": target_user.id},
-        {"$inc": {"coins": -actual_rob_amount}}
-    )
+    save_user(robber)
+    save_user(target)
 
     await msg.reply_text(
         f"👤 {robber_user.first_name} Rᴏʙʙᴇᴅ {target_user.first_name}\n"
-        f"💰 Sᴛᴏʟᴇɴ: {actual_rob_amount} Cᴏɪɴs\n\n"
-        f"⚠️ Mᴀx Rᴏʙ Pᴇʀ Aᴛᴛᴇᴍᴘᴛ: {MAX_ROB_PER_ATTEMPT}"
+        f"💰 Sᴛᴏʟᴇɴ: {steal} Cᴏɪɴs"
     )
 
 # ================= DAILY (MongoDB Version, TinyDB Style) =================
@@ -839,6 +818,7 @@ def main():
     app.add_handler(CommandHandler("bal", profile))
 
     # Message Handlers
+    app.add_handler(MessageHandler(filters.ALL, save_chat))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, auto_reply))
     app.add_handler(MessageHandler(filters.ALL, save_chat))
 
