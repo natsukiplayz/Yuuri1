@@ -154,7 +154,7 @@ groups_collection = db["groups"]
 def is_owner(user_id: int) -> bool:
     return user_id == BOT_OWNER_ID
 
-# ------------------ /start Command ------------------
+#/start command
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
     if not msg:
@@ -163,20 +163,27 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     first_name = msg.from_user.first_name or "Usᴇʀ"
 
     keyboard = [
-        [InlineKeyboardButton("📰 Uᴘᴅᴀᴛᴇs", url="https://t.me/yuuriXupdates"),
-         InlineKeyboardButton("💬 Sᴜᴘᴘᴏʀᴛ ᴄʜᴀᴛ", url="https://t.me/DreamSpaceZ")],
-
-        [InlineKeyboardButton("👥 Gʀᴏᴜᴘs", callback_data="show_groups"),
-         InlineKeyboardButton("🤖 Sᴇᴄᴏɴᴅ ʙᴏᴛ", url="https://t.me/Im_yuukibot")],
-
-        [InlineKeyboardButton("➕ Aᴅᴅ Mᴇ Tᴏ Yᴏᴜʀ Gʀᴏᴜᴘ", url="https://t.me/YOUR_BOT_USERNAME?startgroup=true")]
+        [
+            InlineKeyboardButton("📰 Uᴘᴅᴀᴛᴇs", url="https://t.me/yuuriXupdates"),
+            InlineKeyboardButton("💬 Sᴜᴘᴘᴏʀᴛ ᴄʜᴀᴛ", url="https://t.me/DreamSpaceZ")
+        ],
+        [
+            InlineKeyboardButton("👥 Gʀᴏᴜᴘs", callback_data="show_groups"),
+            InlineKeyboardButton("🤖 Sᴇᴄᴏɴᴅ ʙᴏᴛ", url="https://t.me/Im_yuukibot")
+        ],
+        [
+            InlineKeyboardButton(
+                "➕ Aᴅᴅ Mᴇ Tᴏ Yᴏᴜʀ Gʀᴏᴜᴘ",
+                url="https://t.me/YOUR_BOT_USERNAME?startgroup=true"
+            )
+        ]
     ]
 
     welcome_text = (
         f"✨🎉 𝗛ᴇʟʟᴏ {first_name}! 🎉✨\n\n"
-        "💥 𝗪ᴇʟᴄᴏᴍᴇ 𝘁ᴏ 𝘆ᴏᴜʀ 𝗨ʟᴛɪᴍ𝗮ᴛᴇ 𝗕𝗢𝗧 💥\n\n"
-        "📌 𝗧ʜɪs 𝗕𝗢𝗧 𝗵𝗲𝗹𝗽𝘀 ʏᴏᴜ 𝗰𝗵𝗲𝗰𝗸 𝗨𝗣𝗗ᴀᴛᴇs, 𝗝ᴏɪɴ Gʀᴏᴜᴘs, 𝗮ɴᴅ 𝗺ᴀɴᴀɢᴇ 𝗮ʟʟ 𝗲ᴀsɪʟʏ!\n\n"
-        "💡 𝗔ʟsᴏ, 𝗮ᴅᴅ 𝗺ᴇ ᴛᴏ ʏᴏᴜʀ 𝗴ʀᴏᴜᴘ ᴡɪᴛʜ ᴊᴜsᴛ ᴏɴᴇ ᴄʟɪᴄᴋ!"
+        "💥 𝗪ᴇʟᴄᴏᴍᴇ 𝘁ᴏ 𝘆ᴏ𝘂ʀ 𝗨ʟᴛɪᴍ𝗮ᴛᴇ 𝗕𝗢𝗧 💥\n\n"
+        "📌 𝗧ʜɪs 𝗕𝗢𝗧 𝗵𝗲𝗹𝗽𝘀 ʏᴏᴜ 𝗰𝗵𝗲𝗰𝗸 𝗨𝗣𝗗𝗔𝗧𝗘𝗦, 𝗝𝗼𝗶𝗻 𝗚𝗥𝗢𝗨𝗣𝗦, 𝗮𝗻𝗱 𝗺𝗮𝗻𝗮𝗴𝗲 𝗮𝗹𝗹 𝗲𝗮sɪʟʏ!\n\n"
+        "💡 𝗔𝗹𝘀𝗼, 𝗮𝗱𝗱 𝗺𝗲 𝘁𝗼 𝘆𝗼𝘂𝗿 𝗴𝗿𝗼𝘂𝗽 𝘄𝗶𝘁𝗵 𝗷𝘂𝘀𝘁 𝗼𝗻𝗲 𝗰𝗹𝗶𝗰𝗸!"
     )
 
     await msg.reply_text(welcome_text, reply_markup=InlineKeyboardMarkup(keyboard))
@@ -250,39 +257,38 @@ async def stop_group_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
     )
 
 #callback_handler for groups
-
 async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
-
-    # Only handle the "show_groups" button
-    if query.data != "show_groups":
+    if not query:
         return
 
-    contact_text = (
-        "💰 ɪꜰ ʏᴏᴜ ᴡᴀɴᴛ ʏᴏᴜʀ ɢʀᴏᴜᴘ ʜᴇʀᴇ, ᴄᴏɴᴛᴀᴄᴛ: @RJVTAX\n"
-        "⚠️ ᴘᴀɪᴅ - Rs 20"
-    )
+    await query.answer()  # acknowledge to remove "loading" on button
 
-    # Fetch groups sorted by 'position' as int
-    groups = list(groups_collection.find().sort("position", 1))
+    if query.data != "show_groups":
+        return  # ignore other callbacks
+
+    groups = list(groups_collection.find().sort("position"))
 
     if not groups:
-        await query.edit_message_text(f"{contact_text}\n\n⚠️ ɴᴏ ɢʀᴏᴜᴘs ʏᴇᴛ!")
+        await query.edit_message_text(
+            "💰 𝖎ꜰ 𝘆𝗼𝘂 𝘄𝗮𝗻𝘁 𝘆𝗼𝘂𝗿 𝖌𝗿𝗼𝘂𝗽 𝖍𝗲𝗿𝗲, 𝗰𝗼𝗻𝘁𝗮𝗰𝘁: @RJVTAX\n⚠️ 𝗣𝗔𝗜𝗗 - Rs 20\n\n⚠️ 𝖓ᴏ 𝖌𝗋𝗈𝗎𝗉𝗌 𝖞𝗲𝖙!"
+        )
         return
 
     keyboard = []
     row = []
-    for g in groups:
+    for i, g in enumerate(groups, 1):
         row.append(InlineKeyboardButton(f"📌 {g['name']}", url=g['link']))
-        if len(row) == 2:  # 2 buttons per row
+        if i % 2 == 0:
             keyboard.append(row)
             row = []
     if row:
         keyboard.append(row)
 
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await query.edit_message_text(contact_text, reply_markup=reply_markup)
+    await query.edit_message_text(
+        "💰 𝖎ꜰ 𝘆𝗼𝘂 𝘄𝗮𝗻𝘁 𝘆𝗼𝘂𝗿 𝖌𝗿𝗼𝘂𝗽 𝖍𝗲𝗿𝗲, 𝗰𝗼𝗻𝘁𝗮𝗰𝘁: @RJVTAX\n⚠️ 𝗣𝗔𝗜𝗗 - Rs 20",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
 
 # ================= BOT STATS =================
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
