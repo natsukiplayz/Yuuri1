@@ -129,8 +129,21 @@ from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandle
 from pymongo import MongoClient
 
 # ------------------ CONFIG ------------------
+
+import os
+from pymongo import MongoClient
+
+# Get Mongo URI from Railway env variable
+MONGO_URI = os.environ.get("MONGO_URI")  # Make sure this env variable exists in Railway
+
+if not MONGO_URI:
+    raise ValueError("Mongo URI not set! Please add it in Railway environment variables.")
+
+client = MongoClient(MONGO_URI)
+db = client["yuuri_bot"]
+groups_collection = db["groups"]
+
 BOT_OWNER_ID = 5773908061  # <-- Insert your Telegram user ID here
-MONGO_URI = ""  # <-- Insert your MongoDB URI here
 
 # ------------------ MongoDB Setup ------------------
 client = MongoClient(MONGO_URI)
