@@ -825,8 +825,10 @@ def main():
     app.add_handler(CommandHandler("stop_b", cancel_broadcast))
     app.add_handler(CommandHandler("register", register))
     app.add_handler(CommandHandler("kill", kill))
+    app.add_handler(CommandHandler("rob", robe))
     app.add_handler(CommandHandler("bounty", bounty))
     app.add_handler(CommandHandler("stats", stats))
+    app.add_handler(CommandHandler("bal", profile))
 
     # Message Handlers
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, auto_reply))
