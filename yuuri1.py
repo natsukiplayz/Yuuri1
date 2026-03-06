@@ -956,7 +956,7 @@ async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Check if bot is mentioned or message is a reply to bot
     is_reply = msg.reply_to_message and msg.reply_to_message.from_user.id == context.bot.id
-    is_called = BOT_NAME.lower() in text
+    is_called = "yuuri" in text or "yuri" in text
 
     if update.effective_chat.type == "private" or is_reply or is_called:
         try:
@@ -974,6 +974,7 @@ async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             # AI reply
             reply = ask_ai(text)
+            print("AI Reply:", reply)
 
             try:
                 await msg.reply_text(reply)
