@@ -79,7 +79,7 @@ async def save_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
 from pymongo import MongoClient
 
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != OWNER_ID:
+    if update.effective_user.id != 5773908061:
         return
 
     # ✅ MongoDB collections
