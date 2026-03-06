@@ -78,24 +78,23 @@ async def save_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         upsert=True
     )
 
-#================= BOT STATS (MongoDB + Styled Labels) =================
-from pymongo import MongoClient
-
+# ================= BOT STATS (MongoDB + Styled Labels) =================
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != 5773908061:
+
+    if update.effective_user.id != OWNER_ID:
         return
 
-    # ✅ MongoDB collections
+    # MongoDB collections
     chats_col = db["chats"]
     users_col = db["users"]
 
-    # 📊 Stats
+    # Stats
     groups = chats_col.count_documents({"type": {"$in": ["group", "supergroup"]}})
     private = chats_col.count_documents({"type": "private"})
     blocked = chats_col.count_documents({"blocked": True})
     total_users = users_col.count_documents({})
 
-    # 📝 Styled labels (directly)
+    # Styled labels
     groups_label = "👥 Gʀᴏᴜᴘs"
     chats_label = "💬 Cʜᴀᴛs"
     users_label = "🧑‍💻 Tᴏᴛᴀʟ Usᴇʀs"
@@ -109,7 +108,7 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"{blocked_label} : `{blocked}`\n"
     )
 
-   await update.message.reply_text(text, parse_mode="Markdown")
+    await update.message.reply_text(text, parse_mode="Markdown")
 
 # ================= LEVEL SYSTEM =================
 def add_xp(user_data, amount=10):
