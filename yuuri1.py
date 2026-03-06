@@ -649,7 +649,7 @@ def ask_ai(text):
         }
 
         data = {
-            "model": "moonshotai/borealis‑13b‑moon‑instruct‑v1",
+            "model": "moonshotai/monolith-1-binst-v1",
             "messages": [
                 {
                     "role": "system",
