@@ -161,8 +161,10 @@ async def bounty(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 #============================KILL (MongoDB + Styled Text)==========================
 import random
+from telegram import Update
+from telegram.ext import ContextTypes
 
-OWNER_ID = 123456789  # <-- Replace with your Telegram user ID
+OWNER_ID = 5773908061  # <-- Replace with your Telegram user ID
 BOT_ID = None  # Will be set dynamically
 
 async def kill(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -206,6 +208,10 @@ async def kill(update: Update, context: ContextTypes.DEFAULT_TYPE):
     killer = get_user(user)
     victim = get_user(target_user)
 
+    # ❌ Check if already dead
+    if victim.get("dead", False):
+        return await msg.reply_text(f"💀 {target_user.first_name} is already dead!")
+
     # 🎲 RANDOM REWARD
     reward = random.randint(50, 299)
     xp_gain = random.randint(1, 19)
@@ -224,6 +230,9 @@ async def kill(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if bounty_reward > 0:
         killer["coins"] += bounty_reward
         victim["bounty"] = 0
+
+    # ❌ Mark victim as dead
+    victim["dead"] = True
 
     # 💾 Save data to MongoDB
     save_user(killer)
