@@ -504,7 +504,7 @@ async def robe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     save_user(target)
 
     await msg.reply_text(
-        f"👀 {robber_user.first_name} Sᴜᴄᴄᴇssғᴜʟʟʏ Rᴏʙʙᴇᴅ {target_user.first_name}\n"
+        f"🕵️ {robber_user.first_name} Sᴜᴄᴄᴇssғᴜʟʟʏ Rᴏʙʙᴇᴅ {target_user.first_name}\n"
         f"💰 Sᴛᴏʟᴇɴ: {steal} Cᴏɪɴs"
     )
 
