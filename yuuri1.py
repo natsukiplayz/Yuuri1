@@ -122,6 +122,92 @@ def add_xp(user_data, amount=10):
 
     save_user(user_data)
 
+# ================= PROFILE =================
+async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = update.effective_message
+    if not msg:
+        return
+
+    # 👇 Detect target user (reply or self)
+    if msg.reply_to_message:
+        target_user = msg.reply_to_message.from_user
+    else:
+        target_user = update.effective_user
+
+    # ✅ Fetch from MongoDB
+    data = users.find_one({"id": target_user.id})
+    if not data:
+        # If user doesn't exist, create default
+        data = {
+            "id": target_user.id,
+            "name": target_user.first_name,
+            "coins": 0,
+            "level": 1,
+            "xp": 0,
+            "kills": 0,
+            "guild": None
+        }
+        users.insert_one(data)
+
+    # ✅ Safe access
+    name = data.get("name", target_user.first_name)
+    coins = data.get("coins", 0)
+    level = data.get("level", 1)
+    xp = data.get("xp", 0)
+    kills = data.get("kills", 0)
+    guild = data.get("guild", None)
+
+    guild_name = guild if guild else "Nᴏɴᴇ"
+
+    # --- GLOBAL RANK ---
+    all_users = list(users.find().sort([
+    ("level", -1),
+    ("xp", -1)
+    ]))
+
+    # Filter out bot itself if present
+    filtered_users = [
+        u for u in all_users
+        if u.get("id") != context.bot.id
+    ]
+
+    # Sort by level, then XP
+    sorted_users = sorted(
+        filtered_users,
+        key=lambda x: (x.get("level", 1), x.get("xp", 0)),
+        reverse=True
+    )
+
+    global_rank = next(
+        (idx for idx, u in enumerate(sorted_users, 1)
+         if u.get("id") == target_user.id),
+        0
+    )
+
+    # ✅ Status (alive/dead if using your kill system)
+    status = "Alive"
+    if data.get("dead", False):
+        status = "Dead"
+
+    # --- MESSAGE ---
+    text = (
+        f"👤 Nᴀᴍᴇ: {name}\n"
+        f"🆔 Iᴅ: {target_user.id}\n\n"
+        f"💰 Cᴏɪɴs: {coins}\n"
+        f"🔪 Kɪʟʟs: {kills}\n"
+        f"☠️ Status: {status}\n"
+        f"⭐ Lᴇᴠᴇʟ: {level}\n"
+        f"⚡ Xᴘ: {xp}/{level*100}\n"
+        f"🏰 Gᴜɪʟᴅ: {guild_name}\n"
+        f"🌐 Gʟᴏʙᴀʟ Rᴀɴᴋ: #{global_rank}"
+    )
+
+    # Send profile message
+    await context.bot.send_message(
+        chat_id=msg.chat.id,
+        text=text
+    )
+
 # ================= BOUNTY =================
 async def bounty(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message.reply_to_message:
