@@ -834,7 +834,8 @@ def main():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, auto_reply))
     app.add_handler(MessageHandler(filters.ALL, save_chat))  # if you still want this
 
-await application.bot.delete_webhook(drop_pending_updates=True)
+async def start_bot():
+    await app.bot.delete_webhook(drop_pending_updates=True)
 
     print("🔥 Yuuri Running...")
     app.run_polling()
