@@ -241,16 +241,18 @@ async def bounty(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 #============================KILL (MongoDB + Styled Text)==========================
 import random
+from datetime import datetime
 from telegram import Update
 from telegram.ext import ContextTypes
 
-OWNER_ID = 5773908061  # <-- Replace with your Telegram user ID
-BOT_ID = None  # Will be set dynamically
+OWNER_ID = 5773908061
+BOT_ID = 8762284514
 
 async def kill(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global BOT_ID
+
     if BOT_ID is None:
-        BOT_ID = context.bot.id  # set bot ID dynamically
+        BOT_ID = context.bot.id
 
     if not update.message:
         return
@@ -276,7 +278,7 @@ async def kill(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if target_user.id == OWNER_ID:
         return await msg.reply_text("😒 Yᴏᴜ Cᴀɴ'ᴛ Kɪʟʟ Mʏ Dᴇᴀʀᴇsᴛ Oᴡɴᴇʀ.")
 
-    # ❌ Cannot kill bot itself
+    # ❌ Cannot kill bot
     if target_user.id == BOT_ID:
         return await msg.reply_text("😂 Nɪᴄᴇ Tʀʏ Oɴ Mᴇ!")
 
@@ -284,15 +286,24 @@ async def kill(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if target_user.id == user.id:
         return await msg.reply_text("❌ Yᴏᴜ Cᴀɴ'ᴛ Kɪʟʟ Yᴏᴜʀsᴇʟғ.")
 
-    # ✅ Get MongoDB economy data
+    # ✅ Get MongoDB data
     killer = get_user(user)
     victim = get_user(target_user)
 
+    # 🛡️ Protection check
+    if victim.get("protect_until"):
+        expire = datetime.strptime(victim["protect_until"], "%Y-%m-%d %H:%M:%S")
+        if expire > datetime.utcnow():
+            return await msg.reply_text(
+                "🛡️ Tʜɪꜱ Uꜱᴇʀ Iꜱ Pʀᴏᴛᴇᴄᴛᴇᴅ.\n"
+                "🔒 Cʜᴇᴄᴋ Pʀᴏᴛᴇᴄᴛɪᴏɴ Tɪᴍᴇ → Cᴏᴍɪɴɢ Sᴏᴏɴ 🔜"
+            )
+
     # ❌ Check if already dead
     if victim.get("dead", False):
-        return await msg.reply_text(f"💀 {target_user.first_name} is already dead!")
+        return await msg.reply_text(f"💀 {target_user.first_name} ɪꜱ ᴀʟʀᴇᴀᴅʏ ᴅᴇᴀᴅ!")
 
-    # 🎲 RANDOM REWARD
+    # 🎲 Random rewards
     reward = random.randint(50, 299)
     xp_gain = random.randint(1, 19)
 
@@ -300,32 +311,32 @@ async def kill(update: Update, context: ContextTypes.DEFAULT_TYPE):
     killer["xp"] = killer.get("xp", 0) + xp_gain
     killer["kills"] = killer.get("kills", 0) + 1
 
-    # 🏰 Add Guild XP if applicable
+    # 🏰 Guild XP
     guild_name = killer.get("guild")
     if guild_name:
         await add_guild_xp(guild_name, context)
 
-    # 💀 CLAIM BOUNTY (only once)
+    # 🎯 Bounty reward
     bounty_reward = victim.get("bounty", 0)
     if bounty_reward > 0:
         killer["coins"] += bounty_reward
         victim["bounty"] = 0
 
-    # ❌ Mark victim as dead
+    # 💀 Mark victim dead
     victim["dead"] = True
 
-    # 💾 Save data to MongoDB
+    # 💾 Save MongoDB
     save_user(killer)
     save_user(victim)
 
-    # 📢 Main kill message
+    # 📢 Kill message
     await msg.reply_text(
         f"👤 {user.first_name} Kɪʟʟᴇᴅ {target_user.first_name}\n"
         f"💰 Eᴀʀɴᴇᴅ: {reward} Cᴏɪɴs\n"
         f"⭐ Gᴀɪɴᴇᴅ: +{xp_gain} Xᴘ"
     )
 
-    # 🎯 Bounty message (if exists)
+    # 🎯 Bounty message
     if bounty_reward > 0:
         await msg.reply_text(
             f"🎯 Bᴏᴜɴᴛʏ Cʟᴀɪᴍᴇᴅ!\n"
@@ -333,62 +344,79 @@ async def kill(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 # ================= ROB SYSTEM =================
-import time
+from datetime import datetime
+
+# 🔧 CONFIG
+OWNER_ID = 5773908061
+BOT_ID = 8762284514
 
 MAX_ROB_PER_ATTEMPT = 10000
 
 async def robe(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
+    if not update.message:
+        return
+
     msg = update.message
     robber_user = update.effective_user
 
+    # ❌ Block in private
+    if update.effective_chat.type == "private":
+        return await msg.reply_text("❌ Tʜɪs Cᴏᴍᴍᴀɴᴅ Cᴀɴ Oɴʟʏ Bᴇ Usᴇᴅ Iɴ Gʀᴏᴜᴘs.")
+
+    # ❌ Must reply
     if not msg.reply_to_message:
-        await msg.reply_text("⚠️ Rᴇᴘʟʏ Tᴏ Sᴏᴍᴇᴏɴᴇ Yᴏᴜ Wᴀɴᴛ Tᴏ Rᴏʙ.")
-        return
+        return await msg.reply_text("⚠️ Rᴇᴘʟʏ Tᴏ Sᴏᴍᴇᴏɴᴇ Yᴏᴜ Wᴀɴᴛ Tᴏ Rᴏʙ.")
 
     target_user = msg.reply_to_message.from_user
 
-    # ❌ cannot rob bot
-    if target_user.is_bot:
-        await msg.reply_text("🤖 Yᴏᴜ Cᴀɴɴᴏᴛ Rᴏʙ A Bᴏᴛ.")
-        return
+    # ❌ Cannot rob bot
+    if target_user.id == BOT_ID or target_user.is_bot:
+        return await msg.reply_text("🤖 Yᴏᴜ Cᴀɴɴᴏᴛ Rᴏʙ A Bᴏᴛ.")
 
-    # ❌ cannot rob yourself
+    # ❌ Cannot rob yourself
     if target_user.id == robber_user.id:
-        await msg.reply_text("❌ Yᴏᴜ Cᴀɴ'ᴛ Rᴏʙ Yᴏᴜʀsᴇʟғ.")
-        return
+        return await msg.reply_text("❌ Yᴏᴜ Cᴀɴ'ᴛ Rᴏʙ Yᴏᴜʀsᴇʟғ.")
 
-    # 👑 owner protection
+    # 👑 Owner protection
     if target_user.id == OWNER_ID:
-        await msg.reply_text("👑 Yᴏᴜ Cᴀɴ'ᴛ Rᴏʙ Mʏ Dᴇᴀʀᴇsᴛ Oᴡɴᴇʀ 😒")
-        return
+        return await msg.reply_text("👑 Yᴏᴜ Cᴀɴ'ᴛ Rᴏʙ Mʏ Dᴇᴀʀᴇsᴛ Oᴡɴᴇʀ 😒")
 
+    # ❌ Need amount
     if not context.args:
-        await msg.reply_text("Usage: /rob <amount>")
-        return
+        return await msg.reply_text("⚠️ Uꜱᴀɢᴇ: /rob <amount>")
 
     try:
         amount = int(context.args[0])
     except:
-        await msg.reply_text("❌ Iɴᴠᴀʟɪᴅ Aᴍᴏᴜɴᴛ.")
-        return
+        return await msg.reply_text("❌ Iɴᴠᴀʟɪᴅ Aᴍᴏᴜɴᴛ.")
 
     robber = get_user(robber_user)
     target = get_user(target_user)
 
-    # 💰 minimum coins check
+    # 🛡️ Protection check
+    if target.get("protect_until"):
+        expire = datetime.strptime(target["protect_until"], "%Y-%m-%d %H:%M:%S")
+        if expire > datetime.utcnow():
+            return await msg.reply_text(
+                "🛡️ Tʜɪꜱ Uꜱᴇʀ Iꜱ Pʀᴏᴛᴇᴄᴛᴇᴅ.\n"
+                "🔒 Yᴏᴜ Cᴀɴɴᴏᴛ Rᴏʙ Tʜᴇᴍ."
+            )
+
+    # 💰 Minimum coins check
     if robber["coins"] < 50:
-        await msg.reply_text(
+        return await msg.reply_text(
             "💰 Yᴏᴜ Nᴇᴇᴅ Aᴛ Lᴇᴀsᴛ 50 Cᴏɪɴs Tᴏ Rᴏʙ Sᴏᴍᴇᴏɴᴇ."
         )
-        return
 
     steal = min(amount, target["coins"], MAX_ROB_PER_ATTEMPT)
 
     if steal <= 0:
-        await msg.reply_text(f"💸 {target_user.first_name} Hᴀs Nᴏ Cᴏɪɴs.")
-        return
+        return await msg.reply_text(
+            f"💸 {target_user.first_name} Hᴀs Nᴏ Cᴏɪɴs."
+        )
 
+    # ✅ Always success
     robber["coins"] += steal
     target["coins"] -= steal
 
@@ -396,7 +424,7 @@ async def robe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     save_user(target)
 
     await msg.reply_text(
-        f"👤 {robber_user.first_name} Rᴏʙʙᴇᴅ {target_user.first_name}\n"
+        f"🕵️ {robber_user.first_name} Sᴜᴄᴄᴇssғᴜʟʟʏ Rᴏʙʙᴇᴅ {target_user.first_name}\n"
         f"💰 Sᴛᴏʟᴇɴ: {steal} Cᴏɪɴs"
     )
 
