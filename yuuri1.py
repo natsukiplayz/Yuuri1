@@ -441,6 +441,84 @@ async def daily(update, context):
         f"🎁 Dᴀɪʟʏ Rᴇᴡᴀʀᴅ: +{reward} Cᴏɪɴs"
     )
 
+# ================= PROTECT SYSTEM =================
+from datetime import datetime, timedelta
+
+async def protect(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    if not context.args:
+        return await update.message.reply_text(
+            "🛡️ Pʀᴏᴛᴇᴄᴛɪᴏɴ Sʏsᴛᴇᴍ\n\n"
+            "💰 Cᴏsᴛs:\n"
+            "1ᴅ → 200$\n"
+            "2ᴅ → 400$\n"
+            "3ᴅ → 600$\n\n"
+            "Uꜱᴀɢᴇ: /protect 1d|2d|3d"
+        )
+
+    arg = context.args[0].lower()
+
+    durations = {
+        "1d": (1, 200),
+        "2d": (2, 400),
+        "3d": (3, 600)
+    }
+
+    if arg not in durations:
+        return await update.message.reply_text(
+            "🛡️ Iɴᴠᴀʟɪᴅ Pʀᴏᴛᴇᴄᴛɪᴏɴ Tɪᴍᴇ.\n\n"
+            "💰 Aᴛ Lᴇᴀꜱᴛ 200$ Nᴇᴇᴅᴇᴅ Fᴏʀ 1ᴅ Pʀᴏᴛᴇᴄᴛɪᴏɴ.\n"
+            "Uꜱᴀɢᴇ: /protect 1d|2d|3d"
+        )
+
+    days, price = durations[arg]
+
+    user = get_user(update.effective_user)
+
+    # 💰 Check coins
+    if user["coins"] < price:
+        return await update.message.reply_text(
+            "💰 Nᴏᴛ Eɴᴏᴜɢʜ Cᴏɪɴs.\n"
+            f"🛡️ {arg} Pʀᴏᴛᴇᴄᴛɪᴏɴ Cᴏsᴛꜱ {price}$."
+        )
+
+    now = datetime.utcnow()
+
+  protect_until = user.get("protect_until")
+if protect_until:
+    expire = datetime.strptime(protect_until, "%Y-%m-%d %H:%M:%S")
+    if expire > now:
+
+        remaining = expire - now
+        hours, remainder = divmod(int(remaining.total_seconds()), 3600)
+        minutes, _ = divmod(remainder, 60)
+
+        return await update.message.reply_text(
+            "🛡️ Yᴏᴜ Aʀᴇ Aʟʀᴇᴀᴅʏ Pʀᴏᴛᴇᴄᴛᴇᴅ.\n"
+            f"⏳ Tɪᴍᴇ Lᴇꜰᴛ: {hours}ʜ {minutes}ᴍ\n"
+            f"🔒 Uɴᴛɪʟ: {protect_until}"
+        )
+
+    # 💰 Deduct coins
+    user["coins"] -= price
+
+    expire_time = now + timedelta(days=days)
+    user["protect_until"] = expire_time.strftime("%Y-%m-%d %H:%M:%S")
+
+    save_user(user)
+
+    # ☠️ If dead
+    if user.get("dead", False):
+        return await update.message.reply_text(
+            f"🛡️ Yᴏᴜ Aʀᴇ Nᴏᴡ Pʀᴏᴛᴇᴄᴛᴇᴅ Fᴏʀ {arg}.\n"
+            "🔄 Bᴜᴛ Yᴏᴜʀ Sᴛᴀᴛᴜꜱ Iꜱ Sᴛɪʟʟ Dᴇᴀᴅ Uɴᴛɪʟ Rᴇᴠɪᴠᴇ."
+        )
+
+    # ✅ Normal message
+    await update.message.reply_text(
+        f"🛡️ Yᴏᴜ Aʀᴇ Nᴏᴡ Pʀᴏᴛᴇᴄᴛᴇᴅ Fᴏʀ {arg}."
+    )
+
 # ================= REGISTER =================
 from telegram import Update
 from telegram.ext import ContextTypes
