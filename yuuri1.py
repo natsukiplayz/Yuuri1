@@ -162,21 +162,21 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     first_name = msg.from_user.first_name or "Usᴇʀ"
 
-   keyboard = [
-       [InlineKeyboardButton("📰 Uᴘᴅᴀᴛᴇs", url="https://t.me/yuuriXupdates"),
-       InlineKeyboardButton("💬 Sᴜᴘᴘᴏʀᴛ ᴄʜᴀᴛ", url="https://t.me/DreamSpaceZ")],
+    keyboard = [
+        [InlineKeyboardButton("📰 Uᴘᴅᴀᴛᴇs", url="https://t.me/yuuriXupdates"),
+         InlineKeyboardButton("💬 Sᴜᴘᴘᴏʀᴛ ᴄʜᴀᴛ", url="https://t.me/DreamSpaceZ")],
 
-      [InlineKeyboardButton("👥 Gʀᴏᴜᴘs", callback_data="show_groups"),
-       InlineKeyboardButton("🤖 Sᴇᴄᴏɴᴅ ʙᴏᴛ", url="https://t.me/Im_yuukibot")],
+        [InlineKeyboardButton("👥 Gʀᴏᴜᴘs", callback_data="show_groups"),
+         InlineKeyboardButton("🤖 Sᴇᴄᴏɴᴅ ʙᴏᴛ", url="https://t.me/Im_yuukibot")],
 
-      [InlineKeyboardButton("➕ Aᴅᴅ Mᴇ Tᴏ Yᴏᴜʀ Gʀᴏᴜᴘ", url="https://t.me/YOUR_BOT_USERNAME?startgroup=true")]
+        [InlineKeyboardButton("➕ Aᴅᴅ Mᴇ Tᴏ Yᴏᴜʀ Gʀᴏᴜᴘ", url="https://t.me/YOUR_BOT_USERNAME?startgroup=true")]
     ]
 
     welcome_text = (
         f"✨🎉 𝗛ᴇʟʟᴏ {first_name}! 🎉✨\n\n"
         "💥 𝗪ᴇʟᴄᴏᴍᴇ 𝘁ᴏ 𝘆ᴏᴜʀ 𝗨ʟᴛɪᴍ𝗮ᴛᴇ 𝗕𝗢𝗧 💥\n\n"
-        "📌 𝗧ʜɪs 𝗕𝗢𝗧 𝗵𝗲𝗹𝗽𝘀 ʏᴏᴜ 𝗰𝗵𝗲𝗰𝗸 𝗨𝗣𝗗𝗔𝗧𝗘𝗦, 𝗝𝗼𝗶𝗻 𝗚𝗥𝗢𝗨𝗣𝗦, 𝗮𝗻𝗱 𝗺𝗮𝗻𝗮𝗴𝗲 𝗮𝗹𝗹 𝗲𝗮sɪʟʏ!\n\n"
-        "💡 𝗔𝗹𝘀𝗼, 𝗮𝗱𝗱 𝗺𝗲 𝘁𝗼 𝘆𝗼𝘂𝗿 𝗴𝗿𝗼𝘂𝗽 𝘄𝗶𝘁𝗵 𝗷𝘂𝘀𝘁 𝗼𝗻𝗲 𝗰𝗹𝗶𝗰𝗸!"
+        "📌 𝗧ʜɪs 𝗕𝗢𝗧 𝗵𝗲𝗹𝗽𝘀 ʏᴏᴜ 𝗰𝗵𝗲𝗰𝗸 𝗨𝗣𝗗ᴀᴛᴇs, 𝗝ᴏɪɴ Gʀᴏᴜᴘs, 𝗮ɴᴅ 𝗺ᴀɴᴀɢᴇ 𝗮ʟʟ 𝗲ᴀsɪʟʏ!\n\n"
+        "💡 𝗔ʟsᴏ, 𝗮ᴅᴅ 𝗺ᴇ ᴛᴏ ʏᴏᴜʀ 𝗴ʀᴏᴜᴘ ᴡɪᴛʜ ᴊᴜsᴛ ᴏɴᴇ ᴄʟɪᴄᴋ!"
     )
 
     await msg.reply_text(welcome_text, reply_markup=InlineKeyboardMarkup(keyboard))
