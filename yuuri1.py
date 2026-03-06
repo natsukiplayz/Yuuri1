@@ -24,7 +24,7 @@ dns.resolver.default_resolver.nameservers = ['8.8.8.8', '1.1.1.1']
 # ================= CONFIG =================
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 BOT_NAME = "yuuri"
-OWNER_ID = 5773908061
+OWNER_ID = int(os.getenv("OWNER_ID", "5773908061"))
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 MONGO_URI = os.getenv("MONGO_URI")
 
