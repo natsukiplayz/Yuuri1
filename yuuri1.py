@@ -901,6 +901,8 @@ async def broad_gc(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 # ---------------- AI FUNCTION ----------------
+import httpx
+
 async def ask_ai_async(text: str):
     if not GROQ_API_KEY:
         return "🤖 AI not configured."
