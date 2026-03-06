@@ -34,6 +34,17 @@ db = client["yuuri_db"]
 users = db["users"]
 guilds = db["guilds"]
 
+# ================= MONGODB =================
+client = MongoClient(MONGO_URI)  # <- after the DNS fix!
+db = client["yuuri_db"]
+
+users = db["users"]
+guilds = db["guilds"]
+
+# FIX (alias so old functions work)
+users_col = users
+chats_col = db["chats"]
+
 # ================= LOG =================
 logging.basicConfig(level=logging.INFO)
 
