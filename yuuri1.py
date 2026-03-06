@@ -123,15 +123,18 @@ async def save_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         upsert=True
     )
 
-#start_and_paid_things====================================
-from telegram.ext import ApplicationBuilder
+# ====== GLOBALS ======
+GROUPS = [None, None, None, None, None]  # store 5 groups max
 
-# /start commandtelegram.ext
+# ====== IMPORTS ======
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
+
+# ====== START COMMAND ======
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
     if not msg:
         return
-
     first_name = msg.from_user.first_name or "Usᴇʀ"
 
     keyboard = [
@@ -143,112 +146,105 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    # Fancy multi-line welcome message
     welcome_text = (
         f"✨🎉 𝗛ᴇʟʟᴏ {first_name}! 🎉✨\n\n"
         "💥 𝗪ᴇʟᴄᴏᴍᴇ 𝘁ᴏ 𝘆ᴏᴜʀ ᴜʟᴛɪᴍᴀᴛᴇ 𝗯ᴏᴛ 💥\n\n"
         "📌 𝗧ʜɪs 𝗯𝗼𝘁 𝗵𝗲𝗹𝗽s ʏᴏᴜ 𝗰𝗵𝗲𝗰𝗸 𝗨𝗣𝗗𝗔𝗧𝗘𝗦, 𝗝𝗼𝗶𝗻 𝗚𝗥𝗢𝗨𝗣𝗦, 𝗮𝗻𝗱 𝗺𝗮𝗻𝗮𝗴𝗲 𝗮𝗹𝗹 𝗲𝗮sɪʟʏ!\n\n"
         "💡 𝗔𝗹𝘀𝗼, 𝗮𝗱𝗱 𝗺𝗲 𝘁𝗼 𝘆𝗼𝘂𝗿 𝗴𝗿𝗼𝘂𝗽 𝘄𝗶𝘁𝗵 𝗷𝘂𝘀𝘁 𝗼𝗻𝗲 𝗰𝗹𝗶𝗰𝗸!"
     )
-
     await msg.reply_text(welcome_text, reply_markup=reply_markup)
 
 
-# Callback for "Groups" button
-async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    
-    if query.data == "show_groups":
-        # Font-style contact text
-        contact_text = (
-            "💰 𝗜ꜰ ʏᴏᴜ ᴡᴀɴᴛ ʏᴏᴜʀ ɢʀᴏᴜᴘ ʜᴇʀᴇ, ᴄᴏɴᴛᴀᴄᴛ : @rjvtax\n"
-            "⚠️ 𝗣ᴀɪᴅ - ʀs 20"
-        )
-        
-        if not any(GROUPS):
-            await query.edit_message_text(f"{contact_text}\n\n⚠️ 𝗡ᴏ 𝗴ʀᴼᴜᴘs ʏᴇᴛ!")
-            return
-        
-        keyboard = []
-        row = []
-        for g in GROUPS:
-            if g:
-                name, link = g
-                row.append(InlineKeyboardButton(f"📌 {name}", url=link))
-            if len(row) == 2:
-                keyboard.append(row)
-                row = []
-        if row:
-            keyboard.append(row)
-        
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(contact_text, reply_markup=reply_markup)
-
-from telegram.ext import ApplicationBuilder
-
-# /setgroup <number> <name> <link>
+# ====== SET GROUP ======
 async def setgroup_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global GROUPS
     msg = update.message
     if not msg or not context.args:
         await msg.reply_text("⚠️ 𝗨sᴀɢᴇ: /setgroup <number_max_5> <group_name> <link>")
         return
-    
+
     try:
         number = int(context.args[0])
         if number < 1 or number > 5:
-            await msg.reply_text("⚠️ 𝗡ᴜᴍʙᴇʀ ᴍᴜsᴛ ʙᴇᴛᴡᴇᴇɴ 1 ᴀɴᴅ 5")
+            await msg.reply_text("⚠️ 𝗡ᴜᴍʙᴇʀ 𝗺𝘂s𝘁 𝗯𝗲 𝗯𝗲𝘁𝘄𝗲𝗲𝗻 1 𝗮𝗻𝗱 5")
             return
     except ValueError:
-        await msg.reply_text("⚠️ 𝗜ɴᴠᴀʟɪᴅ ɴᴜᴍʙᴇʀ")
+        await msg.reply_text("⚠️ 𝗜𝗻𝘃𝗮𝗹𝗶𝗱 𝗻𝘂𝗺𝗯𝗲𝗿")
         return
-    
+
     if len(context.args) < 3:
-        await msg.reply_text("⚠️ 𝗨sᴀɢᴇ: /setgroup <number_max_5> <group_name> <link>")
+        await msg.reply_text("⚠️ 𝗨sᴀ𝗴𝗲: /setgroup <number_max_5> <group_name> <link>")
         return
-    
+
     group_name = " ".join(context.args[1:-1])
     group_link = context.args[-1]
-    
     GROUPS[number-1] = (group_name, group_link)
-    
-    # Fancy font-style text
+
     await msg.reply_text(
-        f"✅ 𝗚ʀᴏᴜᴘ 𝗦ᴇᴛ ᴀᴛ 𝗣ᴏsɪᴛɪᴏɴ {number}:\n"
-        f"📌 𝗡ᴀᴍᴇ: {group_name}\n"
-        f"🔗 𝗟ɪɴᴋ: {group_link}"
+        f"✅ 𝗚ʀᴏᴜᴘ 𝗦ᴇᴛ 𝗮𝘁 𝗣𝗼sɪᴛɪ𝗼𝗻 {number}:\n"
+        f"📌 𝗡ᴀ𝗺𝗲: {group_name}\n"
+        f"🔗 𝗟ɪ𝗻𝗸: {group_link}"
     )
 
 
-# /stop_group <number>
+# ====== STOP GROUP ======
 async def stop_group_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global GROUPS
     msg = update.message
     if not msg or not context.args:
-        await msg.reply_text("⚠️ 𝗨sᴀɢᴇ: /stop_group <number_max_5>")
+        await msg.reply_text("⚠️ 𝗨sᴀ𝗴𝗲: /stop_group <number_max_5>")
         return
-    
+
     try:
         number = int(context.args[0])
         if number < 1 or number > 5:
-            await msg.reply_text("⚠️ 𝗡ᴜᴍʙᴇʀ ᴍᴜsᴛ ʙᴇᴛᴡᴇᴇɴ 1 ᴀɴᴅ 5")
+            await msg.reply_text("⚠️ 𝗡ᴜ𝗺ʙ𝗲𝗿 𝗺𝘂s𝘁 𝗯𝗲𝘁𝘄𝗲𝗲𝗻 1 𝗮𝗻𝗱 5")
             return
     except ValueError:
-        await msg.reply_text("⚠️ 𝗜ɴᴠᴀʟɪᴅ ɴᴜᴍʙᴇʀ")
+        await msg.reply_text("⚠️ 𝗜𝗻𝘃𝗮𝗹𝗶𝗱 𝗻𝘂𝗺𝗯𝗲𝗿")
         return
-    
+
     if not GROUPS[number-1]:
-        await msg.reply_text(f"⚠️ 𝗡ᴏ 𝗚ʀᴏᴜᴘ 𝗙ᴏᴜɴᴅ ᴀᴛ 𝗣ᴏsɪᴛɪᴏɴ {number}")
+        await msg.reply_text(f"⚠️ 𝗡ᴏ 𝗚ʀ𝗼𝘂𝗽 𝗙𝗼𝘂𝗻𝗱 𝗮𝘁 𝗣𝗼sɪᴛɪ𝗼𝗻 {number}")
         return
-    
+
     removed_group = GROUPS[number-1][0]
     GROUPS[number-1] = None
-    
+
     await msg.reply_text(
-        f"🗑️ 𝗚ʀᴏᴜᴘ 𝗥ᴇᴍᴏᴠᴇᴅ 𝗙ʀᴏᴍ 𝗣ᴏsɪᴛɪᴏɴ {number}:\n"
-        f"📌 𝗡ᴀᴍᴇ: {removed_group}"
+        f"🗑️ 𝗚ʀ𝗼𝘂𝗽 𝗥𝗲𝗺𝗼𝘃𝗲𝗱 𝗙𝗿𝗼𝗺 𝗣𝗼sɪᴛ𝗶𝗼𝗻 {number}:\n"
+        f"📌 𝗡ᴀ𝗺𝗲: {removed_group}"
     )
+
+
+# ====== CALLBACK HANDLER ======
+async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    contact_text = (
+        "💰 𝗜ꜰ 𝘆𝗼𝘂 𝘄𝗮𝗻𝘁 𝘆𝗼𝘂𝗿 𝗴𝗿𝗼𝘂𝗽 𝗵𝗲𝗿𝗲, 𝗰𝗼𝗻𝘁𝗮𝗰𝘁 : @rjvtax\n"
+        "⚠️ 𝗣𝗮𝗶𝗱 - ʀs 20"
+    )
+
+    if not any(GROUPS):
+        await query.edit_message_text(f"{contact_text}\n\n⚠️ 𝗡ᴏ 𝗴𝗿𝗼ᴜᴘs 𝘆𝗲𝘁!")
+        return
+
+    keyboard = []
+    row = []
+    for g in GROUPS:
+        if g:
+            name, link = g
+            row.append(InlineKeyboardButton(f"📌 {name}", url=link))
+        if len(row) == 2:
+            keyboard.append(row)
+            row = []
+    if row:
+        keyboard.append(row)
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await query.edit_message_text(contact_text, reply_markup=reply_markup)
 
 # ================= BOT STATS =================
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
