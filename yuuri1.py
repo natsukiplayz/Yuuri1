@@ -896,8 +896,9 @@ async def broad_gc(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 #====================Yuuri_Talks_Feature======================
+import httpx  # async HTTP client
 
-def ask_ai(text):
+async def ask_ai_async(text):
     if not GROQ_API_KEY:
         return "🤖 AI not configured."
 
@@ -928,11 +929,12 @@ def ask_ai(text):
             ]
         }
 
-        response = requests.post(url, headers=headers, json=data)
+        async with httpx.AsyncClient(timeout=20) as client:
+            response = await client.post(url, headers=headers, json=data)
 
         if response.status_code != 200:
-            print("Status:", response.status_code)
-            print("Response:", response.text)
+            print("Yuuri Status:", response.status_code)
+            print("Yuuri Response:", response.text)
             return "⚠️ Yuuri Server error"
 
         return response.json()["choices"][0]["message"]["content"]
@@ -945,7 +947,6 @@ def ask_ai(text):
 async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
     if not msg or not msg.text:
-        # Skip non-text messages (stickers, photos, etc.)
         return
 
     text = msg.text.lower()
@@ -972,9 +973,9 @@ async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception as e:
                 print("Typing failed:", e)
 
-            # AI reply
-            reply = ask_ai(text)
-            print("AI Reply:", reply)
+            # Async AI reply
+            reply = await ask_ai_async(text)
+            print("Yuuri Reply:", reply)
 
             try:
                 await msg.reply_text(reply)
