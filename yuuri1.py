@@ -949,13 +949,19 @@ async def ask_ai_async(text):
         print("AI ERROR:", e)
         return "⚠️ Error Talking To Yuuri"
 
+import datetime
+
+BOT_START_TIME = datetime.datetime.utcnow()  # mark bot start
 
 #===========================Auto_Reply=========================
 async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Auto reply handler for Yuuri."""
-
+    """Yuuri replies only to messages after bot startup."""
     msg = update.message
     if not msg or not msg.text:
+        return
+
+    # Ignore messages sent before bot started
+    if msg.date < BOT_START_TIME:
         return
 
     text = msg.text.lower()
@@ -964,17 +970,12 @@ async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if text.startswith("/"):
         return
 
-    # Check if bot is mentioned or message is a reply to bot
+    # Reply only if private chat, or message mentions "yuuri"/"yuri", or is reply to bot
     is_reply = msg.reply_to_message and msg.reply_to_message.from_user.id == BOT_ID
     is_called = "yuuri" in text or "yuri" in text
 
-    # Only reply if private chat, or mentioned, or replying to bot
     if update.effective_chat.type == "private" or is_reply or is_called:
         try:
-            # Add XP (your function)
-            user_data = get_user(update.effective_user)
-            add_xp(user_data, 5)
-
             # Typing action
             try:
                 await context.bot.send_chat_action(
@@ -984,7 +985,7 @@ async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception as e:
                 print("Typing failed:", e)
 
-            # Call AI
+            # Call AI with current message only
             reply = await ask_ai_async(text)
             print("Yuuri Reply:", reply)
 
