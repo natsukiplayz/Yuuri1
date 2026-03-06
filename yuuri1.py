@@ -901,31 +901,35 @@ async def broad_gc(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"📢 Gʀᴏᴜᴘ Bʀᴏᴀᴅᴄᴀsᴛ {status}\n\n✅ Sᴇɴᴛ: {success}\n❌ Fᴀɪʟᴇᴅ: {failed}\n📦 Tᴏᴛᴀʟ: {total}\n⏱ Tɪᴍᴇ: {total_time}s"
     )
 
+#AniWorld================================================
+
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+from telegram.ext import ContextTypes
 
-async def anime_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# /aniworld command
+async def aniworld_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
-    if not msg or not msg.text:
+    if not msg:
         return
 
-    args = context.args
-    if not args:
-        await msg.reply_text("Usage: /ani <anime_name>")
-        return
-
-    anime_name = " ".join(args)
-    anime_query = anime_name.replace(" ", "+")
-    link = f"https://animebot.example.com/search?query={anime_query}"
-
-    keyboard = [[InlineKeyboardButton("Watch Anime", url=link)]]
+    keyboard = [
+        [InlineKeyboardButton("📛🥳 Hɪɴᴅɪ", url="https://t.me/+bztScKui5jIyYzBl")],
+        [InlineKeyboardButton("Eɴɢʟɪsʜ", callback_data="coming_soon")],
+        [InlineKeyboardButton("Jᴀᴘᴀɴᴇsᴇ", callback_data="coming_soon")]
+    ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await msg.reply_text(
-        f"Here is the link for **{anime_name}**:",
-        reply_markup=reply_markup,
-        parse_mode="Markdown"
+        "Cʜᴏᴏsᴇ ʏᴏᴜʀ ʟᴀɴɢᴜᴀɢᴇ ғᴏʀ ᴀɴɪᴍᴇ ᴇᴘɪsᴏᴅᴇs:",
+        reply_markup=reply_markup
     )
+
+# Callback for English/Japanese
+async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if query.data == "coming_soon":
+        await query.edit_message_text("⚠️ Cᴏᴍɪɴɢ Sᴏᴏɴ!")
 
 # ---------------- AI FUNCTION ----------------
 import httpx
@@ -1033,7 +1037,7 @@ def main():
     app.add_handler(CommandHandler("rankers", rankers))
 
     #fun cartoons and anime
-    app.add_handler(CommandHandler("ani", anime_command))
+    app.add_handler(CommandHandler("aniworld", aniworld_command))
 
     # Message Handlers
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, auto_reply))
