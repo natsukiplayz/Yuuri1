@@ -813,29 +813,28 @@ async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ================= MAIN =================
 def main():
-
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-# Command Handlers  
-    app.add_handler(CommandHandler("daily", daily))  
-    app.add_handler(CommandHandler("shop", shop))  
-    app.add_handler(CommandHandler("buyy", purchase))  
-    app.add_handler(CommandHandler("toprichest", richest))  
-    app.add_handler(CommandHandler("broad_c", broad_c))  
-    app.add_handler(CommandHandler("broad_gc", broad_gc))  
-    app.add_handler(CommandHandler("stop_b", cancel_broadcast))  
-    app.add_handler(CommandHandler("register", register))  
-    app.add_handler(CommandHandler("kill", kill))  
-    app.add_handler(CommandHandler("rob", robe))  
-    app.add_handler(CommandHandler("bounty", bounty))  
-    app.add_handler(CommandHandler("stats", stats))  
-    app.add_handler(CommandHandler("bal", profile))  
+    # Command Handlers
+    app.add_handler(CommandHandler("daily", daily))
+    app.add_handler(CommandHandler("shop", shop))
+    app.add_handler(CommandHandler("buyy", purchase))
+    app.add_handler(CommandHandler("toprichest", richest))
+    app.add_handler(CommandHandler("broad_c", broad_c))
+    app.add_handler(CommandHandler("broad_gc", broad_gc))
+    app.add_handler(CommandHandler("stop_b", cancel_broadcast))
+    app.add_handler(CommandHandler("register", register))
+    app.add_handler(CommandHandler("kill", kill))
+    app.add_handler(CommandHandler("rob", robe))
+    app.add_handler(CommandHandler("bounty", bounty))
+    app.add_handler(CommandHandler("stats", stats))
+    app.add_handler(CommandHandler("bal", profile))
 
-# Message Handlers  
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, auto_reply))  
-    app.add_handler(MessageHandler(filters.ALL, save_chat))  
+    # Message Handlers
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, auto_reply))
+    app.add_handler(MessageHandler(filters.ALL, save_chat))
 
-    print("🔥 Yuuri Running...")  
+    print("🔥 Yuuri Running...")
     app.run_polling()
 
 if __name__ == "__main__":
