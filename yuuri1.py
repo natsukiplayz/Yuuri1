@@ -811,7 +811,7 @@ async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             print("Auto-reply handler error:", e)
 
-================= MAIN =================
+# ================= MAIN =================
 
 def main():
 app = ApplicationBuilder().token(BOT_TOKEN).build()
