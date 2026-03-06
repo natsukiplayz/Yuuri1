@@ -122,6 +122,100 @@ async def save_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         upsert=True
     )
 
+#start_and_paid_things====================================
+
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler
+
+# Store groups in memory (numbered 1-5)
+GROUPS = [None, None, None, None, None]  # Each item will be a tuple (name, link)
+
+# /start command
+async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = update.message
+    if not msg:
+        return
+    
+    first_name = msg.from_user.first_name or "Usᴇʀ"
+    
+    keyboard = [
+        [InlineKeyboardButton("📰 𝗨𝗣𝗗𝗔𝗧𝗘𝗦", url="https://t.me/yuuriXupdates"),
+         InlineKeyboardButton("💬 𝗦𝗨𝗣𝗣𝗢𝗥𝗧 𝗖𝗛𝗔𝗧", url="https://t.me/DreamSpaceZ")],
+        [InlineKeyboardButton("👥 𝗚𝗥𝗢𝗨𝗣𝗦", callback_data="show_groups"),
+         InlineKeyboardButton("🤖 𝗦𝗘𝗖𝗢𝗡𝗗 𝗕𝗢𝗧", url="https://t.me/Im_yuukibot")],
+        [InlineKeyboardButton("➕ 𝗔𝗗𝗗 𝗠𝗘 𝗧𝗢 𝗬𝗢𝗨𝗥 𝗚𝗥𝗢𝗨𝗣", url="https://t.me/YOUR_BOT_USERNAME?startgroup=true")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    welcome_text = (
+        f"✨🎉 𝗛ᴇʟʟᴏ {first_name}! 🎉✨\n"
+        "💥 𝗪ᴇʟᴄᴏᴍᴇ 𝘁ᴏ 𝘆ᴏᴜʀ ᴜʟᴛɪᴍᴀᴛᴇ 𝗯ᴏᴛ 💥\n"
+        "📌 𝗖ʜᴇᴄᴋ ᴏᴜᴛ 𝗨𝗣𝗗𝗔𝗧𝗘𝗦, 𝗦𝗨𝗣𝗣𝗢𝗥𝗧, 𝗔𝗡𝗗 𝗚𝗥𝗢𝗨𝗣𝗦 ᴇᴀsɪʟʏ!"
+    )
+    
+    await msg.reply_text(welcome_text, reply_markup=reply_markup)
+
+# /setgroup <number> <name> <link>
+async def setgroup_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = update.message
+    if not msg or not context.args:
+        await msg.reply_text("Usage: /setgroup <number_max_5> <group_name> <link>")
+        return
+    
+    try:
+        number = int(context.args[0])
+        if number < 1 or number > 5:
+            await msg.reply_text("⚠️ 𝗡ᴜᴍʙᴇʀ ᴍᴜsᴛ ʙᴇ ʙᴇᴛᴡᴇᴇɴ 1 ᴀɴᴅ 5")
+            return
+    except ValueError:
+        await msg.reply_text("⚠️ 𝗜ɴᴠᴀʟɪᴅ ɴᴜᴍʙᴇʀ")
+        return
+    
+    if len(context.args) < 3:
+        await msg.reply_text("⚠️ 𝗨sᴀɢᴇ: /setgroup <number_max_5> <group_name> <link>")
+        return
+    
+    group_name = context.args[1]
+    group_link = context.args[2]
+    
+    GROUPS[number-1] = (group_name, group_link)
+    
+    await msg.reply_text(f"✅ 𝗚ʀᴏᴜᴘ 𝗦ᴇᴛ ᴀᴛ ᴘᴏsɪᴛɪᴏɴ {number}:\n📌 {group_name}")
+
+# Callback for groups button
+async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    if query.data == "show_groups":
+        # Contact info in font style first
+        contact_text = "💰 𝗜ꜰ ʏᴏᴜ ᴡᴀɴᴛ ʏᴏᴜʀ ɢʀᴏᴜᴘ ʜᴇʀᴇ ʏᴏᴜ ᴄᴀɴ ᴄᴏɴᴛᴀᴄᴛ : @rjvtax\n⚠️ 𝗣ᴀɪᴅ - ʀs 20"
+        
+        if not any(GROUPS):
+            await query.edit_message_text(f"{contact_text}\n\n⚠️ 𝗡ᴏ 𝗴ʀᴏᴜᴘs ʏᴇᴛ!")
+            return
+        
+        keyboard = []
+        row = []
+        for g in GROUPS:
+            if g:
+                name, link = g
+                row.append(InlineKeyboardButton(f"📌 {name}", url=link))
+            if len(row) == 2:
+                keyboard.append(row)
+                row = []
+        if row:
+            keyboard.append(row)
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await query.edit_message_text(contact_text, reply_markup=reply_markup)
+
+# Add handlers
+app.add_handler(CommandHandler("start", start_command))
+app.add_handler(CommandHandler("setgroup", setgroup_command))
+app.add_handler(CallbackQueryHandler(callback_handler))
+
 # ================= BOT STATS =================
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -1040,10 +1134,15 @@ def main():
     app.add_handler(CommandHandler("protect", protect))
     app.add_handler(CommandHandler("rankers", rankers))
 
+    #paid_and_start_things_firee
+    app.add_handler(CommandHandler("start", start_command))
+    app.add_handler(CommandHandler("setgroup", setgroup_command))
+
     #fun cartoons and anime
     app.add_handler(CommandHandler("aniworld", aniworld_command))
 
     # Message Handlers
+    app.add_handler(CallbackQueryHandler(callback_handler))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, auto_reply))
     app.add_handler(MessageHandler(filters.ALL, save_chat))
 
