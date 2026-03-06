@@ -122,25 +122,25 @@ def add_xp(user_data, amount=10):
 # ================= BOUNTY =================
 async def bounty(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message.reply_to_message:
-        return await update.message.reply_text(fancy("Reply to someone to place bounty."))
+        return await update.message.reply_text("Reply to someone to place bounty.")
 
     if not context.args:
-        return await update.message.reply_text(fancy("Use: /bounty <amount>"))
+        return await update.message.reply_text("Use: /bounty <amount>")
 
     try:
         amount = int(context.args[0])
     except ValueError:
-        return await update.message.reply_text(fancy("❌ Aᴍᴏᴜɴᴛ ᴍᴜsᴛ ʙᴇ ᴀ ɴᴜᴍʙᴇʀ."))
+        return await update.message.reply_text("❌ Aᴍᴏᴜɴᴛ ᴍᴜsᴛ ʙᴇ ᴀ ɴᴜᴍʙᴇʀ.")
 
     sender = get_user(update.effective_user)
     target_user = update.message.reply_to_message.from_user
     target = get_user(target_user)
 
     if sender["coins"] < amount:
-        return await update.message.reply_text(fancy("❌ Nᴏᴛ ᴇɴᴏᴜɢʜ Cᴏɪɴs."))
+        return await update.message.reply_text("❌ Nᴏᴛ ᴇɴᴏᴜɢʜ Cᴏɪɴs.")
 
     if target_user.id == update.effective_user.id:
-        return await update.message.reply_text(fancy("❌ Yᴏᴜ ᴄᴀɴ'ᴛ ᴘʟᴀᴄᴇ ʙᴏᴜɴᴛʏ ᴏɴ ʏᴏᴜʀsᴇʟғ."))
+        return await update.message.reply_text("❌ Yᴏᴜ ᴄᴀɴ'ᴛ ᴘʟᴀᴄᴇ ʙᴏᴜɴᴛʏ ᴏɴ ʏᴏᴜʀsᴇʟғ.")
 
     # Deduct coins from sender
     sender["coins"] -= amount
@@ -153,13 +153,11 @@ async def bounty(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Fancy reply
     await update.message.reply_text(
-        fancy(
             f"🎯 Bᴏᴜɴᴛʏ Pʟᴀᴄᴇᴅ!\n\n"
             f"👤 Tᴀʀɢᴇᴛ: {target_user.first_name}\n"
             f"💰 Rᴇᴡᴀʀᴅ: {amount} Cᴏɪɴs\n\n"
             f"⚔️ Kɪʟʟ ᴛʜᴇᴍ Tᴏ Cʟᴀɪᴍ!"
         )
-    )
 
 #============================KILL (MongoDB + Styled Text)==========================
 import random
@@ -428,11 +426,25 @@ SHOP_ITEMS = {
     "hepikute": (1500, "💖")
 }
 
+# Pre-styled font helper (optional, you can style directly)
+def font_text(text: str) -> str:
+    # Replace only letters/numbers you want in font style
+    font_map = {
+        "A":"ᴬ","B":"ᴮ","C":"ᶜ","D":"ᴰ","E":"ᴱ","F":"ᶠ","G":"ᴳ","H":"ᴴ","I":"ᴵ","J":"ᴶ",
+        "K":"ᴷ","L":"ᴸ","M":"ᴹ","N":"ᴺ","O":"ᴼ","P":"ᴾ","Q":"ᵠ","R":"ᴿ","S":"ˢ","T":"ᵀ",
+        "U":"ᵁ","V":"ⱽ","W":"ᵂ","X":"ˣ","Y":"ʸ","Z":"ᶻ",
+        "a":"ᵃ","b":"ᵇ","c":"ᶜ","d":"ᵈ","e":"ᵉ","f":"ᶠ","g":"ᵍ","h":"ʰ","i":"ᶦ","j":"ʲ",
+        "k":"ᵏ","l":"ˡ","m":"ᵐ","n":"ⁿ","o":"ᵒ","p":"ᵖ","q":"ᵠ","r":"ʳ","s":"ˢ","t":"ᵗ",
+        "u":"ᵘ","v":"ᵛ","w":"ʷ","x":"ˣ","y":"ʸ","z":"ᶻ",
+        "0":"0","1":"1","2":"2","3":"3","4":"4","5":"5","6":"6","7":"7","8":"8","9":"9",
+        " ":" "
+    }
+    return "".join(font_map.get(c, c) for c in text)
 
 async def shop(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = fancy("🎁 Aᴠᴀɪʟᴀʙʟᴇ Gɪꜰᴛs:\n\n")
+    msg = "🎁 Aᴠᴀɪʟᴀʙʟᴇ Gɪꜰᴛs:\n\n"
     for k, (v, emoji) in SHOP_ITEMS.items():
-        msg += f"{emoji} {fancy(k.capitalize())} — {fancy(str(v))} ᴄᴏɪɴs\n"
+        msg += f"{emoji} {font_text(k.capitalize())} — {font_text(str(v))} ᴄᴏɪɴs\n"
 
     await update.message.reply_text(msg)
 
@@ -440,24 +452,24 @@ async def shop(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ================= PURCHASE =================
 async def purchase(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
-        return await update.message.reply_text(fancy("Uꜱᴀɢᴇ: /purchase item"))
+        return await update.message.reply_text("Uꜱᴀɢᴇ: /purchase item")
 
     item = context.args[0].lower()
 
     if item not in SHOP_ITEMS:
-        return await update.message.reply_text(fancy("Iᴛᴇᴍ ɴᴏᴛ ꜰᴏᴜɴᴅ"))
+        return await update.message.reply_text("Iᴛᴇᴍ ɴᴏᴛ ꜰᴏᴜɴᴅ")
 
     u = get_user(update.effective_user)
     price, emoji = SHOP_ITEMS[item]
 
     if u["coins"] < price:
-        return await update.message.reply_text(fancy("ɴᴏᴛ ᴇɴᴏᴜɢʜ ᴄᴏɪɴs"))
+        return await update.message.reply_text("ɴᴏᴛ ᴇɴᴏᴜɢʜ ᴄᴏɪɴs")
 
     u["coins"] -= price
     u["inventory"].append(item)
     save_user(u)
 
-    await update.message.reply_text(f"✅ {emoji} Yᴏᴜ ʙᴏᴜɢʜᴛ {fancy(item.capitalize())}")
+    await update.message.reply_text(f"✅ {emoji} Yᴏᴜ ʙᴏᴜɢʜᴛ {font_text(item.capitalize())}")
 
 # ================= TOP 10 RICHEST (MongoDB Version, Pre-Fancy Text) =================
 async def richest(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -506,28 +518,28 @@ broadcast_control = {"running": False, "cancel": False}
 # ================= CANCEL BROADCAST =================
 async def cancel_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != OWNER_ID:
-        return await update.message.reply_text(fancy("❌ Uɴᴀᴜᴛʜᴏʀɪᴢᴇᴅ"))
+        return await update.message.reply_text("❌ Uɴᴀᴜᴛʜᴏʀɪᴢᴇᴅ")
 
     if not broadcast_control["running"]:
-        return await update.message.reply_text(fancy("❌ Nᴏ ʙʀᴏᴀᴅᴄᴀsᴛ ʀᴜɴɴɪɴɢ"))
+        return await update.message.reply_text("❌ Nᴏ ʙʀᴏᴀᴅᴄᴀsᴛ ʀᴜɴɴɪɴɢ")
 
     broadcast_control["cancel"] = True
-    await update.message.reply_text(fancy("🛑 Bʀᴏᴀᴅᴄᴀsᴛ Cᴀɴᴄᴇʟʟᴀᴛɪᴏɴ RᴇQᴜᴇsᴛᴇᴅ..."))
+    await update.message.reply_text("🛑 Bʀᴏᴀᴅᴄᴀsᴛ Cᴀɴᴄᴇʟʟᴀᴛɪᴏɴ RᴇQᴜᴇsᴛᴇᴅ...")
 
 # ================= PRIVATE BROADCAST =================
 async def broad_c(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != OWNER_ID:
-        return await update.message.reply_text(fancy("❌ Uɴᴀᴜᴛʜᴏʀɪᴢᴇᴅ"))
+        return await update.message.reply_text("❌ Uɴᴀᴜᴛʜᴏʀɪᴢᴇᴅ")
 
     if broadcast_control["running"]:
-        return await update.message.reply_text(fancy("⚠️ Aɴᴏᴛʜᴇʀ ʙʀᴏᴀᴅᴄᴀsᴛ ʀᴜɴɴɪɴɢ!"))
+        return await update.message.reply_text("⚠️ Aɴᴏᴛʜᴇʀ ʙʀᴏᴀᴅᴄᴀsᴛ ʀᴜɴɴɪɴɢ!")
 
     # Get message preserving all spaces
     if update.message.reply_to_message:
         msg = update.message.reply_to_message.text or update.message.reply_to_message.caption
     else:
         if not context.args:
-            return await update.message.reply_text(fancy("Rᴇᴘʟʏ ᴏʀ ᴜsᴇ /broad_c message"))
+            return await update.message.reply_text("Rᴇᴘʟʏ ᴏʀ ᴜsᴇ /broad_c message")
         msg = update.message.text.split(" ", 1)[1]
 
     all_chats = list(db["chats"].find({"type": "private"}))
@@ -538,8 +550,7 @@ async def broad_c(update: Update, context: ContextTypes.DEFAULT_TYPE):
     broadcast_control["running"] = True
     broadcast_control["cancel"] = False
     start_time = time.time()
-
-    progress_msg = await update.message.reply_text(fancy("🚀 Sᴛᴀʀᴛɪɴɢ Bʀᴏᴀᴅᴄᴀsᴛ..."))
+    progress_msg = await update.message.reply_text("🚀 Sᴛᴀʀᴛɪɴɢ Bʀᴏᴀᴅᴄᴀsᴛ...")
 
     for i, chat in enumerate(all_chats, start=1):
         if broadcast_control["cancel"]:
@@ -556,9 +567,7 @@ async def broad_c(update: Update, context: ContextTypes.DEFAULT_TYPE):
             filled = int((i / total) * bar_len)
             bar = "█" * filled + "░" * (bar_len - filled)
             await progress_msg.edit_text(
-                fancy(
-                    f"📊 Bʀᴏᴀᴅᴄᴀsᴛɪɴɢ...\n\n[{bar}] {i}/{total}\n✅ Sᴜᴄᴄᴇss: {success}\n❌ Fᴀɪʟᴇᴅ: {failed}\n📦 Tᴏᴛᴀʟ: {total}"
-                )
+                f"📊 Bʀᴏᴀᴅᴄᴀsᴛɪɴɢ...\n\n[{bar}] {i}/{total}\n✅ Sᴜᴄᴄᴇss: {success}\n❌ Fᴀɪʟᴇᴅ: {failed}\n📦 Tᴏᴛᴀʟ: {total}"
             )
 
         await asyncio.sleep(0.07)
@@ -568,24 +577,22 @@ async def broad_c(update: Update, context: ContextTypes.DEFAULT_TYPE):
     total_time = round(time.time() - start_time, 2)
 
     await progress_msg.edit_text(
-        fancy(
-            f"📢 Bʀᴏᴀᴅᴄᴀsᴛ {status}\n\n✅ Sᴇɴᴛ: {success}\n❌ Fᴀɪʟᴇᴅ: {failed}\n📦 Tᴏᴛᴀʟ: {total}\n⏱ Tɪᴍᴇ: {total_time}s"
-        )
+        f"📢 Bʀᴏᴀᴅᴄᴀsᴛ {status}\n\n✅ Sᴇɴᴛ: {success}\n❌ Fᴀɪʟᴇᴅ: {failed}\n📦 Tᴏᴛᴀʟ: {total}\n⏱ Tɪᴍᴇ: {total_time}s"
     )
 
 # ================= GROUP BROADCAST =================
 async def broad_gc(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != OWNER_ID:
-        return await update.message.reply_text(fancy("❌ Uɴᴀᴜᴛʜᴏʀɪᴢᴇᴅ"))
+        return await update.message.reply_text("❌ Uɴᴀᴜᴛʜᴏʀɪᴢᴇᴅ")
 
     if broadcast_control["running"]:
-        return await update.message.reply_text(fancy("⚠️ Aɴᴏᴛʜᴇʀ ʙʀᴏᴀᴅᴄᴀsᴛ ʀᴜɴɴɪɴɢ!"))
+        return await update.message.reply_text("⚠️ Aɴᴏᴛʜᴇʀ ʙʀᴏᴀᴅᴄᴀsᴛ ʀᴜɴɴɪɴɢ!")
 
     if update.message.reply_to_message:
         msg = update.message.reply_to_message.text or update.message.reply_to_message.caption
     else:
         if not context.args:
-            return await update.message.reply_text(fancy("Rᴇᴘʟʏ ᴏʀ ᴜsᴇ /broad_gc message"))
+            return await update.message.reply_text("Rᴇᴘʟʏ ᴏʀ ᴜsᴇ /broad_gc message")
         msg = update.message.text.split(" ", 1)[1]
 
     all_groups = list(db["chats"].find({"type": {"$in": ["group", "supergroup"]}}))
@@ -597,7 +604,7 @@ async def broad_gc(update: Update, context: ContextTypes.DEFAULT_TYPE):
     broadcast_control["cancel"] = False
     start_time = time.time()
 
-    progress_msg = await update.message.reply_text(fancy("🚀 Sᴛᴀʀᴛɪɴɢ Gʀᴏᴜᴘ Bʀᴏᴀᴅᴄᴀsᴛ..."))
+    progress_msg = await update.message.reply_text("🚀 Sᴛᴀʀᴛɪɴɢ Gʀᴏᴜᴘ Bʀᴏᴀᴅᴄᴀsᴛ...")
 
     for i, chat in enumerate(all_groups, start=1):
         if broadcast_control["cancel"]:
@@ -614,9 +621,7 @@ async def broad_gc(update: Update, context: ContextTypes.DEFAULT_TYPE):
             filled = int(percent / 10)
             bar = "█" * filled + "░" * (10 - filled)
             await progress_msg.edit_text(
-                fancy(
-                    f"📊 Gʀᴏᴜᴘ Bʀᴏᴀᴅᴄᴀsᴛ...\n\n[{bar}] {percent}%\n✅ Sᴜᴄᴄᴇss: {success}\n❌ Fᴀɪʟᴇᴅ: {failed}\n📦 Tᴏᴛᴀʟ: {total}"
-                )
+                f"📊 Gʀᴏᴜᴘ Bʀᴏᴀᴅᴄᴀsᴛ...\n\n[{bar}] {percent}%\n✅ Sᴜᴄᴄᴇss: {success}\n❌ Fᴀɪʟᴇᴅ: {failed}\n📦 Tᴏᴛᴀʟ: {total}"
             )
 
         await asyncio.sleep(0.07)
@@ -626,9 +631,7 @@ async def broad_gc(update: Update, context: ContextTypes.DEFAULT_TYPE):
     total_time = round(time.time() - start_time, 2)
 
     await progress_msg.edit_text(
-        fancy(
-            f"📢 Gʀᴏᴜᴘ Bʀᴏᴀᴅᴄᴀsᴛ {status}\n\n✅ Sᴇɴᴛ: {success}\n❌ Fᴀɪʟᴇᴅ: {failed}\n📦 Tᴏᴛᴀʟ: {total}\n⏱ Tɪᴍᴇ: {total_time}s"
-        )
+        f"📢 Gʀᴏᴜᴘ Bʀᴏᴀᴅᴄᴀsᴛ {status}\n\n✅ Sᴇɴᴛ: {success}\n❌ Fᴀɪʟᴇᴅ: {failed}\n📦 Tᴏᴛᴀʟ: {total}\n⏱ Tɪᴍᴇ: {total_time}s"
     )
 
 #====================Yuuri_Talks_Feature======================
