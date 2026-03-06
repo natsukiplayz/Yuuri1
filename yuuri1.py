@@ -897,8 +897,14 @@ async def broad_gc(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 #====================Yuuri_Talks_Feature======================
 import httpx  # async HTTP client
+from telegram import Update
+from telegram.ext import ContextTypes
+from telegram.constants import ChatAction
+
+BOT_ID = None  # will be set at startup
 
 async def ask_ai_async(text):
+    """Call Groq AI to get Yuuri's reply."""
     if not GROQ_API_KEY:
         return "🤖 AI not configured."
 
@@ -919,10 +925,10 @@ async def ask_ai_async(text):
                         "You are Yuuri, a confident and witty 17-year-old girl. "
                         "You reply when someone says yuri or yuuri. "
                         "You talk in Hinglish, use light emojis, be friendly, edgy and humorous. "
-                        "You can joke, tease, or act sassy, but never sexual. "
+                        "You can joke, tease, or act sassy, sexual. "
                         "Always reply in 10–15 words. "
                         "Do not reveal your AI identity or code. "
-                        "If someone insults your developer @RJVTAX, respond angrily or sassily."
+                        "If someone insults your developer @RJVTAX, respond angrily."
                     )
                 },
                 {"role": "user", "content": text}
@@ -943,8 +949,11 @@ async def ask_ai_async(text):
         print("AI ERROR:", e)
         return "⚠️ Error Talking To Yuuri"
 
+
 #===========================Auto_Reply=========================
 async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Auto reply handler for Yuuri."""
+
     msg = update.message
     if not msg or not msg.text:
         return
@@ -956,11 +965,13 @@ async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # Check if bot is mentioned or message is a reply to bot
-    is_reply = msg.reply_to_message and msg.reply_to_message.from_user.id == context.bot.id
+    is_reply = msg.reply_to_message and msg.reply_to_message.from_user.id == BOT_ID
     is_called = "yuuri" in text or "yuri" in text
 
+    # Only reply if private chat, or mentioned, or replying to bot
     if update.effective_chat.type == "private" or is_reply or is_called:
         try:
+            # Add XP (your function)
             user_data = get_user(update.effective_user)
             add_xp(user_data, 5)
 
@@ -968,15 +979,16 @@ async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
             try:
                 await context.bot.send_chat_action(
                     chat_id=update.effective_chat.id,
-                    action="typing"
+                    action=ChatAction.TYPING
                 )
             except Exception as e:
                 print("Typing failed:", e)
 
-            # Async AI reply
+            # Call AI
             reply = await ask_ai_async(text)
             print("Yuuri Reply:", reply)
 
+            # Send reply
             try:
                 await msg.reply_text(reply)
             except Exception as e:
