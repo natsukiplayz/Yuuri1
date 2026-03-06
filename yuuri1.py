@@ -43,13 +43,16 @@ def get_user(user):
 
     if not data:
         data = {
-            "id": user.id,
-            "name": user.first_name,
-            "coins": 100,
-            "xp": 0,
-            "level": 1,
-            "inventory": []
-        }
+        "id": user.id,
+        "name": user.first_name,
+        "coins": 100,
+        "xp": 0,
+        "level": 1,
+        "kills": 0,
+        "guild": None,
+        "dead": False,
+        "inventory": []
+    }
         users.insert_one(data)
 
     return data
