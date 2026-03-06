@@ -894,6 +894,7 @@ def main():
     app.add_handler(CommandHandler("bounty", bounty))
     app.add_handler(CommandHandler("stats", stats))
     app.add_handler(CommandHandler("bal", profile))
+    app.add_handler(CommandHandler("protect", protect))
 
     # Message Handlers
     app.add_handler(MessageHandler(filters.ALL, save_chat))
