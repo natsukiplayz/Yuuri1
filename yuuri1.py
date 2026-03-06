@@ -158,23 +158,14 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not msg:
         return
 
+    # Detect target
     if msg.reply_to_message:
         target_user = msg.reply_to_message.from_user
     else:
         target_user = update.effective_user
 
-    data = users.find_one({"id": target_user.id})
-
-    if not data:
-        data = {
-            "id": target_user.id,
-            "name": target_user.first_name,
-            "coins": 0,
-            "xp": 0,
-            "kills": 0,
-            "guild": None
-        }
-        users.insert_one(data)
+    # ✅ Use your USER SYSTEM
+    data = get_user(target_user)
 
     name = data.get("name", target_user.first_name)
     coins = data.get("coins", 0)
@@ -184,7 +175,7 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     guild_name = guild if guild else "Nᴏɴᴇ"
 
-    # Rank calculation
+    # ================= RANK =================
     current_rank, next_rank = get_rank_data(xp)
 
     if next_rank:
@@ -197,10 +188,10 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
         bar = create_progress_bar(percent)
 
     else:
+        percent = 100
+        bar = create_progress_bar(percent)
 
-        bar = "██████████ 100%"
-
-    # GLOBAL RANK
+    # ================= GLOBAL RANK =================
     all_users = list(users.find({"id": {"$ne": context.bot.id}}))
 
     sorted_users = sorted(
@@ -209,25 +200,30 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reverse=True
     )
 
-    global_rank = next(
-        (i for i, u in enumerate(sorted_users, 1)
-         if u.get("id") == target_user.id),
-        0
-    )
+    global_rank = 0
+    for i, user in enumerate(sorted_users, 1):
+        if user.get("id") == target_user.id:
+            global_rank = i
+            break
 
+    # ================= STATUS =================
     status = "Alive"
-    if data.get("dead", False):
+    if data.get("dead"):
         status = "Dead"
 
+    # ================= PROFILE MESSAGE =================
     text = (
         f"👤 Nᴀᴍᴇ: {name}\n"
         f"🆔 Iᴅ: {target_user.id}\n\n"
+
         f"💰 Cᴏɪɴs: {coins}\n"
         f"🔪 Kɪʟʟs: {kills}\n"
-        f"☠️ Status: {status}\n\n"
+        f"☠️ Sᴛᴀᴛᴜs: {status}\n\n"
+
         f"🏅 Rᴀɴᴋ: {current_rank['name']}\n"
-        f"📊 Pʀᴏɢʀᴇss:\n{bar}\n"
-        f"🌐 Gʟᴏʙᴀʟ Rᴀɴᴋ: {global_rank}\n\n"
+        f"📊 Pʀᴏɢʀᴇss:\n{bar}\n\n"
+
+        f"🌐 Gʟᴏʙᴀʟ Rᴀɴᴋ: #{global_rank}\n"
         f"🏰 Gᴜɪʟᴅ: {guild_name}"
     )
 
