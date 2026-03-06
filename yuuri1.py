@@ -198,18 +198,20 @@ async def rankers(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ================= PROFILE =================
 async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     msg = update.effective_message
     if not msg:
         return
 
-    # --- Target user ---
+    # Target user
     if msg.reply_to_message:
         target_user = msg.reply_to_message.from_user
     else:
         target_user = update.effective_user
 
-    # --- Get or create user ---
+    # Get user data
     data = users.find_one({"id": target_user.id})
+
     if not data:
         data = {
             "id": target_user.id,
@@ -224,32 +226,36 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
         }
         users.insert_one(data)
 
-    # Update name if changed
-    if data["name"] != target_user.first_name:
-        data["name"] = target_user.first_name
-        users.update_one({"id": target_user.id}, {"$set": {"name": target_user.first_name}})
-
     name = data.get("name", target_user.first_name)
     coins = data.get("coins", 0)
     xp = data.get("xp", 0)
     kills = data.get("kills", 0)
-    guild_name = data.get("guild") or "Nᴏɴᴇ"
-    status = "Dead" if data.get("dead", False) else "Alive"
+    guild = data.get("guild")
+    dead = data.get("dead", False)
 
-    # --- Rank & Progress ---
+    guild_name = guild if guild else "Nᴏɴᴇ"
+
+    # Rank system
     current_rank, next_rank = get_rank_data(xp)
 
     if next_rank:
         progress = xp - current_rank["xp"]
         needed = next_rank["xp"] - current_rank["xp"]
+
         percent = int((progress / needed) * 100) if needed > 0 else 0
         bar = create_progress_bar(percent)
+
     else:
         bar = "██████████ 100%"
 
-    # --- Global Rank ---
-    all_users = list(users.find({"id": {"$ne": context.bot.id}}))
-    sorted_users = sorted(all_users, key=lambda u: u.get("xp", 0), reverse=True)
+    # Global Rank
+    all_users = list(users.find())
+
+    sorted_users = sorted(
+        all_users,
+        key=lambda u: u.get("xp", 0),
+        reverse=True
+    )
 
     global_rank = 0
     for i, u in enumerate(sorted_users, 1):
@@ -257,7 +263,8 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
             global_rank = i
             break
 
-    # --- Profile Text ---
+    status = "Dead" if dead else "Alive"
+
     text = (
         f"👤 Nᴀᴍᴇ: {name}\n"
         f"🆔 Iᴅ: {target_user.id}\n\n"
@@ -266,14 +273,11 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"☠️ Status: {status}\n\n"
         f"🏅 Rᴀɴᴋ: {current_rank['name']}\n"
         f"📊 Pʀᴏɢʀᴇss:\n{bar}\n"
-        f"🌐 Gʟᴏʙᴀʟ Rᴀɴᴋ: #{global_rank}\n\n"
+        f"🌐 Gʟᴏʙᴀʟ Rᴀɴᴋ: {global_rank}\n\n"
         f"🏰 Gᴜɪʟᴅ: {guild_name}"
     )
 
-    try:
-        await msg.reply_text(text)
-    except Exception as e:
-        print("Profile Error:", e)
+    await msg.reply_text(text)
 
 # ================= BOUNTY =================
 async def bounty(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1002,11 +1006,10 @@ def main():
     app.add_handler(CommandHandler("protect", protect))
     app.add_handler(CommandHandler("rankers", rankers))
 
-    # Message Handlers
-    app.add_handler(MessageHandler(filters.ALL, save_chat))
+# Message Handlers
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, auto_reply))
     app.add_handler(MessageHandler(filters.ALL, save_chat))
-
+ 
     print("🔥 Yuuri Running...")
     app.run_polling()
 
