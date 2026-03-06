@@ -129,7 +129,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandle
 from pymongo import MongoClient
 
 # ------------------ CONFIG ------------------
-BOT_OWNER_ID = 123456789  # <-- Insert your Telegram user ID here
+BOT_OWNER_ID = 5773908061  # <-- Insert your Telegram user ID here
 MONGO_URI = ""  # <-- Insert your MongoDB URI here
 
 # ------------------ MongoDB Setup ------------------
