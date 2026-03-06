@@ -168,7 +168,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     [InlineKeyboardButton("👥 Gʀᴏᴜᴘs", callback_data="show_groups"),
      InlineKeyboardButton("🤖 Sᴇᴄᴏɴᴅ ʙᴏᴛ", url="https://t.me/Im_yuukibot")],
     [InlineKeyboardButton("➕ Aᴅᴅ Mᴇ Tᴏ Yᴏᴜʀ Gʀᴏᴜᴘ", url="https://t.me/YOUR_BOT_USERNAME?startgroup=true")]
-]
+    ]
 
     welcome_text = (
         f"✨🎉 𝗛ᴇʟʟᴏ {first_name}! 🎉✨\n\n"
