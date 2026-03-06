@@ -813,6 +813,8 @@ async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ================= MAIN =================
 def main():
+    print("🔥 Yuuri Starting...")
+
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     # Command Handlers
@@ -836,7 +838,6 @@ def main():
 
     print("🔥 Yuuri Running...")
 
-    # Start bot
     app.run_polling(drop_pending_updates=True)
 
 
