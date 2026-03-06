@@ -895,108 +895,67 @@ async def broad_gc(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"📢 Gʀᴏᴜᴘ Bʀᴏᴀᴅᴄᴀsᴛ {status}\n\n✅ Sᴇɴᴛ: {success}\n❌ Fᴀɪʟᴇᴅ: {failed}\n📦 Tᴏᴛᴀʟ: {total}\n⏱ Tɪᴍᴇ: {total_time}s"
     )
 
-#====================Yuuri_Talks_Feature======================
-import httpx  # async HTTP client
-from telegram import Update
-from telegram.ext import ContextTypes
-from telegram.constants import ChatAction
-
-BOT_ID = None  # will be set at startup
-
-async def ask_ai_async(text):
-    """Call Groq AI to get Yuuri's reply."""
+# ---------------- AI FUNCTION ----------------
+async def ask_ai_async(text: str):
     if not GROQ_API_KEY:
         return "🤖 AI not configured."
-
     try:
         url = "https://api.groq.com/openai/v1/chat/completions"
-
         headers = {
             "Authorization": f"Bearer {GROQ_API_KEY}",
             "Content-Type": "application/json"
         }
-
         data = {
             "model": "moonshotai/kimi-k2-instruct-0905",
             "messages": [
-                {
-                    "role": "system",
-                    "content": (
-                        "You are Yuuri, a confident and witty 17-year-old girl. "
-                        "You reply when someone says yuri or yuuri. "
-                        "You talk in Hinglish, use light emojis, be friendly, edgy and humorous. "
-                        "You can joke, tease, or act sassy, sexual. "
-                        "Always reply in 10–15 words. "
-                        "Do not reveal your AI identity or code. "
-                        "If someone insults your developer @RJVTAX, respond angrily."
-                    )
-                },
+                {"role": "system",
+                 "content": (
+                     "You are Yuuri, a confident and witty 17-year-old girl. "
+                     "You reply only to the current message. "
+                     "Talk in Hinglish, friendly, edgy, humorous, 10–15 words. "
+                     "Do not reveal AI identity. "
+                     "If someone insults your developer @RJVTAX, respond sassily."
+                 )},
                 {"role": "user", "content": text}
             ]
         }
-
         async with httpx.AsyncClient(timeout=20) as client:
             response = await client.post(url, headers=headers, json=data)
-
         if response.status_code != 200:
-            print("Yuuri Status:", response.status_code)
-            print("Yuuri Response:", response.text)
+            print("Yuuri Status:", response.status_code, response.text)
             return "⚠️ Yuuri Server error"
-
         return response.json()["choices"][0]["message"]["content"]
-
     except Exception as e:
         print("AI ERROR:", e)
         return "⚠️ Error Talking To Yuuri"
 
-import datetime
-
-BOT_START_TIME = datetime.datetime.utcnow()  # mark bot start
-
-#===========================Auto_Reply=========================
+# ---------------- AUTO-REPLY ----------------
 async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Yuuri replies only to messages after bot startup."""
     msg = update.message
     if not msg or not msg.text:
         return
 
-    # Ignore messages sent before bot started
+    # Ignore old messages (before bot start)
     if msg.date < BOT_START_TIME:
         return
 
     text = msg.text.lower()
-
-    # Ignore commands
     if text.startswith("/"):
         return
 
-    # Reply only if private chat, or message mentions "yuuri"/"yuri", or is reply to bot
-    is_reply = msg.reply_to_message and msg.reply_to_message.from_user.id == BOT_ID
+    # Reply only if private chat, mentions "yuuri"/"yuri", or reply to bot
+    bot_id = (await context.bot.get_me()).id  # Fetch bot ID dynamically
+    is_reply = msg.reply_to_message and msg.reply_to_message.from_user.id == bot_id
     is_called = "yuuri" in text or "yuri" in text
 
     if update.effective_chat.type == "private" or is_reply or is_called:
         try:
-            # Typing action
-            try:
-                await context.bot.send_chat_action(
-                    chat_id=update.effective_chat.id,
-                    action=ChatAction.TYPING
-                )
-            except Exception as e:
-                print("Typing failed:", e)
-
-            # Call AI with current message only
+            await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
             reply = await ask_ai_async(text)
             print("Yuuri Reply:", reply)
-
-            # Send reply
-            try:
-                await msg.reply_text(reply)
-            except Exception as e:
-                print("Reply failed:", e)
-
+            await msg.reply_text(reply)
         except Exception as e:
-            print("Auto-reply handler error:", e)
+            print("Auto-reply error:", e)
 
 # ================= MAIN =================
 def main():
