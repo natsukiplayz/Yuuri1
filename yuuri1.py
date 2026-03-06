@@ -162,13 +162,13 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     first_name = msg.from_user.first_name or "Usᴇʀ"
 
-    keyboard = [
-        [InlineKeyboardButton("📰 𝗨𝗣𝗗𝗔𝗧𝗘𝗦", url="https://t.me/yuuriXupdates"),
-         InlineKeyboardButton("💬 𝗦𝗨𝗣𝗣𝗢𝗥𝗧 𝗖𝗛𝗔𝗧", url="https://t.me/DreamSpaceZ")],
-        [InlineKeyboardButton("👥 𝗚𝗥𝗢𝗨𝗣𝗦", callback_data="show_groups"),
-         InlineKeyboardButton("🤖 𝗦𝗘𝗖𝗢𝗡𝗗 𝗕𝗢𝗧", url="https://t.me/Im_yuukibot")],
-        [InlineKeyboardButton("➕ 𝗔𝗗𝗗 𝗠𝗘 𝗧𝗢 𝗬𝗢𝗨𝗥 𝗚𝗥𝗢𝗨𝗣", url="https://t.me/YOUR_BOT_USERNAME?startgroup=true")]
-    ]
+   keyboard = [
+    [InlineKeyboardButton("📰 Uᴘᴅᴀᴛᴇs", url="https://t.me/yuuriXupdates"),
+     InlineKeyboardButton("💬 Sᴜᴘᴘᴏʀᴛ ᴄʜᴀᴛ", url="https://t.me/DreamSpaceZ")],
+    [InlineKeyboardButton("👥 Gʀᴏᴜᴘs", callback_data="show_groups"),
+     InlineKeyboardButton("🤖 Sᴇᴄᴏɴᴅ ʙᴏᴛ", url="https://t.me/Im_yuukibot")],
+    [InlineKeyboardButton("➕ Aᴅᴅ Mᴇ Tᴏ Yᴏᴜʀ Gʀᴏᴜᴘ", url="https://t.me/YOUR_BOT_USERNAME?startgroup=true")]
+]
 
     welcome_text = (
         f"✨🎉 𝗛ᴇʟʟᴏ {first_name}! 🎉✨\n\n"
@@ -247,27 +247,33 @@ async def stop_group_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
         f"📌 𝗡𝗔𝗠𝗘: {result['name']}"
     )
 
-# ------------------ Callback Handler ------------------
+#callback_handler for groups
+
 async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
+    # Only handle the "show_groups" button
+    if query.data != "show_groups":
+        return
+
     contact_text = (
-        "💰 𝗜ꜰ 𝘆𝗼𝘂 𝘄𝗮𝗻𝘁 𝘆𝗼𝘂𝗿 𝗴𝗿𝗼𝘂𝗽 𝗵𝗲𝗿𝗲, 𝗰𝗼𝗻𝘁𝗮𝗰𝘁: @RJVTAX\n"
-        "⚠️ 𝗣𝗔𝗜𝗗 - Rs 20"
+        "💰 ɪꜰ ʏᴏᴜ ᴡᴀɴᴛ ʏᴏᴜʀ ɢʀᴏᴜᴘ ʜᴇʀᴇ, ᴄᴏɴᴛᴀᴄᴛ: @RJVTAX\n"
+        "⚠️ ᴘᴀɪᴅ - Rs 20"
     )
 
-    groups = list(groups_collection.find().sort("position"))
+    # Fetch groups sorted by 'position' as int
+    groups = list(groups_collection.find().sort("position", 1))
 
     if not groups:
-        await query.edit_message_text(f"{contact_text}\n\n⚠️ 𝗡ᴏ 𝗚𝗥𝗢𝗨𝗣𝗦 ʏᴇᴛ!")
+        await query.edit_message_text(f"{contact_text}\n\n⚠️ ɴᴏ ɢʀᴏᴜᴘs ʏᴇᴛ!")
         return
 
     keyboard = []
     row = []
     for g in groups:
         row.append(InlineKeyboardButton(f"📌 {g['name']}", url=g['link']))
-        if len(row) == 2:
+        if len(row) == 2:  # 2 buttons per row
             keyboard.append(row)
             row = []
     if row:
