@@ -999,7 +999,9 @@ async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ================= MAIN =================
 def main():
+    global BOT_ID
     app = ApplicationBuilder().token(BOT_TOKEN).build()
+    BOT_ID = app.bot.id  # set bot id at startup
 
     # Command Handlers
     app.add_handler(CommandHandler("daily", daily))
@@ -1018,10 +1020,10 @@ def main():
     app.add_handler(CommandHandler("protect", protect))
     app.add_handler(CommandHandler("rankers", rankers))
 
-# Message Handlers
+    # Message Handlers
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, auto_reply))
     app.add_handler(MessageHandler(filters.ALL, save_chat))
- 
+
     print("🔥 Yuuri Running...")
     app.run_polling()
 
