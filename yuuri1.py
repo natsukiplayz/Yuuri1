@@ -649,7 +649,7 @@ def ask_ai(text):
         }
 
         data = {
-            "model": "llama-3.1-8b-instant",
+            "model": "moonshotai/borealis‑13b‑moon‑instruct‑v1",
             "messages": [
                 {
                     "role": "system",
