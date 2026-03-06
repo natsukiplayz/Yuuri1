@@ -106,7 +106,7 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"{blocked_label} : `{blocked}`\n"
     )
 
-    await safe_send(update, context, text, parse_mode="Markdown")
+   await update.message.reply_text(text, parse_mode="Markdown")
 
 # ================= LEVEL SYSTEM =================
 def add_xp(user_data, amount=10):
