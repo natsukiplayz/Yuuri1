@@ -161,10 +161,17 @@ async def bounty(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     )
 
-#============================KILL (MongoDB + Fancy Font)==========================
+#============================KILL (MongoDB + Styled Text)==========================
 import random
 
+OWNER_ID = 123456789  # <-- Replace with your Telegram user ID
+BOT_ID = None  # Will be set dynamically
+
 async def kill(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    global BOT_ID
+    if BOT_ID is None:
+        BOT_ID = context.bot.id  # set bot ID dynamically
+
     if not update.message:
         return
 
@@ -173,25 +180,29 @@ async def kill(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # ❌ Block in private
     if update.effective_chat.type == "private":
-        return await msg.reply_text(fancy("❌ Tʜɪs Cᴏᴍᴍᴀɴᴅ Cᴀɴ Oɴʟʏ Bᴇ Usᴇᴅ Iɴ Gʀᴏᴜᴘs."))
+        return await msg.reply_text("❌ Tʜɪs Cᴏᴍᴍᴀɴᴅ Cᴀɴ Oɴʟʏ Bᴇ Usᴇᴅ Iɴ Gʀᴏᴜᴘs.")
 
     # ❌ Must reply
     if not msg.reply_to_message:
-        return await msg.reply_text(fancy("⚠️ Rᴇᴘʟʏ Tᴏ Sᴏᴍᴇᴏɴᴇ Yᴏᴜ Wᴀɴᴛ Tᴏ Kɪʟʟ."))
+        return await msg.reply_text("⚠️ Rᴇᴘʟʏ Tᴏ Sᴏᴍᴇᴏɴᴇ Yᴏᴜ Wᴀɴᴛ Tᴏ Kɪʟʟ.")
 
     target_user = msg.reply_to_message.from_user
 
     # ❌ Invalid target
     if not target_user:
-        return await msg.reply_text(fancy("❌ Iɴᴠᴀʟɪᴅ Tᴀʀɢᴇᴛ."))
+        return await msg.reply_text("❌ Iɴᴠᴀʟɪᴅ Tᴀʀɢᴇᴛ.")
 
-    # ❌ Cannot kill bot
-    if target_user.is_bot:
-        return await msg.reply_text(fancy("🤖 Yᴏᴜ Cᴀɴɴᴏᴛ Kɪʟʟ Bᴏᴛs."))
+    # ❌ Cannot kill bot owner
+    if target_user.id == OWNER_ID:
+        return await msg.reply_text("😒 Yᴏᴜ Cᴀɴ'ᴛ Kɪʟʟ Mʏ Dᴇᴀʀᴇsᴛ Oᴡɴᴇʀ.")
+
+    # ❌ Cannot kill bot itself
+    if target_user.id == BOT_ID:
+        return await msg.reply_text("😂 Nɪᴄᴇ Tʀʏ Oɴ Mᴇ!")
 
     # ❌ Cannot kill yourself
     if target_user.id == user.id:
-        return await msg.reply_text(fancy("❌ Yᴏᴜ Cᴀɴ'ᴛ Kɪʟʟ Yᴏᴜʀsᴇʟғ."))
+        return await msg.reply_text("❌ Yᴏᴜ Cᴀɴ'ᴛ Kɪʟʟ Yᴏᴜʀsᴇʟғ.")
 
     # ✅ Get MongoDB economy data
     killer = get_user(user)
@@ -221,18 +232,18 @@ async def kill(update: Update, context: ContextTypes.DEFAULT_TYPE):
     save_user(victim)
 
     # 📢 Main kill message
-    await msg.reply_text(fancy(
+    await msg.reply_text(
         f"👤 {user.first_name} Kɪʟʟᴇᴅ {target_user.first_name}\n"
         f"💰 Eᴀʀɴᴇᴅ: {reward} Cᴏɪɴs\n"
         f"⭐ Gᴀɪɴᴇᴅ: +{xp_gain} Xᴘ"
-    ))
+    )
 
     # 🎯 Bounty message (if exists)
     if bounty_reward > 0:
-        await msg.reply_text(fancy(
+        await msg.reply_text(
             f"🎯 Bᴏᴜɴᴛʏ Cʟᴀɪᴍᴇᴅ!\n"
             f"💰 Eᴀʀɴᴇᴅ ᴇxᴛʀᴀ: {bounty_reward} Cᴏɪɴs!"
-        ))
+        )
 
 #========================rob (MongoDB + limit + owner protection + font)========================
 import time
@@ -669,21 +680,26 @@ def ask_ai(text):
 #===========================Auto_Reply=========================
 async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
+    if not msg or not msg.text:
+        # Skip non-text messages (stickers, photos, etc.)
+        return
+
     text = msg.text.lower()
 
+    # Ignore commands
     if text.startswith("/"):
         return
 
+    # Check if bot is mentioned or message is a reply to bot
     is_reply = msg.reply_to_message and msg.reply_to_message.from_user.id == context.bot.id
-    is_called = BOT_NAME in text
+    is_called = BOT_NAME.lower() in text
 
     if update.effective_chat.type == "private" or is_reply or is_called:
-
         try:
             user_data = get_user(update.effective_user)
             add_xp(user_data, 5)
 
-            # Typing
+            # Typing action
             try:
                 await context.bot.send_chat_action(
                     chat_id=update.effective_chat.id,
