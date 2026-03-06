@@ -124,6 +124,7 @@ async def save_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 #start_and_paid_things====================================
 
+from telegram.ext import ApplicationBuilder
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler
 
@@ -154,6 +155,8 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     
     await msg.reply_text(welcome_text, reply_markup=reply_markup)
+
+from telegram.ext import ApplicationBuilder
 
 # /setgroup <number> <name> <link>
 async def setgroup_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -210,11 +213,6 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         await query.edit_message_text(contact_text, reply_markup=reply_markup)
-
-# Add handlers
-app.add_handler(CommandHandler("start", start_command))
-app.add_handler(CommandHandler("setgroup", setgroup_command))
-app.add_handler(CallbackQueryHandler(callback_handler))
 
 # ================= BOT STATS =================
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
