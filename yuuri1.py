@@ -14,6 +14,9 @@ from telegram.ext import (
     filters
 )
 
+from datetime import datetime, timezone
+BOT_START_TIME = datetime.now(timezone.utc)
+
 # ================= TERMUX +srv FIX =================
 import dns.resolver
 
@@ -935,33 +938,48 @@ async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not msg or not msg.text:
         return
 
-    # Ignore old messages (before bot start)
+    # Ignore messages sent before bot started
     if msg.date < BOT_START_TIME:
         return
 
     text = msg.text.lower()
+
+    # Ignore commands
     if text.startswith("/"):
         return
 
-    # Reply only if private chat, mentions "yuuri"/"yuri", or reply to bot
-    bot_id = (await context.bot.get_me()).id  # Fetch bot ID dynamically
-    is_reply = msg.reply_to_message and msg.reply_to_message.from_user.id == bot_id
-    is_called = "yuuri" in text or "yuri" in text
+    try:
+        # ✅ Fetch bot ID safely inside async function
+        bot_user = await context.bot.get_me()
+        bot_id = bot_user.id
 
-    if update.effective_chat.type == "private" or is_reply or is_called:
-        try:
-            await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
+        # Check if message is reply to bot or mentions Yuuri/Yuri
+        is_reply = msg.reply_to_message and msg.reply_to_message.from_user.id == bot_id
+        is_called = "yuuri" in text or "yuri" in text
+
+        # Reply only if private chat, reply to bot, or message calls Yuuri/Yuri
+        if update.effective_chat.type == "private" or is_reply or is_called:
+            # Show typing action
+            await context.bot.send_chat_action(
+                chat_id=update.effective_chat.id,
+                action=ChatAction.TYPING
+            )
+
+            # Get AI reply
             reply = await ask_ai_async(text)
             print("Yuuri Reply:", reply)
+
+            # Send reply
             await msg.reply_text(reply)
-        except Exception as e:
-            print("Auto-reply error:", e)
+
+    except Exception as e:
+        print("Auto-reply error:", e)
 
 # ================= MAIN =================
 def main():
     global BOT_ID
     app = ApplicationBuilder().token(BOT_TOKEN).build()
-    BOT_ID = app.bot.id  # set bot id at startup
+   # BOT_ID = app.bot.id  # set bot id at startup
 
     # Command Handlers
     app.add_handler(CommandHandler("daily", daily))
