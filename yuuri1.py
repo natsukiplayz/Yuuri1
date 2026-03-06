@@ -6,6 +6,7 @@ import logging
 import random
 import requests
 from telegram.constants import ChatAction
+from telegram.ext import CallbackQueryHandler
 from pymongo import MongoClient
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
