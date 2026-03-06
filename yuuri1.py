@@ -163,11 +163,13 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     first_name = msg.from_user.first_name or "Usᴇʀ"
 
    keyboard = [
-    [InlineKeyboardButton("📰 Uᴘᴅᴀᴛᴇs", url="https://t.me/yuuriXupdates"),
-     InlineKeyboardButton("💬 Sᴜᴘᴘᴏʀᴛ ᴄʜᴀᴛ", url="https://t.me/DreamSpaceZ")],
-    [InlineKeyboardButton("👥 Gʀᴏᴜᴘs", callback_data="show_groups"),
-     InlineKeyboardButton("🤖 Sᴇᴄᴏɴᴅ ʙᴏᴛ", url="https://t.me/Im_yuukibot")],
-    [InlineKeyboardButton("➕ Aᴅᴅ Mᴇ Tᴏ Yᴏᴜʀ Gʀᴏᴜᴘ", url="https://t.me/YOUR_BOT_USERNAME?startgroup=true")]
+       [InlineKeyboardButton("📰 Uᴘᴅᴀᴛᴇs", url="https://t.me/yuuriXupdates"),
+       InlineKeyboardButton("💬 Sᴜᴘᴘᴏʀᴛ ᴄʜᴀᴛ", url="https://t.me/DreamSpaceZ")],
+
+      [InlineKeyboardButton("👥 Gʀᴏᴜᴘs", callback_data="show_groups"),
+       InlineKeyboardButton("🤖 Sᴇᴄᴏɴᴅ ʙᴏᴛ", url="https://t.me/Im_yuukibot")],
+
+      [InlineKeyboardButton("➕ Aᴅᴅ Mᴇ Tᴏ Yᴏᴜʀ Gʀᴏᴜᴘ", url="https://t.me/YOUR_BOT_USERNAME?startgroup=true")]
     ]
 
     welcome_text = (
