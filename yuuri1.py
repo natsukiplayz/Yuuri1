@@ -744,7 +744,6 @@ def main():
     app.add_handler(MessageHandler(filters.ALL, save_chat))  # if you still want this
 
     print("🔥 Yuuri Running...")
-    app.run_polling()
 
 
 if __name__ == "__main__":
