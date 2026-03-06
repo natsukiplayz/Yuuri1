@@ -7,7 +7,7 @@ import random
 import requests
 from telegram.constants import ChatAction
 from pymongo import MongoClient
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -17,6 +17,7 @@ from telegram.ext import (
 )
 
 from datetime import datetime, timezone
+
 BOT_START_TIME = datetime.now(timezone.utc)
 
 # ================= TERMUX +srv FIX =================
@@ -900,6 +901,32 @@ async def broad_gc(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"📢 Gʀᴏᴜᴘ Bʀᴏᴀᴅᴄᴀsᴛ {status}\n\n✅ Sᴇɴᴛ: {success}\n❌ Fᴀɪʟᴇᴅ: {failed}\n📦 Tᴏᴛᴀʟ: {total}\n⏱ Tɪᴍᴇ: {total_time}s"
     )
 
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+
+async def anime_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = update.message
+    if not msg or not msg.text:
+        return
+
+    args = context.args
+    if not args:
+        await msg.reply_text("Usage: /ani <anime_name>")
+        return
+
+    anime_name = " ".join(args)
+    anime_query = anime_name.replace(" ", "+")
+    link = f"https://animebot.example.com/search?query={anime_query}"
+
+    keyboard = [[InlineKeyboardButton("Watch Anime", url=link)]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await msg.reply_text(
+        f"Here is the link for **{anime_name}**:",
+        reply_markup=reply_markup,
+        parse_mode="Markdown"
+    )
+
 # ---------------- AI FUNCTION ----------------
 import httpx
 
@@ -1004,6 +1031,9 @@ def main():
     app.add_handler(CommandHandler("status", profile))
     app.add_handler(CommandHandler("protect", protect))
     app.add_handler(CommandHandler("rankers", rankers))
+
+    #fun cartoons and anime
+    app.add_handler(CommandHandler("ani", anime_command))
 
     # Message Handlers
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, auto_reply))
