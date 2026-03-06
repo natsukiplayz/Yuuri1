@@ -649,7 +649,7 @@ def ask_ai(text):
         }
 
         data = {
-            "model": "moonshotai/monolith-1-binst-v1",
+            "model": "moonshotai/kimi-k2-instruct-0905",
             "messages": [
                 {
                     "role": "system",
