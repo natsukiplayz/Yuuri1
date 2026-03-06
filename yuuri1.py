@@ -191,6 +191,35 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
         percent = 100
         bar = create_progress_bar(percent)
 
+# ================= TOP 10 RANKERS =================
+async def rankers(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    all_users = list(
+        users.find({"id": {"$ne": context.bot.id}})
+        .sort("xp", -1)
+        .limit(10)
+    )
+
+    if not all_users:
+        return await update.message.reply_text("ɴᴏ ᴘʟᴀʏᴇʀꜱ ꜰᴏᴜɴᴅ.")
+
+    text = "🏆 Tᴏᴘ 10 Rᴀɴᴋᴇʀs:\n\n"
+
+    for i, user in enumerate(all_users, start=1):
+
+        name = user.get("name", "Unknown")
+        xp = user.get("xp", 0)
+
+        rank, _ = get_rank_data(xp)
+
+        icon = "💓" if user.get("premium") else "👤"
+
+        text += f"{icon} {i}. {name} — {rank['name']} ({xp} XP)\n"
+
+    text += "\n💓 = Pʀᴇᴍɪᴜᴍ • 👤 = Nᴏʀᴍᴀʟ"
+
+    await update.message.reply_text(text)
+
     # ================= GLOBAL RANK =================
     all_users = list(users.find({"id": {"$ne": context.bot.id}}))
 
@@ -952,6 +981,7 @@ def main():
     app.add_handler(CommandHandler("stats", stats))
     app.add_handler(CommandHandler("bal", profile))
     app.add_handler(CommandHandler("protect", protect))
+    app.add_handler(CommandHandler("rankers", rankers))
 
     # Message Handlers
     app.add_handler(MessageHandler(filters.ALL, save_chat))
