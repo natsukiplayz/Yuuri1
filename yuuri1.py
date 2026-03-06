@@ -913,15 +913,19 @@ async def aniworld_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     keyboard = [
-        [InlineKeyboardButton("📛🥳 Hɪɴᴅɪ", url="https://t.me/+bztScKui5jIyYzBl")],
+        [InlineKeyboardButton("📛🥳 Hɪɴᴅɪ", url="https://t.me/ANIME_WORLD_HINDI_OFFICIAL_YUURI")],
         [InlineKeyboardButton("Eɴɢʟɪsʜ", callback_data="coming_soon")],
         [InlineKeyboardButton("Jᴀᴘᴀɴᴇsᴇ", callback_data="coming_soon")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await msg.reply_text(
-        "Cʜᴏᴏsᴇ ʏᴏᴜʀ ʟᴀɴɢᴜᴀɢᴇ ғᴏʀ ᴀɴɪᴍᴇ ᴇᴘɪsᴏᴅᴇs:",
-        reply_markup=reply_markup
+    "💥✨💫 Cʜᴏᴏsᴇ ʏᴏᴜʀ ʟᴀɴɢᴜᴀɢᴇ 💫✨💥\n"
+    "🌟 ғᴏʀ ᴀɴɪᴍᴇ ᴇᴘɪsᴏᴅᴇs 🌟\n"
+    "🔥 📛🥳 𝗛𝗶𝗻ᴅɪ | 𝗘𝗻𝗴𝗹𝗶𝘀𝗵 | 𝗝𝗮𝗽𝗮ɴᴇsᴇ 🔥\n"
+    "✨ 𝗦ᴏᴏɴ ᴛᴏ ʙʀɪɴɢ ᴀʟʟ ᴇᴘɪsᴏᴅᴇs ✨\n"
+    "💫💥🎉 Sᴛᴀʀᴛ ʏᴏᴜʀ ᴀɴɪᴍᴇ ᴀᴅᴠᴇɴᴛᴜʀᴇ 🎉💥💫",
+    reply_markup=reply_markup
     )
 
 # Callback for English/Japanese
