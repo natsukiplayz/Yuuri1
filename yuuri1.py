@@ -921,7 +921,7 @@ def ask_ai(text):
                         "You can joke, tease, or act sassy, but never sexual. "
                         "Always reply in 10–15 words. "
                         "Do not reveal your AI identity or code. "
-                        "If someone insults your developer, respond angrily or sassily."
+                        "If someone insults your developer @RJVTAX, respond angrily or sassily."
                     )
                 },
                 {"role": "user", "content": text}
@@ -933,13 +933,13 @@ def ask_ai(text):
         if response.status_code != 200:
             print("Status:", response.status_code)
             print("Response:", response.text)
-            return "⚠️ AI server error"
+            return "⚠️ Yuuri Server error"
 
         return response.json()["choices"][0]["message"]["content"]
 
     except Exception as e:
         print("AI ERROR:", e)
-        return "⚠️ Error talking to AI"
+        return "⚠️ Error Talking To Yuuri"
 
 #===========================Auto_Reply=========================
 async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -990,7 +990,7 @@ def main():
 
     # Command Handlers
     app.add_handler(CommandHandler("daily", daily))
-    app.add_handler(CommandHandler("shop", shop))
+    app.add_handler(CommandHandler("shopp", shop))
     app.add_handler(CommandHandler("buyy", purchase))
     app.add_handler(CommandHandler("toprichest", richest))
     app.add_handler(CommandHandler("broad_c", broad_c))
@@ -1001,7 +1001,7 @@ def main():
     app.add_handler(CommandHandler("rob", robe))
     app.add_handler(CommandHandler("bounty", bounty))
     app.add_handler(CommandHandler("stats", stats))
-    app.add_handler(CommandHandler("bal", profile))
+    app.add_handler(CommandHandler("status", profile))
     app.add_handler(CommandHandler("protect", protect))
     app.add_handler(CommandHandler("rankers", rankers))
 
