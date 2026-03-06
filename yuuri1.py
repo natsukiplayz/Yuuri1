@@ -506,7 +506,6 @@ async def robe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await msg.reply_text(
         f"👀 {robber_user.first_name} Sᴜᴄᴄᴇssғᴜʟʟʏ Rᴏʙʙᴇᴅ {target_user.first_name}\n"
         f"💰 Sᴛᴏʟᴇɴ: {steal} Cᴏɪɴs"
-        f"amount: `{steal}`\n"
     )
 
 # ================= DAILY (MongoDB Version, TinyDB Style) =================
