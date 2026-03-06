@@ -34,10 +34,6 @@ db = client["yuuri_db"]
 users = db["users"]
 guilds = db["guilds"]
 
-# FIX (alias so old functions work)
-users_col = users
-chats_col = db["chats"]
-
 # ================= LOG =================
 logging.basicConfig(level=logging.INFO)
 
@@ -336,10 +332,10 @@ async def kill(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"💰 Eᴀʀɴᴇᴅ ᴇxᴛʀᴀ: {bounty_reward} Cᴏɪɴs!"
         )
 
-#========================rob (MongoDB + limit + owner protection + font)========================
+#======================== ROB (FIXED FOR YOUR PROFILE SYSTEM) ========================
 import time
 
-MAX_ROB_PER_ATTEMPT = 10000  # maximum coins per attempt
+MAX_ROB_PER_ATTEMPT = 10000  # max coins per rob
 
 async def robe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message:
@@ -361,13 +357,13 @@ async def robe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if target_user.id == robber_user.id:
         return await msg.reply_text("❌ Yᴏᴜ Cᴀɴ'ᴛ Rᴏʙ Yᴏᴜʀsᴇʟғ.")
 
-    # ❌ Cannot rob owner
+    # 👑 OWNER PROTECTION
     if target_user.id == OWNER_ID:
         return await msg.reply_text("👑 Yᴏᴜ Cᴀɴ'ᴛ Rᴏʙ Mʏ Dᴇᴀʀᴇsᴛ Oᴡɴᴇʀ 😒")
 
     # ❌ Missing amount
     if not context.args:
-        return await msg.reply_text("Usage: /ʀᴏʙ <ᴀᴍᴏᴜɴᴛ>")
+        return await msg.reply_text("Usage: /rob <amount>")
 
     # 💰 Parse amount
     try:
@@ -378,43 +374,51 @@ async def robe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if amount <= 0:
         return await msg.reply_text("❌ Aᴍᴏᴜɴᴛ Mᴜsᴛ Bᴇ Pᴏsɪᴛɪᴠᴇ.")
 
-    # 🔹 Fetch users from MongoDB
-    robber = users_col.find_one({"user_id": robber_user.id}) or {"user_id": robber_user.id, "coins": 0}
-    target = users_col.find_one({"user_id": target_user.id}) or {"user_id": target_user.id, "coins": 0}
+    # 🔹 Fetch users from SAME collection as profile
+    robber = users.find_one({"id": robber_user.id})
+    target = users.find_one({"id": target_user.id})
 
-    # 🛡 Protection check
-    if target.get("protect_until", 0) > int(time.time()) and robber_user.id != OWNER_ID:
-        return await msg.reply_text(f"🛡️ {target_user.first_name} Iѕ Pʀᴏᴛᴇᴄᴛᴇᴅ!")
+    if not robber:
+        robber = {"id": robber_user.id, "coins": 0}
+        users.insert_one(robber)
 
-    # 💰 Check robber min coins
-    if robber.get("coins", 0) < 50:
+    if not target:
+        target = {"id": target_user.id, "coins": 0}
+        users.insert_one(target)
+
+    robber_coins = robber.get("coins", 0)
+    target_coins = target.get("coins", 0)
+
+    # 💰 Check robber minimum coins
+    if robber_coins < 50:
         return await msg.reply_text(
             "💰 Yᴏᴜ Nᴇᴇᴅ Aᴛ Lᴇᴀsᴛ 50 Cᴏɪɴs Tᴏ Rᴏʙ Sᴏᴍᴇᴏɴᴇ.\n"
-            "💡 Use /ᴅᴀɪʟʏ Tᴏ Gᴇᴛ A Cʜᴀɴᴄᴇ Fᴏʀ Wɪɴɴɪɴɢ 1-100 Cᴏɪɴs Dᴀɪʟʏ."
+            "💡 Usᴇ /ᴅᴀɪʟʏ Tᴏ Gᴇᴛ Cᴏɪɴs."
         )
 
-    # 💸 Limit per rob attempt
-    actual_rob_amount = min(amount, target.get("coins", 0), MAX_ROB_PER_ATTEMPT)
+    # 💸 Limit rob amount
+    actual_rob_amount = min(amount, target_coins, MAX_ROB_PER_ATTEMPT)
 
     if actual_rob_amount <= 0:
-        return await msg.reply_text(f"💸 {target_user.first_name} Hᴀs Nᴏ Cᴏɪɴs Tᴏ Rᴏʙ.")
+        return await msg.reply_text(
+            f"💸 {target_user.first_name} Hᴀs Nᴏ Cᴏɪɴs Tᴏ Rᴏʙ."
+        )
 
-    # ✅ SUCCESS: update coins in MongoDB
-    users_col.update_one(
-        {"user_id": robber_user.id},
-        {"$inc": {"coins": actual_rob_amount}},
-        upsert=True
+    # ✅ Update coins
+    users.update_one(
+        {"id": robber_user.id},
+        {"$inc": {"coins": actual_rob_amount}}
     )
-    users_col.update_one(
-        {"user_id": target_user.id},
-        {"$inc": {"coins": -actual_rob_amount}},
-        upsert=True
+
+    users.update_one(
+        {"id": target_user.id},
+        {"$inc": {"coins": -actual_rob_amount}}
     )
 
     await msg.reply_text(
         f"👤 {robber_user.first_name} Rᴏʙʙᴇᴅ {target_user.first_name}\n"
         f"💰 Sᴛᴏʟᴇɴ: {actual_rob_amount} Cᴏɪɴs\n\n"
-        f"⚠️ Mᴀx Rᴏʙ Pᴇʀ Aᴛᴛᴇᴍᴘᴛ : {MAX_ROB_PER_ATTEMPT} Cᴏɪɴs"
+        f"⚠️ Mᴀx Rᴏʙ Pᴇʀ Aᴛᴛᴇᴍᴘᴛ: {MAX_ROB_PER_ATTEMPT}"
     )
 
 # ================= DAILY (MongoDB Version, TinyDB Style) =================
