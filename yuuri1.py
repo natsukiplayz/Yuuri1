@@ -78,34 +78,26 @@ async def save_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         upsert=True
     )
 
-# ================= BOT STATS (MongoDB + Styled Labels) =================
+# ================= BOT STATS =================
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if update.effective_user.id != OWNER_ID:
         return
 
-    # MongoDB collections
     chats_col = db["chats"]
     users_col = db["users"]
 
-    # Stats
     groups = chats_col.count_documents({"type": {"$in": ["group", "supergroup"]}})
     private = chats_col.count_documents({"type": "private"})
     blocked = chats_col.count_documents({"blocked": True})
     total_users = users_col.count_documents({})
 
-    # Styled labels
-    groups_label = "👥 Gʀᴏᴜᴘs"
-    chats_label = "💬 Cʜᴀᴛs"
-    users_label = "🧑‍💻 Tᴏᴛᴀʟ Usᴇʀs"
-    blocked_label = "🚫 Bʟᴏᴄᴋᴇᴅ Usᴇʀs"
-
     text = (
         "📊 𝗬𝘂𝘂𝗿𝗶 𝗕𝗼𝘁 𝗦𝘁𝗮𝘁𝘀\n\n"
-        f"{groups_label} : `{groups}`\n"
-        f"{chats_label} : `{private}`\n"
-        f"{users_label} : `{total_users}`\n"
-        f"{blocked_label} : `{blocked}`\n"
+        f"👥 Gʀᴏᴜᴘs : `{groups}`\n"
+        f"💬 Cʜᴀᴛs : `{private}`\n"
+        f"🧑‍💻 Tᴏᴛᴀʟ Usᴇʀs : `{total_users}`\n"
+        f"🚫 Bʟᴏᴄᴋᴇᴅ Usᴇʀs : `{blocked}`\n"
     )
 
     await update.message.reply_text(text, parse_mode="Markdown")
