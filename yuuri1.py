@@ -1118,6 +1118,8 @@ def main():
    # BOT_ID = app.bot.id  # set bot id at startup
 
     # Command Handlers
+    app.add_handler(CommandHandler("start", start_command))
+    app.add_handler(CommandHandler("setgroup", setgroup_command))
     app.add_handler(CommandHandler("daily", daily))
     app.add_handler(CommandHandler("shopp", shop))
     app.add_handler(CommandHandler("buyy", purchase))
@@ -1134,10 +1136,7 @@ def main():
     app.add_handler(CommandHandler("protect", protect))
     app.add_handler(CommandHandler("rankers", rankers))
 
-    #paid_and_start_things_firee
-    app.add_handler(CommandHandler("start", start_command))
-    app.add_handler(CommandHandler("setgroup", setgroup_command))
-
+   
     #fun cartoons and anime
     app.add_handler(CommandHandler("aniworld", aniworld_command))
 
