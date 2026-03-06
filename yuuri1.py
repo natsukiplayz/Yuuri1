@@ -484,20 +484,19 @@ async def protect(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     now = datetime.utcnow()
 
-  protect_until = user.get("protect_until")
-if protect_until:
-    expire = datetime.strptime(protect_until, "%Y-%m-%d %H:%M:%S")
-    if expire > now:
+    protect_until = user.get("protect_until")
+    if protect_until:
+        expire = datetime.strptime(protect_until, "%Y-%m-%d %H:%M:%S")
+        if expire > now:
+            remaining = expire - now
+            hours, remainder = divmod(int(remaining.total_seconds()), 3600)
+            minutes, _ = divmod(remainder, 60)
 
-        remaining = expire - now
-        hours, remainder = divmod(int(remaining.total_seconds()), 3600)
-        minutes, _ = divmod(remainder, 60)
-
-        return await update.message.reply_text(
-            "🛡️ Yᴏᴜ Aʀᴇ Aʟʀᴇᴀᴅʏ Pʀᴏᴛᴇᴄᴛᴇᴅ.\n"
-            f"⏳ Tɪᴍᴇ Lᴇꜰᴛ: {hours}ʜ {minutes}ᴍ\n"
-            f"🔒 Uɴᴛɪʟ: {protect_until}"
-        )
+            return await update.message.reply_text(
+                "🛡️ Yᴏᴜ Aʀᴇ Aʟʀᴇᴀᴅʏ Pʀᴏᴛᴇᴄᴛᴇᴅ.\n"
+                f"⏳ Tɪᴍᴇ Lᴇꜰᴛ: {hours}ʜ {minutes}ᴍ\n"
+                f"🔒 Uɴᴛɪʟ: {protect_until}"
+            )
 
     # 💰 Deduct coins
     user["coins"] -= price
