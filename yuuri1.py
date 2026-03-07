@@ -148,6 +148,49 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(text, parse_mode="Markdown")
 
+#start_command
+async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = update.message
+    if not msg:
+        return
+
+    # Save user to database
+    get_user(msg.from_user)
+
+    first_name = msg.from_user.first_name or "User"
+
+    # Inline keyboard
+    keyboard = [
+        [
+            InlineKeyboardButton("📰 Uᴘᴅᴀᴛᴇs", url="https://t.me/yuuriXupdates"),
+            InlineKeyboardButton("💬 Sᴜᴘᴘᴏʀᴛ ᴄʜᴀᴛ", url="https://t.me/DreamSpaceZ")
+        ],
+        [
+            InlineKeyboardButton("🤖 Sᴇᴄᴏɴᴅ ʙᴏᴛ", url="https://t.me/Im_yuukibot")
+        ],
+        [
+            InlineKeyboardButton(
+                "➕ Aᴅᴅ Mᴇ Tᴏ Yᴏᴜʀ Gʀᴏᴜᴘ",
+                url="https://t.me/YOUR_BOT_USERNAME?startgroup=true"
+            )
+        ]
+    ]
+
+    welcome_text = (
+        f"✨🎉 𝗛ᴇʟʟᴏ {first_name}! 🎉✨\n\n"
+        "💥 𝗪ᴇʟᴄᴏᴍᴇ 𝘁ᴏ 𝗬𝘂𝘂𝗿𝗶 𝗕𝗼𝘁 💥\n\n"
+        "📌 𝗧ʜɪs 𝗯𝗼𝘁 𝗵𝗲𝗹𝗽𝘀 𝘆𝗼𝘂 𝗴𝗲𝘁 𝘂𝗽𝗱𝗮𝘁𝗲𝘀, 𝗷𝗼𝗶𝗻 𝗰𝗼𝗺𝗺𝘂𝗻𝗶𝘁𝗶𝗲𝘀,\n"
+        "𝗮𝗻𝗱 𝘂𝘀𝗲 𝗺𝗮𝗻𝘆 𝗳𝘂𝗻 𝗳𝗲𝗮𝘁𝘂𝗿𝗲𝘀.\n\n"
+        "💡 𝗬𝗼𝘂 𝗰𝗮𝗻 𝗮𝗹𝘀𝗼 𝗮𝗱𝗱 𝗺𝗲 𝘁𝗼 𝘆𝗼𝘂𝗿 𝗴𝗿𝗼𝘂𝗽!"
+    )
+
+    sent_msg = await msg.reply_text(
+        welcome_text,
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+    context.chat_data["start_message_id"] = sent_msg.message_id
+
 # ================= LEVEL SYSTEM =================
 def add_xp(user_data, amount=10):
     user_data["xp"] += amount
