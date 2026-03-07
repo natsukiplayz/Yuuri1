@@ -1070,7 +1070,6 @@ def main():
 
     # Command Handlers
     app.add_handler(CommandHandler("start", start_command))
-    app.add_handler(CommandHandler("setgroup", setgroup_command))
     app.add_handler(CommandHandler("daily", daily))
     app.add_handler(CommandHandler("shopp", shop))
     app.add_handler(CommandHandler("buyy", purchase))
@@ -1086,8 +1085,7 @@ def main():
     app.add_handler(CommandHandler("status", profile))
     app.add_handler(CommandHandler("protect", protect))
     app.add_handler(CommandHandler("rankers", rankers))
-    app.add_handler(CommandHandler("stop_g", stop_group_command))
-   
+ 
     #fun cartoons and anime
     app.add_handler(CommandHandler("aniworld", aniworld_command))
 
