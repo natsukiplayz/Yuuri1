@@ -169,7 +169,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             InlineKeyboardButton("💬 Sᴜᴘᴘᴏʀᴛ ᴄʜᴀᴛ", url="https://t.me/DreamSpaceZ")
         ],
         [
-            InlineKeyboardButton("👥 Gʀᴏᴜᴘs", callback_data="show_groups"),  # plain ASCII callback_data
+            InlineKeyboardButton("👥 Gʀᴏᴜᴘs", callback_data="show_groups"),
             InlineKeyboardButton("🤖 Sᴇᴄᴏɴᴅ ʙᴏᴛ", url="https://t.me/Im_yuukibot")
         ],
         [
@@ -183,34 +183,41 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     welcome_text = (
         f"✨🎉 𝗛ᴇʟʟᴏ {first_name}! 🎉✨\n\n"
         "💥 𝗪ᴇʟᴄᴏᴍᴇ 𝘁ᴏ 𝘆ᴏᴜʀ 𝗨ʟᴛɪᴍ𝗮ᴛᴇ 𝗕𝗢𝗧 💥\n\n"
-        "📌 𝗧ʜɪs 𝗕𝗢𝗧 𝗵𝗲𝗹𝗽𝘀 ʏᴏᴜ 𝗰𝗵𝗲𝗰𝗸 𝗨ᴘᴅᴀᴛᴇs, 𝗝ᴏɪɴ Gʀᴏᴜᴘs, 𝗮ɴ𝗱 𝗺𝗮ɴ𝗮ɢ𝗲 𝗮ʟʟ 𝗲ᴀsɪʟʏ!\n\n"
+        "📌 𝗧ʜɪs 𝗕𝗢𝗧 𝗵𝗲𝗹𝗽𝘀 ʏᴏᴜ 𝗰𝗵𝗲𝗰𝗸 𝗨ᴘᴅᴀᴛᴇs, 𝗝ᴏɪɴ Gʀᴏᴜᴘs, 𝗮ɴ𝗱 𝗺𝗮ɴ𝗮𝗴𝗲 𝗮ʟʟ 𝗲ᴀsɪʟʏ!\n\n"
         "💡 𝗔ʟsᴏ, 𝗮ᴅᴅ 𝗺ᴇ ᴛᴏ ʏᴏᴜʀ 𝗴ʀᴏᴜᴘ ᴡɪᴛʜ ᴊᴜsᴛ ᴏɴᴇ ᴄʟɪᴄᴋ!"
     )
 
-    await msg.reply_text(welcome_text, reply_markup=InlineKeyboardMarkup(keyboard))
+    # Send message and save the sent message object
+    sent_msg = await msg.reply_text(
+        welcome_text,
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+    # Optional: store the message id in context for later use
+    context.chat_data['start_message_id'] = sent_msg.message_id
 
 
 # ------------------ Callback Handler ------------------
 async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    if not query:
+    if not query or not query.message:
         return
 
-    await query.answer()  # acknowledge the click
+    await query.answer()  # acknowledge button click
 
     if query.data != "show_groups":
-        return  # ignore other callbacks
+        return
 
     contact_text = (
         "💰 𝖎ꜰ 𝘆𝗼𝘂 𝘄𝗮𝗻𝘁 𝘆𝗼𝘂𝗿 𝖌𝗿𝗼𝘂𝗽 𝖍𝗲𝗿𝗲, 𝗰𝗼𝗻𝘁𝗮𝗰𝘁: @RJVTAX\n"
         "⚠️ 𝗣𝗔𝗜𝗗 - Rs 20"
     )
 
-    # Fetch groups from MongoDB sorted by position
+    # Fetch groups from MongoDB
     groups = list(groups_collection.find().sort("position"))
 
     if not groups:
-        await query.edit_message_text(f"{contact_text}\n\n⚠️ 𝖓ᴏ 𝖌𝗋𝗈𝗎𝗉𝗌 𝖞𝗲𝖙!")
+        await query.message.edit_text(f"{contact_text}\n\n⚠️ 𝖓ᴏ 𝖌𝗋𝗈𝗎𝗉𝗌 𝖞𝗲𝖙!")
         return
 
     keyboard = []
@@ -224,7 +231,7 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard.append(row)
 
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await query.edit_message_text(contact_text, reply_markup=reply_markup)
+    await query.message.edit_text(contact_text, reply_markup=reply_markup)
 
 # ------------------ /setgroup Command ------------------
 async def setgroup_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
