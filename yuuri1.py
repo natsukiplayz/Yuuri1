@@ -1125,8 +1125,8 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def revive(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user = update.effective_user
-    chat_id = update.effective_chat.id
-    reply = update.message.reply_to_message
+    msg = update.effective_message
+    reply = msg.reply_to_message
 
     # target player
     if reply:
@@ -1137,15 +1137,11 @@ async def revive(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = users.find_one({"id": target.id})
 
     if not data:
-        return await update.message.reply_text(
-            "❌ Pʟᴀʏᴇʀ Nᴏᴛ Fᴏᴜɴᴅ"
-        )
+        return await msg.reply_text("❌ Pʟᴀʏᴇʀ Nᴏᴛ Fᴏᴜɴᴅ")
 
-    # already alive
-    if data.get("status") == "alive":
-        return await update.message.reply_text(
-            "⚠️ Tʜɪs Pʟᴀʏᴇʀ ɪs Aʟʀᴇᴀᴅʏ Aʟɪᴠᴇ"
-        )
+    # check if already alive
+    if not data.get("dead", False):
+        return await msg.reply_text("⚠️ Tʜɪs Pʟᴀʏᴇʀ ɪs Aʟʀᴇᴀᴅʏ Aʟɪᴠᴇ")
 
     # self revive cost
     if target.id == user.id:
@@ -1153,7 +1149,7 @@ async def revive(update: Update, context: ContextTypes.DEFAULT_TYPE):
         coins = data.get("coins", 0)
 
         if coins < 400:
-            return await update.message.reply_text(
+            return await msg.reply_text(
                 "💰 Yᴏᴜ Nᴇᴇᴅ 400 Cᴏɪɴs Tᴏ Rᴇᴠɪᴠᴇ Yᴏᴜʀsᴇʟғ"
             )
 
@@ -1165,16 +1161,15 @@ async def revive(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # revive player
     users.update_one(
         {"id": target.id},
-        {"$set": {"status": "alive"}}
+        {"$set": {"dead": False}}
     )
 
-    await update.message.reply_text(
+    await msg.reply_text(
 f"""
 ✨ Rᴇᴠɪᴠᴇ Sᴜᴄᴄᴇssғᴜʟ
 
 👤 Nᴀᴍᴇ : {target.first_name}
 🆔 Iᴅ : {target.id}
-
 ❤️ Sᴛᴀᴛᴜs : Aʟɪᴠᴇ
 
 ⚔️ Rᴇᴀᴅʏ Aɢᴀɪɴ
