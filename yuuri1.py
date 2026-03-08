@@ -544,7 +544,7 @@ async def join(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user.id in game["players"]:
         return
 
-    users_col.update_one({"_id": user.id}, {"$inc": {"coins": -bet}})
+    users.update_one({"id": user.id}, {"$inc": {"coins": -bet}})
 
     game["players"].append(user.id)
     game["pot"] += bet
