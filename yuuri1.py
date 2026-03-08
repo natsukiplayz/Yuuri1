@@ -1520,6 +1520,105 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if query.data == "coming_soon":
         await query.edit_message_text("⚠️ Cᴏᴍɪɴɢ Sᴏᴏɴ!")
 
+#events setoption
+from telegram import Update
+from telegram.ext import ContextTypes, CommandHandler
+from pymongo import MongoClient
+
+mongo = MongoClient(MONGO_URL)
+db = mongo["yuuri"]
+events = db["events"]
+
+OWNER_ID = 5773908061  # your telegram id
+
+
+async def set_event(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+
+    if user.id != OWNER_ID:
+        await update.message.reply_text("❌ Oɴʟʏ Bᴏᴛ Oᴡɴᴇʀ Cᴀɴ Uѕᴇ Tʜɪѕ")
+        return
+
+    if not context.args:
+        await update.message.reply_text("Usage: /set heist")
+        return
+
+    event_name = context.args[0].lower()
+
+    if event_name != "heist":
+        await update.message.reply_text("❌ Uɴᴋɴᴏᴡɴ Eᴠᴇɴᴛ")
+        return
+
+    events.update_one(
+        {"name": "heist"},
+        {"$set": {"active": True}},
+        upsert=True
+    )
+
+    text = """
+🌍 Gʟᴏʙᴀʟ Eᴠᴇɴᴛ
+
+🏦 A Hᴇɪsᴛ Eᴠᴇɴᴛ Hᴀs Bᴇᴇɴ Gʀᴀɴᴛᴇᴅ
+
+💰 Rewards
+Coins
+XP
+Random Box 🎁
+
+Usage: /heist
+
+Host a heist and build a team.
+
+Players can join using:
+/joinheist
+
+For more info:
+/heisthelp
+"""
+
+    await update.message.reply_text(text)
+
+#heist normal player 
+heists = db["heists"]
+
+
+async def heist(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    chat = update.effective_chat
+
+    event = events.find_one({"name": "heist"})
+
+    if not event or not event.get("active"):
+        await update.message.reply_text(
+            "❌ Hᴇɪsᴛ Eᴠᴇɴᴛ Iѕ Nᴏᴛ Aᴄᴛɪᴠᴇ"
+        )
+        return
+
+    existing = heists.find_one({"chat_id": chat.id})
+
+    if existing:
+        await update.message.reply_text(
+            "⚠️ A Hᴇɪsᴛ Iѕ Aʟʀᴇᴀᴅʏ Rᴜɴɴɪɴɢ"
+        )
+        return
+
+    heists.insert_one({
+        "chat_id": chat.id,
+        "host": user.id,
+        "players": [user.id]
+    })
+
+    text = f"""
+🏦 Hᴇɪsᴛ Lᴏʙʙʏ Cʀᴇᴀᴛᴇᴅ
+
+👤 Host: {user.first_name}
+👥 Players: 1/5
+
+Use /joinheist to join
+"""
+
+    await update.message.reply_text(text)
+
 # ---------------- AI FUNCTION ----------------
 import httpx
 
@@ -1632,6 +1731,8 @@ def main():
     app.add_handler(CommandHandler("out", out))
     app.add_handler(CommandHandler("revive", revive))
     app.add_handler(CommandHandler("givee", givee))
+    app.add_handler(CommandHandler("set", set_event))
+    app.add_handler(CommandHandler("heist", heist))
 
     #fun cartoons and anime
     app.add_handler(CommandHandler("aniworld", aniworld_command))
