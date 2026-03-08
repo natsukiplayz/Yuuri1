@@ -1176,6 +1176,93 @@ f"""
 """
     )
 
+#givee_section - to transfer coins to another one 
+async def givee(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    msg = update.effective_message
+    sender = update.effective_user
+    reply = msg.reply_to_message
+
+    if not reply:
+        return await msg.reply_text("⚠️ Rᴇᴘʟʏ Tᴏ A Pʟᴀʏᴇʀ Tᴏ Gɪᴠᴇ Cᴏɪɴs")
+
+    target = reply.from_user
+
+    if not target:
+        return await msg.reply_text("❌ Pʟᴀʏᴇʀ Nᴏᴛ Fᴏᴜɴᴅ")
+
+    if target.is_bot:
+        return await msg.reply_text("🤖 Yᴏᴜ Cᴀɴ'ᴛ Gɪᴠᴇ Cᴏɪɴs Tᴏ Bᴏᴛs")
+
+    if not context.args:
+        return await msg.reply_text("⚠️ Usᴀɢᴇ: /givee <amount>")
+
+    try:
+        amount = int(context.args[0])
+    except:
+        return await msg.reply_text("❌ Iɴᴠᴀʟɪᴅ Aᴍᴏᴜɴᴛ")
+
+    if amount <= 0:
+        return await msg.reply_text("❌ Aᴍᴏᴜɴᴛ Mᴜsᴛ Bᴇ Pᴏsɪᴛɪᴠᴇ")
+
+    if target.id == sender.id:
+        return await msg.reply_text("⚠️ Yᴏᴜ Cᴀɴ'ᴛ Gɪᴠᴇ Cᴏɪɴs Tᴏ Yᴏᴜʀsᴇʟғ")
+
+    # 🚫 block giving coins to owner
+    if target.id == OWNER_ID:
+        return await msg.reply_text("🧸 Nᴏᴛ Nᴇᴇᴅ Tᴏ Gɪᴠᴇ Mʏ Oᴡɴᴇʀ 🧸✨")
+
+    sender_data = get_user(sender)
+    receiver_data = get_user(target)
+
+    if sender_data.get("coins", 0) < amount:
+        return await msg.reply_text("💰 Yᴏᴜ Dᴏɴ'ᴛ Hᴀᴠᴇ Eɴᴏᴜɢʜ Cᴏɪɴs")
+
+    # ===== TAX =====
+    tax = int(amount * 0.10)
+    received = amount - tax
+
+    # ===== XP DEDUCTION =====
+    xp_loss = max(1, min(amount // 30, 50))
+
+    # ===== ANIMATION =====
+    anim = await msg.reply_text("💸 Tʀᴀɴsғᴇʀ Iɴɪᴛɪᴀᴛᴇᴅ...")
+    await asyncio.sleep(1.2)
+
+    await anim.edit_text("💰 Cᴀʟᴄᴜʟᴀᴛɪɴɢ Tᴀx...")
+    await asyncio.sleep(1.2)
+
+    # deduct sender
+    users.update_one(
+        {"id": sender.id},
+        {"$inc": {"coins": -amount, "xp": -xp_loss}}
+    )
+
+    # give receiver
+    users.update_one(
+        {"id": target.id},
+        {"$inc": {"coins": received}}
+    )
+
+    # tax to owner
+    users.update_one(
+        {"id": OWNER_ID},
+        {"$inc": {"coins": tax}}
+    )
+
+    await anim.edit_text(
+f"""
+✅ Tʀᴀɴsᴀᴄᴛɪᴏɴ Cᴏᴍᴘʟᴇᴛᴇᴅ
+
+👤 Sᴇɴᴅᴇʀ: {sender.first_name}
+🎁 Rᴇᴄᴇɪᴠᴇʀ: {target.first_name}
+
+✅ {target.first_name} Rᴇᴄᴇɪᴠᴇᴅ ${received}
+💸 Tᴀx: ${tax} (10%)
+⚡ Xᴘ Dᴇᴅᴜᴄᴛᴇᴅ: -{xp_loss}
+"""
+    )
+
 # ================= SHOP =================
 SHOP_ITEMS = {
     "rose": (500, "🌹"),
@@ -1544,6 +1631,7 @@ def main():
     app.add_handler(CommandHandler("rullrank", rullrank))
     app.add_handler(CommandHandler("out", out))
     app.add_handler(CommandHandler("revive", revive))
+    app.add_handler(CommandHandler("givee", givee))
 
     #fun cartoons and anime
     app.add_handler(CommandHandler("aniworld", aniworld_command))
