@@ -388,7 +388,7 @@ async def rullate(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     amount = int(context.args[0])
 
-    user_data = users_col.find_one({"_id": user.id})
+    user_data = users.find_one({"id": user.id})
 
     if user_data["coins"] < amount:
         await update.message.reply_text("💸 You don't have enough coins.")
@@ -438,8 +438,8 @@ async def auto_start(chat_id, context):
 
     if len(game["players"]) < 2:
 
-        users_col.update_one(
-            {"_id": game["players"][0]},
+        users.update_one(
+            {"id": game["players"][0]},
             {"$inc": {"coins": game["bet"]}}
         )
 
@@ -535,7 +535,7 @@ async def join(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     bet = game["bet"]
 
-    user_data = users_col.find_one({"_id": user.id})
+    user_data = users.find_one({"id": user.id})
 
     if user_data["coins"] < bet:
         await update.message.reply_text("Not enough coins.")
@@ -617,8 +617,8 @@ You lose the bet.
             winner = players[0]
             pot = game["pot"]
 
-            users_col.update_one(
-                {"_id": winner},
+            users.update_one(
+                {"id": winner},
                 {"$inc": {"coins": pot, "roulette_won": pot}}
             )
 
@@ -652,7 +652,7 @@ Or /out
 
 async def rullrank(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    top_users = users_col.find().sort("roulette_won", -1).limit(10)
+    top_users = users.find().sort("roulette_won", -1).limit(10)
 
     text = (
         "🏆 Rᴜssɪᴀɴ Rᴜʟʟᴇᴛᴇ Lᴇᴀᴅᴇʀʙᴏᴀʀᴅ\n\n"
