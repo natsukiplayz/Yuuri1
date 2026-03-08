@@ -377,58 +377,60 @@ from telegram.ext import ContextTypes
 
 roulette_games = {}
 
-# HOST GAME
+# 🎰 HOST GAME
 async def rullate(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     user = update.effective_user
     chat_id = update.effective_chat.id
 
     if not context.args:
-        await update.message.reply_text("❌ Usage : /rullate <amount>")
-        return
+        return await update.message.reply_text("❌ Uꜱᴀɢᴇ : /ʀᴜʟʟᴀᴛᴇ <ᴀᴍᴏᴜɴᴛ>")
 
     amount = int(context.args[0])
 
     user_data = users.find_one({"id": user.id})
 
+    if not user_data:
+        return await update.message.reply_text("❌ Uꜱᴇ /sᴛᴀʀᴛ ғɪʀsᴛ")
+
     if user_data["coins"] < amount:
-        await update.message.reply_text("💸 You don't have enough coins.")
-        return
+        return await update.message.reply_text("💸 Nᴏᴛ ᴇɴᴏᴜɢʜ ᴄᴏɪɴs")
 
     if chat_id in roulette_games:
-        await update.message.reply_text("🎮 A roulette game already exists.")
-        return
+        return await update.message.reply_text("🎮 Gᴀᴍᴇ ᴀʟʀᴇᴀᴅʏ ʀᴜɴɴɪɴɢ")
 
     users.update_one({"id": user.id}, {"$inc": {"coins": -amount}})
 
     roulette_games[chat_id] = {
         "host": user.id,
         "bet": amount,
-        "players": [user.id],
+        "players": [{
+            "id": user.id,
+            "name": user.first_name
+        }],
         "pot": amount,
         "started": False,
         "turn": 0
     }
 
-    await update.message.reply_text(
-        f"""
-🎰 Rᴜssɪᴀɴ Rᴜʟʟᴇᴛᴇ Hᴏsᴛᴇᴅ!
+    await update.message.reply_text(f"""
+🎰 Rᴜssɪᴀɴ Rᴜʟʟᴇᴛᴇ Hᴏsᴛᴇᴅ
 
-Hᴏsᴛ : {user.first_name}
-Bᴇᴛ : {amount} coins
+👤 Hᴏsᴛ : {user.first_name}
+💰 Bᴇᴛ : {amount}
 
-Use:
-/join {amount}
+👉 Uꜱᴇ /ᴊᴏɪɴ
 
-Game will start in 2 minutes
-Or host can use /on
-"""
-    )
+⏳ Sᴛᴀʀᴛs ɪɴ 2 ᴍɪɴ
+Oʀ ᴜꜱᴇ /ᴏɴ
+""")
 
     asyncio.create_task(auto_start(chat_id, context))
 
 
-# AUTO START
+# ⏳ AUTO START
 async def auto_start(chat_id, context):
+
     await asyncio.sleep(120)
 
     game = roulette_games.get(chat_id)
@@ -438,14 +440,16 @@ async def auto_start(chat_id, context):
 
     if len(game["players"]) < 2:
 
+        host = game["players"][0]["id"]
+
         users.update_one(
-            {"id": game["players"][0]},
+            {"id": host},
             {"$inc": {"coins": game["bet"]}}
         )
 
         await context.bot.send_message(
             chat_id,
-            "❌ No one joined.\nCoins refunded."
+            "❌ Nᴏ ᴏɴᴇ ᴊᴏɪɴᴇᴅ\n💰 Rᴇғᴜɴᴅᴇᴅ"
         )
 
         del roulette_games[chat_id]
@@ -454,22 +458,24 @@ async def auto_start(chat_id, context):
     await start_game(chat_id, context)
 
 
-# START COMMAND
+# 🚀 FORCE START
 async def on(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     chat_id = update.effective_chat.id
+    user = update.effective_user
+
     game = roulette_games.get(chat_id)
 
     if not game:
         return
 
-    if update.effective_user.id != game["host"]:
-        return
+    if user.id != game["host"]:
+        return await update.message.reply_text("⛔ Oɴʟʏ Hᴏsᴛ")
 
     await start_game(chat_id, context)
 
 
-# START GAME
+# 🎮 START GAME
 async def start_game(chat_id, context):
 
     game = roulette_games[chat_id]
@@ -477,47 +483,27 @@ async def start_game(chat_id, context):
 
     players = game["players"]
 
-    rounds = len(players)
+    await context.bot.send_message(chat_id,f"""
+🥳 Rᴜssɪᴀɴ Rᴜʟʟᴇᴛᴇ Sᴛᴀʀᴛᴇᴅ
+
+🔫 Uꜱᴇ /sʜᴏᴛ ᴏɴ ʏᴏᴜʀ ᴛᴜʀɴ
+
+💨 Eᴍᴘᴛʏ → Sᴀғᴇ  
+💀 Bᴜʟʟᴇᴛ → Oᴜᴛ
+
+👥 Pʟᴀʏᴇʀs : {len(players)}
+🍯 Pᴏᴛ : {game['pot']}
+""")
+
+    first = players[0]["name"]
 
     await context.bot.send_message(
         chat_id,
-f"""
-🥳 The Russian Rullate Game Has Been Started
-
-Welcome to Yuuri's Russian Rullate Game
-
-Use /shot when it's your turn.
-
-If chamber empty → safe  
-If bullet → you're out 😮‍💨
-
-Total players : {len(players)}
-Total rounds : {rounds}
-
-Good luck winning the pot 🍯
-"""
-    )
-
-    # VOICE MESSAGE
-    await context.bot.send_voice(
-        chat_id,
-        voice="https://api.streamelements.com/kappa/v2/speech?voice=Brian&text=Welcome+to+Yuuri+Russian+Roulette+Game"
-    )
-
-    first = players[0]
-
-    await context.bot.send_message(
-        chat_id,
-        f"""
-🎯 Now Turn : {first}
-
-Use : /shot
-Or /out
-"""
+        f"🎯 Nᴏᴡ Tᴜʀɴ : {first}\n🔫 Uꜱᴇ /sʜᴏᴛ"
     )
 
 
-# JOIN
+# 👥 JOIN
 async def join(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user = update.effective_user
@@ -526,55 +512,37 @@ async def join(update: Update, context: ContextTypes.DEFAULT_TYPE):
     game = roulette_games.get(chat_id)
 
     if not game:
-        await update.message.reply_text("No roulette game.")
-        return
+        return await update.message.reply_text("❌ Nᴏ Gᴀᴍᴇ")
 
     if game["started"]:
-        await update.message.reply_text("Game already started.")
-        return
+        return await update.message.reply_text("⛔ Gᴀᴍᴇ Sᴛᴀʀᴛᴇᴅ")
 
     bet = game["bet"]
 
     user_data = users.find_one({"id": user.id})
 
     if user_data["coins"] < bet:
-        await update.message.reply_text("Not enough coins.")
-        return
+        return await update.message.reply_text("💸 Nᴏᴛ ᴇɴᴏᴜɢʜ")
 
-    if user.id in game["players"]:
-        return
+    for p in game["players"]:
+        if p["id"] == user.id:
+            return
 
     users.update_one({"id": user.id}, {"$inc": {"coins": -bet}})
 
-    game["players"].append(user.id)
+    game["players"].append({
+        "id": user.id,
+        "name": user.first_name
+    })
+
     game["pot"] += bet
 
     await update.message.reply_text(
-        f"✅ {user.first_name} joined!\nPot : {game['pot']}"
+        f"✅ {user.first_name} Jᴏɪɴᴇᴅ\n💰 Pᴏᴛ : {game['pot']}"
     )
 
 
-# OUT COMMAND
-async def out(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    chat_id = update.effective_chat.id
-    user = update.effective_user
-
-    game = roulette_games.get(chat_id)
-
-    if not game:
-        return
-
-    if user.id in game["players"]:
-
-        game["players"].remove(user.id)
-
-        await update.message.reply_text(
-            f"{user.first_name} left the game."
-        )
-
-
-# SHOT
+# 🔫 SHOOT
 async def shot(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     chat_id = update.effective_chat.id
@@ -586,70 +554,124 @@ async def shot(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     players = game["players"]
-
     turn = game["turn"]
 
-    if players[turn] != user.id:
-        await update.message.reply_text("Not your turn.")
-        return
+    current = players[turn]
+
+    if current["id"] != user.id:
+        return await update.message.reply_text("⏳ Nᴏᴛ Yᴏᴜʀ Tᴜʀɴ")
 
     chamber = random.randint(1,6)
 
-    await update.message.reply_text("Click... Click...")
+    msg = await update.message.reply_text("Cʟɪᴄᴋ... Cʟɪᴄᴋ...")
 
     await asyncio.sleep(2)
 
+    # 💀 BULLET
     if chamber == 1:
 
-        await update.message.reply_text(
-            f"""
-💥 THAD!!!!
+        await msg.edit_text(
+f"""💥 Bᴏᴏᴍ!
 
-{user.first_name} is OUT!
-You lose the bet.
+{user.first_name} ɪs Oᴜᴛ"""
+)
+
+        players.pop(turn)
+if len(players) == 1:
+
+    winner = players[0]
+    pot = game["pot"]
+
+    xp_reward = random.randint(40, 80)
+
+    users.update_one(
+        {"id": winner["id"]},
+        {"$inc": {
+            "coins": pot,
+            "xp": xp_reward,
+            "roulette_won": 1
+        }}
+    )
+
+    # Get profile photo
+    photos = await context.bot.get_user_profile_photos(winner["id"], limit=1)
+
+    caption = f"""
+🎰 **Rᴜssɪᴀɴ Rᴜʟʟᴇᴛᴇ Rᴇsᴜʟᴛ**
+
+━━━━━━━━━━━━━━━
+
+🏆 **Wɪɴɴᴇʀ**
+👤 [{winner['name']}](tg://user?id={winner['id']})
+
+💰 **Pᴏᴛ Wᴏɴ**
+`{pot}` ᴄᴏɪɴs
+
+⭐ **XP Gᴀɪɴᴇᴅ**
+`+{xp_reward}` XP
+
+━━━━━━━━━━━━━━━
+
+🎯 **Cᴏɴɢʀᴀᴛᴜʟᴀᴛɪᴏɴs!**
 """
+
+    if photos.total_count > 0:
+
+        file_id = photos.photos[0][0].file_id
+
+        await context.bot.send_photo(
+            chat_id,
+            photo=file_id,
+            caption=caption,
+            parse_mode="Markdown"
         )
-
-        players.remove(user.id)
-
-        if len(players) == 1:
-
-            winner = players[0]
-            pot = game["pot"]
-
-            users.update_one(
-                {"id": winner},
-                {"$inc": {"coins": pot, "roulette_won": pot}}
-            )
-
-            await context.bot.send_message(
-                chat_id,
-                f"""
-🏆 Winner!
-
-User ID : {winner}
-
-Won : {pot} coins
-"""
-            )
-
-            del roulette_games[chat_id]
-            return
 
     else:
 
-        await update.message.reply_text(
-f"""
-😮‍💨 Safe!
-
-Now next player's turn.
-Use /shot
-Or /out
-"""
+        await context.bot.send_message(
+            chat_id,
+            caption,
+            parse_mode="Markdown"
         )
 
-    game["turn"] = (game["turn"] + 1) % len(players)
+    del roulette_games[chat_id]
+    return
 
+        if turn >= len(players):
+            game["turn"] = 0
+
+    else:
+
+        await msg.edit_text("😮‍💨 Sᴀғᴇ!")
+
+        game["turn"] = (turn + 1) % len(players)
+
+    next_player = players[game["turn"]]["name"]
+
+    await context.bot.send_message(
+        chat_id,
+        f"🎯 Nᴇxᴛ Tᴜʀɴ : {next_player}\n🔫 /sʜᴏᴛ"
+    )
+
+
+# 🚪 LEAVE GAME
+async def out(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    chat_id = update.effective_chat.id
+    user = update.effective_user
+
+    game = roulette_games.get(chat_id)
+
+    if not game:
+        return
+
+    for p in game["players"]:
+        if p["id"] == user.id:
+            game["players"].remove(p)
+            await update.message.reply_text(f"{user.first_name} Lᴇғᴛ")
+            break
+
+#RullRank leaderboard of rullategame====
 async def rullrank(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     top_users = users.find().sort("roulette_won", -1).limit(10)
