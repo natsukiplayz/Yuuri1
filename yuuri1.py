@@ -665,11 +665,47 @@ async def out(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not game:
         return
 
-    for p in game["players"]:
+    players = game["players"]
+
+    for p in players:
         if p["id"] == user.id:
-            game["players"].remove(p)
-            await update.message.reply_text(f"{user.first_name} Lᴇғᴛ")
-            break
+
+            players.remove(p)
+
+            await update.message.reply_text(f"{user.first_name} Lᴇғᴛ Tʜᴇ Gᴀᴍᴇ")
+
+            # 🎯 IF ONLY ONE PLAYER LEFT → WINNER
+            if len(players) == 1:
+
+                winner = players[0]
+                pot = game["pot"]
+
+                xp_reward = random.randint(40, 80)
+
+                users.update_one(
+                    {"id": winner["id"]},
+                    {"$inc": {
+                        "coins": pot,
+                        "xp": xp_reward,
+                        "roulette_won": 1
+                    }}
+                )
+
+                await context.bot.send_message(
+                    chat_id,
+f"""
+🏆 Rᴜssɪᴀɴ Rᴜʟʟᴇᴛᴇ Wɪɴɴᴇʀ
+
+👤 {winner['name']}
+
+💰 Wᴏɴ : {pot} ᴄᴏɪɴs
+⭐ XP : +{xp_reward}
+"""
+                )
+
+                del roulette_games[chat_id]
+
+            return
 
 #RullRank leaderboard of rullategame====
 async def rullrank(update: Update, context: ContextTypes.DEFAULT_TYPE):
