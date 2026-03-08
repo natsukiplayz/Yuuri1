@@ -1632,9 +1632,7 @@ def main():
     app.add_handler(CommandHandler("out", out))
     app.add_handler(CommandHandler("revive", revive))
     app.add_handler(CommandHandler("givee", givee))
-    app.add_handler(CommandHandler("set", set_event))
-    app.add_handler(CommandHandler("heist", heist))
-    app.add_handler(CommandHandler("cancelheist", cancelheist))
+ 
     #fun cartoons and anime
     app.add_handler(CommandHandler("aniworld", aniworld_command))
 
