@@ -482,6 +482,19 @@ async def start_game(chat_id, context):
     game["started"] = True
 
     players = game["players"]
+    count = len(players)
+
+    # chamber size
+    if count == 2:
+        chambers = 6
+    elif count == 3:
+        chambers = 8
+    else:
+        chambers = 10
+
+    game["chambers"] = chambers
+    game["bullet"] = random.randint(1, chambers)
+    game["current"] = 1
 
     await context.bot.send_message(chat_id,f"""
 🥳 Rᴜssɪᴀɴ Rᴜʟʟᴇᴛᴇ Sᴛᴀʀᴛᴇᴅ
@@ -493,6 +506,7 @@ async def start_game(chat_id, context):
 
 👥 Pʟᴀʏᴇʀs : {len(players)}
 🍯 Pᴏᴛ : {game['pot']}
+🔄 Cʜᴀᴍʙᴇʀs : {chambers}
 """)
 
     first = players[0]["name"]
@@ -501,7 +515,6 @@ async def start_game(chat_id, context):
         chat_id,
         f"🎯 Nᴏᴡ Tᴜʀɴ : {first}\n🔫 Uꜱᴇ /sʜᴏᴛ"
     )
-
 
 # 👥 JOIN
 async def join(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -561,23 +574,21 @@ async def shot(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if current["id"] != user.id:
         return await update.message.reply_text("⏳ Nᴏᴛ Yᴏᴜʀ Tᴜʀɴ")
 
-    chamber = random.randint(1,6)
-
-    msg = await update.message.reply_text("Cʟɪᴄᴋ... Cʟɪᴄᴋ...")
-
+    msg = await update.message.reply_text("🔫 Cʟɪᴄᴋ... Cʟɪᴄᴋ...")
     await asyncio.sleep(2)
 
-    # 💀 BULLET
-    if chamber == 1:
+    # 💀 BULLET HIT
+    if game["current"] == game["bullet"]:
 
         await msg.edit_text(
 f"""💥 Bᴏᴏᴍ!
 
-{user.first_name} ɪs Oᴜᴛ"""
+💀 {user.first_name} ɪs Oᴜᴛ"""
         )
 
         players.pop(turn)
 
+        # 🏆 WINNER
         if len(players) == 1:
 
             winner = players[0]
@@ -594,8 +605,11 @@ f"""💥 Bᴏᴏᴍ!
                 }}
             )
 
-            # Get profile photo
-            photos = await context.bot.get_user_profile_photos(winner["id"], limit=1)
+            # 📸 GET PROFILE PHOTO
+            photos = await context.bot.get_user_profile_photos(
+                winner["id"],
+                limit=1
+            )
 
             caption = f"""
 🎰 **Rᴜssɪᴀɴ Rᴜʟʟᴇᴛᴇ Rᴇsᴜʟᴛ**
@@ -612,10 +626,10 @@ f"""💥 Bᴏᴏᴍ!
 `+{xp_reward}` XP
 
 ━━━━━━━━━━━━━━━
-
-🎯 **Cᴏɴɢʀᴀᴛᴜʟᴀᴛɪᴏɴs!**
+🎉 **Cᴏɴɢʀᴀᴛᴜʟᴀᴛɪᴏɴs!**
 """
 
+            # 📸 SEND PHOTO RESULT
             if photos.total_count > 0:
 
                 file_id = photos.photos[0][0].file_id
@@ -638,6 +652,7 @@ f"""💥 Bᴏᴏᴍ!
             del roulette_games[chat_id]
             return
 
+        # FIX TURN AFTER REMOVE
         if turn >= len(players):
             game["turn"] = 0
 
@@ -645,13 +660,21 @@ f"""💥 Bᴏᴏᴍ!
 
         await msg.edit_text("😮‍💨 Sᴀғᴇ!")
 
+        # MOVE CHAMBER
+        game["current"] += 1
+
+        # NEXT PLAYER
         game["turn"] = (turn + 1) % len(players)
 
     next_player = players[game["turn"]]["name"]
 
     await context.bot.send_message(
         chat_id,
-        f"🎯 Nᴇxᴛ Tᴜʀɴ : {next_player}\n🔫 /sʜᴏᴛ"
+        f"""
+🎯 Nᴇxᴛ Tᴜʀɴ : {next_player}
+
+🔫 Uꜱᴇ /shot
+"""
     )
 
 # 🚪 LEAVE GAME
