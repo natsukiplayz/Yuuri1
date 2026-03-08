@@ -1619,6 +1619,31 @@ Use /joinheist to join
 
     await update.message.reply_text(text)
 
+#cancelheist
+async def cancelheist(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    chat = update.effective_chat
+
+    heist = heists.find_one({"chat_id": chat.id})
+
+    if not heist:
+        await update.message.reply_text(
+            "❌ Nᴏ Aᴄᴛɪᴠᴇ Hᴇɪsᴛ"
+        )
+        return
+
+    if heist["host"] != user.id:
+        await update.message.reply_text(
+            "❌ Oɴʟʏ Tʜᴇ Hᴏsᴛ Cᴀɴ Cᴀɴᴄᴇʟ Tʜᴇ Hᴇɪsᴛ"
+        )
+        return
+
+    heists.delete_one({"chat_id": chat.id})
+
+    await update.message.reply_text(
+        "❌ Hᴇɪsᴛ Cᴀɴᴄᴇʟʟᴇᴅ Bʏ Hᴏsᴛ"
+    )
+
 # ---------------- AI FUNCTION ----------------
 import httpx
 
@@ -1733,7 +1758,7 @@ def main():
     app.add_handler(CommandHandler("givee", givee))
     app.add_handler(CommandHandler("set", set_event))
     app.add_handler(CommandHandler("heist", heist))
-
+    app.add_handler(CommandHandler("cancelheist", cancelheist))
     #fun cartoons and anime
     app.add_handler(CommandHandler("aniworld", aniworld_command))
 
