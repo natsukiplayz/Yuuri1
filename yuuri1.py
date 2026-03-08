@@ -398,7 +398,7 @@ async def rullate(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("🎮 A roulette game already exists.")
         return
 
-    users_col.update_one({"_id": user.id}, {"$inc": {"coins": -amount}})
+    users.update_one({"id": user.id}, {"$inc": {"coins": -amount}})
 
     roulette_games[chat_id] = {
         "host": user.id,
