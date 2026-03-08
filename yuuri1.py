@@ -1121,6 +1121,66 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "✨ Wᴇʟᴄᴏᴍᴇ Tᴏ Yᴜᴜʀɪ!"
     )
 
+#revive_player 🥳
+async def revive(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    user = update.effective_user
+    chat_id = update.effective_chat.id
+    reply = update.message.reply_to_message
+
+    # target player
+    if reply:
+        target = reply.from_user
+    else:
+        target = user
+
+    data = users.find_one({"id": target.id})
+
+    if not data:
+        return await update.message.reply_text(
+            "❌ Pʟᴀʏᴇʀ Nᴏᴛ Fᴏᴜɴᴅ"
+        )
+
+    # already alive
+    if data.get("status") == "alive":
+        return await update.message.reply_text(
+            "⚠️ Tʜɪs Pʟᴀʏᴇʀ ɪs Aʟʀᴇᴀᴅʏ Aʟɪᴠᴇ"
+        )
+
+    # self revive cost
+    if target.id == user.id:
+
+        coins = data.get("coins", 0)
+
+        if coins < 400:
+            return await update.message.reply_text(
+                "💰 Yᴏᴜ Nᴇᴇᴅ 400 Cᴏɪɴs Tᴏ Rᴇᴠɪᴠᴇ Yᴏᴜʀsᴇʟғ"
+            )
+
+        users.update_one(
+            {"id": user.id},
+            {"$inc": {"coins": -400}}
+        )
+
+    # revive player
+    users.update_one(
+        {"id": target.id},
+        {"$set": {"status": "alive"}}
+    )
+
+    await update.message.reply_text(
+f"""
+✨ Rᴇᴠɪᴠᴇ Sᴜᴄᴄᴇssғᴜʟ
+
+👤 Nᴀᴍᴇ : {target.first_name}
+🆔 Iᴅ : {target.id}
+
+❤️ Sᴛᴀᴛᴜs : Aʟɪᴠᴇ
+
+⚔️ Rᴇᴀᴅʏ Aɢᴀɪɴ
+"""
+    )
+
 # ================= SHOP =================
 SHOP_ITEMS = {
     "rose": (500, "🌹"),
@@ -1488,6 +1548,7 @@ def main():
     app.add_handler(CommandHandler("shot", shot))
     app.add_handler(CommandHandler("rullrank", rullrank))
     app.add_handler(CommandHandler("out", out))
+    app.add_handler(CommandHandler("revive", revive))
 
     #fun cartoons and anime
     app.add_handler(CommandHandler("aniworld", aniworld_command))
