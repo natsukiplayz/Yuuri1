@@ -1525,7 +1525,7 @@ from telegram import Update
 from telegram.ext import ContextTypes, CommandHandler
 from pymongo import MongoClient
 
-mongo = MongoClient(MONGO_URL)
+mongo = MongoClient(MONGO_URI)
 db = mongo["yuuri"]
 events = db["events"]
 
