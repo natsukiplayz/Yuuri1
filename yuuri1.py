@@ -574,29 +574,30 @@ async def shot(update: Update, context: ContextTypes.DEFAULT_TYPE):
 f"""💥 Bᴏᴏᴍ!
 
 {user.first_name} ɪs Oᴜᴛ"""
-)
+        )
 
         players.pop(turn)
-if len(players) == 1:
 
-    winner = players[0]
-    pot = game["pot"]
+        if len(players) == 1:
 
-    xp_reward = random.randint(40, 80)
+            winner = players[0]
+            pot = game["pot"]
 
-    users.update_one(
-        {"id": winner["id"]},
-        {"$inc": {
-            "coins": pot,
-            "xp": xp_reward,
-            "roulette_won": 1
-        }}
-    )
+            xp_reward = random.randint(40, 80)
 
-    # Get profile photo
-    photos = await context.bot.get_user_profile_photos(winner["id"], limit=1)
+            users.update_one(
+                {"id": winner["id"]},
+                {"$inc": {
+                    "coins": pot,
+                    "xp": xp_reward,
+                    "roulette_won": 1
+                }}
+            )
 
-    caption = f"""
+            # Get profile photo
+            photos = await context.bot.get_user_profile_photos(winner["id"], limit=1)
+
+            caption = f"""
 🎰 **Rᴜssɪᴀɴ Rᴜʟʟᴇᴛᴇ Rᴇsᴜʟᴛ**
 
 ━━━━━━━━━━━━━━━
@@ -615,27 +616,27 @@ if len(players) == 1:
 🎯 **Cᴏɴɢʀᴀᴛᴜʟᴀᴛɪᴏɴs!**
 """
 
-    if photos.total_count > 0:
+            if photos.total_count > 0:
 
-        file_id = photos.photos[0][0].file_id
+                file_id = photos.photos[0][0].file_id
 
-        await context.bot.send_photo(
-            chat_id,
-            photo=file_id,
-            caption=caption,
-            parse_mode="Markdown"
-        )
+                await context.bot.send_photo(
+                    chat_id,
+                    photo=file_id,
+                    caption=caption,
+                    parse_mode="Markdown"
+                )
 
-    else:
+            else:
 
-        await context.bot.send_message(
-            chat_id,
-            caption,
-            parse_mode="Markdown"
-        )
+                await context.bot.send_message(
+                    chat_id,
+                    caption,
+                    parse_mode="Markdown"
+                )
 
-    del roulette_games[chat_id]
-    return
+            del roulette_games[chat_id]
+            return
 
         if turn >= len(players):
             game["turn"] = 0
@@ -652,7 +653,6 @@ if len(players) == 1:
         chat_id,
         f"🎯 Nᴇxᴛ Tᴜʀɴ : {next_player}\n🔫 /sʜᴏᴛ"
     )
-
 
 # 🚪 LEAVE GAME
 async def out(update: Update, context: ContextTypes.DEFAULT_TYPE):
