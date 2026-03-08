@@ -382,8 +382,8 @@ async def rullate(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat_id = update.effective_chat.id
 
-    if len(context.args) == 0:
-        await update.message.reply_text("❌ 𝗨𝘀𝗮𝗴𝗲 : /rullate <amount>")
+    if not context.args:
+        await update.message.reply_text("❌ Usage : /rullate <amount>")
         return
 
     amount = int(context.args[0])
@@ -391,16 +391,17 @@ async def rullate(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_data = users_col.find_one({"_id": user.id})
 
     if user_data["coins"] < amount:
-        await update.message.reply_text("💸 𝗬𝗼𝘂 𝗱𝗼𝗻'𝘁 𝗵𝗮𝘃𝗲 𝗲𝗻𝗼𝘂𝗴𝗵 𝗰𝗼𝗶𝗻𝘀.")
+        await update.message.reply_text("💸 You don't have enough coins.")
         return
 
     if chat_id in roulette_games:
-        await update.message.reply_text("🎮 𝗔 𝗿𝗼𝘂𝗹𝗲𝘁𝘁𝗲 𝗴𝗮𝗺𝗲 𝗶𝘀 𝗮𝗹𝗿𝗲𝗮𝗱𝘆 𝗿𝘂𝗻𝗻𝗶𝗻𝗴.")
+        await update.message.reply_text("🎮 A roulette game already exists.")
         return
 
     users_col.update_one({"_id": user.id}, {"$inc": {"coins": -amount}})
 
     roulette_games[chat_id] = {
+        "host": user.id,
         "bet": amount,
         "players": [user.id],
         "pot": amount,
@@ -409,93 +410,175 @@ async def rullate(update: Update, context: ContextTypes.DEFAULT_TYPE):
     }
 
     await update.message.reply_text(
-        f"🎰 **𝗥𝘂𝘀𝘀𝗶𝗮𝗻 𝗥𝗼𝘂𝗹𝗲𝘁𝘁𝗲**\n\n"
-        f"👤 𝗛𝗼𝘀𝘁 : {user.first_name}\n"
-        f"💰 𝗕𝗲𝘁 : `{amount}` 𝗰𝗼𝗶𝗻𝘀\n\n"
-        f"⏳ 𝗚𝗮𝗺𝗲 𝘀𝘁𝗮𝗿𝘁𝘀 𝗶𝗻 **2 𝗺𝗶𝗻𝘂𝘁𝗲𝘀**\n"
-        f"👉 𝗨𝘀𝗲 /join {amount} 𝘁𝗼 𝗷𝗼𝗶𝗻",
-        parse_mode="Markdown"
+        f"""
+🎰 Rᴜssɪᴀɴ Rᴜʟʟᴇᴛᴇ Hᴏsᴛᴇᴅ!
+
+Hᴏsᴛ : {user.first_name}
+Bᴇᴛ : {amount} coins
+
+Use:
+/join {amount}
+
+Game will start in 2 minutes
+Or host can use /on
+"""
     )
 
-    asyncio.create_task(start_roulette(chat_id, context))
+    asyncio.create_task(auto_start(chat_id, context))
 
 
-# AUTO START AFTER 2 MINUTES
-async def start_roulette(chat_id, context):
+# AUTO START
+async def auto_start(chat_id, context):
     await asyncio.sleep(120)
 
     game = roulette_games.get(chat_id)
-    if not game:
+
+    if not game or game["started"]:
         return
 
     if len(game["players"]) < 2:
-        host = game["players"][0]
 
-        users_col.update_one({"_id": host}, {"$inc": {"coins": game["bet"]}})
+        users_col.update_one(
+            {"_id": game["players"][0]},
+            {"$inc": {"coins": game["bet"]}}
+        )
 
         await context.bot.send_message(
             chat_id,
-            "❌ **𝗡𝗼 𝗼𝗻𝗲 𝗷𝗼𝗶𝗻𝗲𝗱.**\n"
-            "💰 𝗖𝗼𝗶𝗻𝘀 𝗿𝗲𝗳𝘂𝗻𝗱𝗲𝗱.",
-            parse_mode="Markdown"
+            "❌ No one joined.\nCoins refunded."
         )
 
         del roulette_games[chat_id]
         return
 
+    await start_game(chat_id, context)
+
+
+# START COMMAND
+async def on(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    chat_id = update.effective_chat.id
+    game = roulette_games.get(chat_id)
+
+    if not game:
+        return
+
+    if update.effective_user.id != game["host"]:
+        return
+
+    await start_game(chat_id, context)
+
+
+# START GAME
+async def start_game(chat_id, context):
+
+    game = roulette_games[chat_id]
     game["started"] = True
+
+    players = game["players"]
+
+    rounds = len(players)
 
     await context.bot.send_message(
         chat_id,
-        "🔫 **𝗥𝗼𝘂𝗹𝗲𝘁𝘁𝗲 𝗚𝗮𝗺𝗲 𝗦𝘁𝗮𝗿𝘁𝗲𝗱!**\n\n"
-        "👉 𝗣𝗹𝗮𝘆𝗲𝗿𝘀 𝘂𝘀𝗲 /shot 𝗼𝗻 𝘁𝗵𝗲𝗶𝗿 𝘁𝘂𝗿𝗻!",
-        parse_mode="Markdown"
+f"""
+🥳 The Russian Rullate Game Has Been Started
+
+Welcome to Yuuri's Russian Rullate Game
+
+Use /shot when it's your turn.
+
+If chamber empty → safe  
+If bullet → you're out 😮‍💨
+
+Total players : {len(players)}
+Total rounds : {rounds}
+
+Good luck winning the pot 🍯
+"""
+    )
+
+    # VOICE MESSAGE
+    await context.bot.send_voice(
+        chat_id,
+        voice="https://api.streamelements.com/kappa/v2/speech?voice=Brian&text=Welcome+to+Yuuri+Russian+Roulette+Game"
+    )
+
+    first = players[0]
+
+    await context.bot.send_message(
+        chat_id,
+        f"""
+🎯 Now Turn : {first}
+
+Use : /shot
+Or /out
+"""
     )
 
 
-# JOIN GAME
+# JOIN
 async def join(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     user = update.effective_user
     chat_id = update.effective_chat.id
 
     game = roulette_games.get(chat_id)
 
     if not game:
-        await update.message.reply_text("❌ 𝗡𝗼 𝗮𝗰𝘁𝗶𝘃𝗲 𝗿𝗼𝘂𝗹𝗲𝘁𝘁𝗲.")
+        await update.message.reply_text("No roulette game.")
         return
 
     if game["started"]:
-        await update.message.reply_text("⛔ 𝗚𝗮𝗺𝗲 𝗮𝗹𝗿𝗲𝗮𝗱𝘆 𝘀𝘁𝗮𝗿𝘁𝗲𝗱.")
+        await update.message.reply_text("Game already started.")
         return
 
-    amount = game["bet"]
-
-    if user.id in game["players"]:
-        await update.message.reply_text("⚠️ 𝗬𝗼𝘂 𝗮𝗹𝗿𝗲𝗮𝗱𝘆 𝗷𝗼𝗶𝗻𝗲𝗱.")
-        return
+    bet = game["bet"]
 
     user_data = users_col.find_one({"_id": user.id})
 
-    if user_data["coins"] < amount:
-        await update.message.reply_text("💸 𝗡𝗼𝘁 𝗲𝗻𝗼𝘂𝗴𝗵 𝗰𝗼𝗶𝗻𝘀.")
+    if user_data["coins"] < bet:
+        await update.message.reply_text("Not enough coins.")
         return
 
-    users_col.update_one({"_id": user.id}, {"$inc": {"coins": -amount}})
+    if user.id in game["players"]:
+        return
+
+    users_col.update_one({"_id": user.id}, {"$inc": {"coins": -bet}})
 
     game["players"].append(user.id)
-    game["pot"] += amount
+    game["pot"] += bet
 
     await update.message.reply_text(
-        f"✅ {user.first_name} 𝗷𝗼𝗶𝗻𝗲𝗱!\n"
-        f"💰 𝗣𝗼𝘁 : `{game['pot']}`",
-        parse_mode="Markdown"
+        f"✅ {user.first_name} joined!\nPot : {game['pot']}"
     )
 
 
-# SHOOT
-async def shot(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
+# OUT COMMAND
+async def out(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     chat_id = update.effective_chat.id
+    user = update.effective_user
+
+    game = roulette_games.get(chat_id)
+
+    if not game:
+        return
+
+    if user.id in game["players"]:
+
+        game["players"].remove(user.id)
+
+        await update.message.reply_text(
+            f"{user.first_name} left the game."
+        )
+
+
+# SHOT
+async def shot(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    chat_id = update.effective_chat.id
+    user = update.effective_user
 
     game = roulette_games.get(chat_id)
 
@@ -503,77 +586,106 @@ async def shot(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     players = game["players"]
+
     turn = game["turn"]
 
     if players[turn] != user.id:
-        await update.message.reply_text("⏳ 𝗡𝗼𝘁 𝘆𝗼𝘂𝗿 𝘁𝘂𝗿𝗻.")
+        await update.message.reply_text("Not your turn.")
         return
 
-    chamber = random.randint(1, 6)
+    chamber = random.randint(1,6)
+
+    await update.message.reply_text("Click... Click...")
+
+    await asyncio.sleep(2)
 
     if chamber == 1:
 
-        players.remove(user.id)
-
         await update.message.reply_text(
-            f"💥 **𝗕𝗔𝗡𝗚!**\n"
-            f"💀 {user.first_name} 𝗶𝘀 𝗼𝘂𝘁!",
-            parse_mode="Markdown"
+            f"""
+💥 THAD!!!!
+
+{user.first_name} is OUT!
+You lose the bet.
+"""
         )
 
+        players.remove(user.id)
+
         if len(players) == 1:
+
             winner = players[0]
             pot = game["pot"]
-            xp = random.randint(10, 50)
 
             users_col.update_one(
                 {"_id": winner},
-                {
-                    "$inc": {
-                        "coins": pot,
-                        "xp": xp,
-                        "roulette_won": pot
-                    }
-                }
+                {"$inc": {"coins": pot, "roulette_won": pot}}
             )
 
             await context.bot.send_message(
                 chat_id,
-                f"🏆 **𝗪𝗘 𝗛𝗔𝗩𝗘 𝗔 𝗪𝗜𝗡𝗡𝗘𝗥!**\n\n"
-                f"💰 𝗣𝗼𝘁 : `{pot}`\n"
-                f"⭐ 𝗫𝗣 : `{xp}`",
-                parse_mode="Markdown"
+                f"""
+🏆 Winner!
+
+User ID : {winner}
+
+Won : {pot} coins
+"""
             )
 
             del roulette_games[chat_id]
             return
 
     else:
+
         await update.message.reply_text(
-            f"😮‍💨 **𝗖𝗹𝗶𝗰𝗸...**\n"
-            f"{user.first_name} 𝗦𝘂𝗿𝘃𝗶𝘃𝗲𝗱!",
-            parse_mode="Markdown"
+f"""
+😮‍💨 Safe!
+
+Now next player's turn.
+Use /shot
+Or /out
+"""
         )
 
     game["turn"] = (game["turn"] + 1) % len(players)
 
-
-# LEADERBOARD
 async def rullrank(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    top = users_col.find().sort("roulette_won", -1).limit(10)
+    top_users = users_col.find().sort("roulette_won", -1).limit(10)
 
-    text = "🏆 **𝗥𝗼𝘂𝗹𝗲𝘁𝘁𝗲 𝗟𝗲𝗮𝗱𝗲𝗿𝗯𝗼𝗮𝗿𝗱**\n\n"
+    text = (
+        "🏆 Rᴜssɪᴀɴ Rᴜʟʟᴇᴛᴇ Lᴇᴀᴅᴇʀʙᴏᴀʀᴅ\n\n"
+    )
 
     rank = 1
-    for user in top:
-        name = user.get("name", "Player")
+
+    for user in top_users:
+
+        name = user.get("name", "Pʟᴀʏᴇʀ")
         amount = user.get("roulette_won", 0)
 
-        text += f"{rank}. {name} — `{amount}`\n"
+        medals = {
+            1: "🥇",
+            2: "🥈",
+            3: "🥉"
+        }
+
+        medal = medals.get(rank, "🔹")
+
+        text += f"{medal} {rank}. {name} — `{amount}` ᴄᴏɪɴs\n"
+
         rank += 1
 
-    await update.message.reply_text(text, parse_mode="Markdown")
+    if rank == 1:
+        text += "Nᴏ Rᴏᴜʟᴇᴛᴛᴇ Wɪɴɴᴇʀs Yᴇᴛ."
+
+    text += "\n\n🎰 Kᴇᴇᴘ Pʟᴀʏɪɴɢ & Wɪɴ Tʜᴇ Pᴏᴛ 🍯"
+
+    await update.message.reply_text(
+        text,
+        parse_mode="Markdown"
+    )
 
 #============================KILL (MongoDB + Styled Text)==========================
 import random
@@ -1294,6 +1406,7 @@ def main():
     app.add_handler(CommandHandler("join", join))
     app.add_handler(CommandHandler("shot", shot))
     app.add_handler(CommandHandler("rullrank", rullrank))
+    app.add_handler(CommandHandler("out", out))
 
     #fun cartoons and anime
     app.add_handler(CommandHandler("aniworld", aniworld_command))
