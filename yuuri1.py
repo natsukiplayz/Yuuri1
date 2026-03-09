@@ -41,6 +41,7 @@ client = MongoClient(MONGO_URI)  # <- after the DNS fix!
 db = client["yuuri_db"]
 users = db["users"]
 guilds = db["guilds"]
+heists = db["heists"]
 
 # ================= LOG =================
 logging.basicConfig(level=logging.INFO)
@@ -68,6 +69,26 @@ def get_user(user):
 
 def save_user(data):
     users.update_one({"id": data["id"]}, {"$set": data})
+
+#heist_config====
+HEIST_MAX_PLAYERS = 4
+HEIST_MIN_PLAYERS = 2
+HEIST_REWARD = 10000
+HEIST_WAIT_TIME = 60
+
+#heist_timer
+import asyncio
+
+async def start_heist_timer(chat_id, context):
+
+    await asyncio.sleep(HEIST_WAIT_TIME)
+
+    heist = heists.find_one({"chat_id": chat_id})
+
+    if not heist or heist["started"]:
+        return
+
+    await start_heist(chat_id, context)
 
 # ================= RANK SYSTEM =================
 
@@ -246,6 +267,135 @@ async def rankers(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text += "\n💓 = Pʀᴇᴍɪᴜᴍ • 👤 = Nᴏʀᴍᴀʟ"
 
     await update.message.reply_text(text)
+
+#money_heist_update
+async def heist(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    chat = update.effective_chat
+    user = update.effective_user
+
+    existing = heists.find_one({"chat_id": chat.id})
+
+    if existing:
+        await update.message.reply_text("⚠️ A heist is already active.")
+        return
+
+    heists.insert_one({
+        "chat_id": chat.id,
+        "host": user.id,
+        "players": [{
+            "id": user.id,
+            "name": user.first_name
+        }],
+        "started": False
+    })
+
+    text = f"""
+🏦 Hᴇɪsᴛ Lᴏʙʙʏ Cʀᴇᴀᴛᴇᴅ
+
+👤 Host: {user.first_name}
+👥 Players: 1/4
+
+⏳ Heist starts in 60 seconds.
+
+Use /joinheist to join
+"""
+
+    await update.message.reply_text(text)
+
+    context.application.create_task(start_heist_timer(chat.id, context))
+
+#join_heist
+async def joinheist(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    chat = update.effective_chat
+    user = update.effective_user
+
+    heist = heists.find_one({"chat_id": chat.id})
+
+    if not heist:
+        await update.message.reply_text("❌ No active heist.")
+        return
+
+    players = heist["players"]
+
+    if any(p["id"] == user.id for p in players):
+        await update.message.reply_text("⚠️ You already joined.")
+        return
+
+    if len(players) >= HEIST_MAX_PLAYERS:
+        await update.message.reply_text("🚫 Heist team is full.")
+        return
+
+    players.append({
+        "id": user.id,
+        "name": user.first_name
+    })
+
+    heists.update_one(
+        {"chat_id": chat.id},
+        {"$set": {"players": players}}
+    )
+
+    await update.message.reply_text(
+        f"👥 {user.first_name} joined the heist\nPlayers: {len(players)}/4"
+    )
+
+#forcejoin_heist
+async def stfast(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    chat = update.effective_chat
+    user = update.effective_user
+
+    heist = heists.find_one({"chat_id": chat.id})
+
+    if not heist:
+        return await update.message.reply_text("❌ No heist active.")
+
+    if heist["host"] != user.id:
+        return await update.message.reply_text("❌ Only host can force start.")
+
+    await start_heist(chat.id, context)
+
+#start_heist
+async def start_heist(chat_id, context):
+
+    heist = heists.find_one({"chat_id": chat_id})
+
+    if not heist:
+        return
+
+    players = heist["players"]
+
+    if len(players) < HEIST_MIN_PLAYERS:
+
+        await context.bot.send_message(
+            chat_id,
+            "❌ Not enough players for heist."
+        )
+
+        heists.delete_one({"chat_id": chat_id})
+        return
+
+    heists.update_one(
+        {"chat_id": chat_id},
+        {"$set": {"started": True}}
+    )
+
+    gif_url = "https://media.tenor.com/3zK0F3Xy7TQAAAAC/money-heist-robbery.gif"
+
+    await context.bot.send_animation(
+        chat_id,
+        gif_url,
+        caption="🏦 Breaking into the vault..."
+    )
+
+    await asyncio.sleep(6)
+
+    await context.bot.send_message(
+        chat_id,
+        "💰 The vault is open!\n\nCheck your DM to choose your action."
+    )
 
 # ================= PROFILE =================
 async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1632,7 +1782,10 @@ def main():
     app.add_handler(CommandHandler("out", out))
     app.add_handler(CommandHandler("revive", revive))
     app.add_handler(CommandHandler("givee", givee))
- 
+    app.add_handler(CommandHandler("heist", heist))
+    app.add_handler(CommandHandler("joinheist", joinheist))
+    app.add_handler(CommandHandler("stfast", stfast))
+
     #fun cartoons and anime
     app.add_handler(CommandHandler("aniworld", aniworld_command))
 
