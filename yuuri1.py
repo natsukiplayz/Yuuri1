@@ -1869,6 +1869,7 @@ def main():
     app.add_handler(CommandHandler("heist", heist))
     app.add_handler(CommandHandler("joinheist", joinheist))
     app.add_handler(CommandHandler("stfast", stfast))
+    app.add_handler(CommandHandler("stopheist", stopheist))
 
     #fun cartoons and anime
     app.add_handler(CommandHandler("aniworld", aniworld_command))
