@@ -250,19 +250,14 @@ async def rankers(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ================= HEIST CONFIG =================
 
-import asyncio
-
 HEIST_MAX_PLAYERS = 4
 HEIST_MIN_PLAYERS = 2
 HEIST_REWARD = 10000
 HEIST_WAIT_TIME = 60
-
-
 # ================= HEIST TIMER =================
+async def heist_timer(context: ContextTypes.DEFAULT_TYPE):
 
-async def start_heist_timer(chat_id, context):
-
-    await asyncio.sleep(HEIST_WAIT_TIME)
+    chat_id = context.job.chat_id
 
     heist = heists.find_one({"chat_id": chat_id})
 
@@ -274,9 +269,7 @@ async def start_heist_timer(chat_id, context):
 
     await start_heist(chat_id, context)
 
-
 # ================= /heist =================
-
 async def heist(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     msg = update.message
@@ -289,9 +282,7 @@ async def heist(update: Update, context: ContextTypes.DEFAULT_TYPE):
     existing = heists.find_one({"chat_id": chat.id})
 
     if existing:
-        return await msg.reply_text(
-            "⚠️ ᴀ ʜᴇɪꜱᴛ ɪꜱ ᴀʟʀᴇᴀᴅʏ ᴀᴄᴛɪᴠᴇ."
-        )
+        return await msg.reply_text("⚠️ ʜᴇɪꜱᴛ ᴀʟʀᴇᴀᴅʏ ᴀᴄᴛɪᴠᴇ.")
 
     heists.insert_one({
         "chat_id": chat.id,
@@ -312,7 +303,7 @@ async def heist(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 💰 ᴠᴀᴜʟᴛ: 10,000 ᴄᴏɪɴꜱ
 
-⏳ ʜᴇɪꜱᴛ ꜱᴛᴀʀᴛꜱ ɪɴ 60 ꜱᴇᴄᴏɴᴅꜱ
+⏳ ꜱᴛᴀʀᴛɪɴɢ ɪɴ 60 ꜱᴇᴄᴏɴᴅꜱ
 
 ᴊᴏɪɴ ᴜꜱɪɴɢ:
 /joinheist
@@ -320,10 +311,12 @@ async def heist(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await msg.reply_text(text)
 
-    context.application.create_task(
-        start_heist_timer(chat.id, context)
+    context.job_queue.run_once(
+        heist_timer,
+        HEIST_WAIT_TIME,
+        chat_id=chat.id,
+        name=f"heist_{chat.id}"
     )
-
 
 # ================= /joinheist =================
 
@@ -379,26 +372,21 @@ async def joinheist(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def stfast(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     msg = update.message
-    if not msg:
-        return
-
     chat = update.effective_chat
     user = update.effective_user
 
     heist = heists.find_one({"chat_id": chat.id})
 
     if not heist:
-        return await msg.reply_text(
-            "❌ ɴᴏ ʜᴇɪꜱᴛ ᴀᴄᴛɪᴠᴇ."
-        )
+        return await msg.reply_text("❌ ɴᴏ ʜᴇɪꜱᴛ ᴀᴄᴛɪᴠᴇ.")
 
     if heist["host"] != user.id:
-        return await msg.reply_text(
-            "❌ ᴏɴʟʏ ʜᴏꜱᴛ ᴄᴀɴ ꜱᴛᴀʀᴛ."
-        )
+        return await msg.reply_text("❌ ᴏɴʟʏ ʜᴏꜱᴛ ᴄᴀɴ ꜱᴛᴀʀᴛ.")
+
+    if heist.get("started"):
+        return await msg.reply_text("⚠️ ʜᴇɪꜱᴛ ᴀʟʀᴇᴀᴅʏ ꜱᴛᴀʀᴛᴇᴅ.")
 
     await start_heist(chat.id, context)
-
 
 # ================= START HEIST =================
 
@@ -407,6 +395,9 @@ async def start_heist(chat_id, context):
     heist = heists.find_one({"chat_id": chat_id})
 
     if not heist:
+        return
+
+    if heist.get("started"):
         return
 
     players = heist["players"]
@@ -421,6 +412,7 @@ async def start_heist(chat_id, context):
         heists.delete_one({"chat_id": chat_id})
         return
 
+    # mark started
     heists.update_one(
         {"chat_id": chat_id},
         {"$set": {"started": True}}
@@ -446,6 +438,47 @@ async def start_heist(chat_id, context):
 📩 ᴄʜᴇᴄᴋ ʏᴏᴜʀ ᴅᴍ
 ᴛᴏ ᴄʜᴏᴏꜱᴇ ʏᴏᴜʀ ᴏᴘᴛɪᴏɴ.
 """
+    )
+
+    # send DM to players
+    for player in players:
+        try:
+            await context.bot.send_message(
+                player["id"],
+                """
+🏦 ʜᴇɪꜱᴛ ᴅᴇᴄɪꜱɪᴏɴ
+
+ᴛʜᴇ ᴠᴀᴜʟᴛ ʜᴀꜱ 10,000 ᴄᴏɪɴꜱ.
+
+ᴡʜᴀᴛ ᴡɪʟʟ ʏᴏᴜ ᴅᴏ?
+
+💰 Steal — take all money
+🤝 Share — split with team
+🚪 Leave — take nothing
+"""
+            )
+        except:
+            pass
+
+#stop_heist
+async def stopheist(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    msg = update.message
+    chat = update.effective_chat
+    user = update.effective_user
+
+    heist = heists.find_one({"chat_id": chat.id})
+
+    if not heist:
+        return await msg.reply_text("❌ ɴᴏ ʜᴇɪꜱᴛ ᴀᴄᴛɪᴠᴇ.")
+
+    if heist["host"] != user.id:
+        return await msg.reply_text("❌ ᴏɴʟʏ ʜᴏꜱᴛ ᴄᴀɴ ꜱᴛᴏᴘ ᴛʜᴇ ʜᴇɪꜱᴛ.")
+
+    heists.delete_one({"chat_id": chat.id})
+
+    await msg.reply_text(
+        "🛑 ʜᴇɪꜱᴛ ᴄᴀɴᴄᴇʟʟᴇᴅ ʙʏ ʜᴏꜱᴛ."
     )
 
 # ================= PROFILE =================
