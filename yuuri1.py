@@ -70,26 +70,6 @@ def get_user(user):
 def save_user(data):
     users.update_one({"id": data["id"]}, {"$set": data})
 
-#heist_config====
-HEIST_MAX_PLAYERS = 4
-HEIST_MIN_PLAYERS = 2
-HEIST_REWARD = 10000
-HEIST_WAIT_TIME = 60
-
-#heist_timer
-import asyncio
-
-async def start_heist_timer(chat_id, context):
-
-    await asyncio.sleep(HEIST_WAIT_TIME)
-
-    heist = heists.find_one({"chat_id": chat_id})
-
-    if not heist or heist["started"]:
-        return
-
-    await start_heist(chat_id, context)
-
 # ================= RANK SYSTEM =================
 
 RANKS = [
@@ -268,8 +248,40 @@ async def rankers(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(text)
 
-#money_heist_update
+# ================= HEIST CONFIG =================
+
+import asyncio
+
+HEIST_MAX_PLAYERS = 4
+HEIST_MIN_PLAYERS = 2
+HEIST_REWARD = 10000
+HEIST_WAIT_TIME = 60
+
+
+# ================= HEIST TIMER =================
+
+async def start_heist_timer(chat_id, context):
+
+    await asyncio.sleep(HEIST_WAIT_TIME)
+
+    heist = heists.find_one({"chat_id": chat_id})
+
+    if not heist:
+        return
+
+    if heist.get("started"):
+        return
+
+    await start_heist(chat_id, context)
+
+
+# ================= /heist =================
+
 async def heist(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    msg = update.message
+    if not msg:
+        return
 
     chat = update.effective_chat
     user = update.effective_user
@@ -277,8 +289,9 @@ async def heist(update: Update, context: ContextTypes.DEFAULT_TYPE):
     existing = heists.find_one({"chat_id": chat.id})
 
     if existing:
-        await update.message.reply_text("⚠️ A heist is already active.")
-        return
+        return await msg.reply_text(
+            "⚠️ ᴀ ʜᴇɪꜱᴛ ɪꜱ ᴀʟʀᴇᴀᴅʏ ᴀᴄᴛɪᴠᴇ."
+        )
 
     heists.insert_one({
         "chat_id": chat.id,
@@ -287,26 +300,38 @@ async def heist(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "id": user.id,
             "name": user.first_name
         }],
-        "started": False
+        "started": False,
+        "votes": {}
     })
 
     text = f"""
-🏦 Hᴇɪsᴛ Lᴏʙʙʏ Cʀᴇᴀᴛᴇᴅ
+🏦 ʜᴇɪꜱᴛ ʟᴏʙʙʏ ᴄʀᴇᴀᴛᴇᴅ
 
-👤 Host: {user.first_name}
-👥 Players: 1/4
+👤 ʜᴏꜱᴛ: {user.first_name}
+👥 ᴘʟᴀʏᴇʀꜱ: 1/4
 
-⏳ Heist starts in 60 seconds.
+💰 ᴠᴀᴜʟᴛ: 10,000 ᴄᴏɪɴꜱ
 
-Use /joinheist to join
+⏳ ʜᴇɪꜱᴛ ꜱᴛᴀʀᴛꜱ ɪɴ 60 ꜱᴇᴄᴏɴᴅꜱ
+
+ᴊᴏɪɴ ᴜꜱɪɴɢ:
+/joinheist
 """
 
-    await update.message.reply_text(text)
+    await msg.reply_text(text)
 
-    context.application.create_task(start_heist_timer(chat.id, context))
+    context.application.create_task(
+        start_heist_timer(chat.id, context)
+    )
 
-#join_heist
+
+# ================= /joinheist =================
+
 async def joinheist(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    msg = update.message
+    if not msg:
+        return
 
     chat = update.effective_chat
     user = update.effective_user
@@ -314,18 +339,21 @@ async def joinheist(update: Update, context: ContextTypes.DEFAULT_TYPE):
     heist = heists.find_one({"chat_id": chat.id})
 
     if not heist:
-        await update.message.reply_text("❌ No active heist.")
-        return
+        return await msg.reply_text(
+            "❌ ɴᴏ ᴀᴄᴛɪᴠᴇ ʜᴇɪꜱᴛ."
+        )
 
     players = heist["players"]
 
     if any(p["id"] == user.id for p in players):
-        await update.message.reply_text("⚠️ You already joined.")
-        return
+        return await msg.reply_text(
+            "⚠️ ʏᴏᴜ ᴀʟʀᴇᴀᴅʏ ᴊᴏɪɴᴇᴅ."
+        )
 
     if len(players) >= HEIST_MAX_PLAYERS:
-        await update.message.reply_text("🚫 Heist team is full.")
-        return
+        return await msg.reply_text(
+            "🚫 ʜᴇɪꜱᴛ ᴛᴇᴀᴍ ɪꜱ ꜰᴜʟʟ."
+        )
 
     players.append({
         "id": user.id,
@@ -337,12 +365,22 @@ async def joinheist(update: Update, context: ContextTypes.DEFAULT_TYPE):
         {"$set": {"players": players}}
     )
 
-    await update.message.reply_text(
-        f"👥 {user.first_name} joined the heist\nPlayers: {len(players)}/4"
+    await msg.reply_text(
+        f"""
+👥 {user.first_name} ᴊᴏɪɴᴇᴅ ᴛʜᴇ ʜᴇɪꜱᴛ
+
+ᴘʟᴀʏᴇʀꜱ: {len(players)}/4
+"""
     )
 
-#forcejoin_heist
+
+# ================= /stfast =================
+
 async def stfast(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    msg = update.message
+    if not msg:
+        return
 
     chat = update.effective_chat
     user = update.effective_user
@@ -350,14 +388,20 @@ async def stfast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     heist = heists.find_one({"chat_id": chat.id})
 
     if not heist:
-        return await update.message.reply_text("❌ No heist active.")
+        return await msg.reply_text(
+            "❌ ɴᴏ ʜᴇɪꜱᴛ ᴀᴄᴛɪᴠᴇ."
+        )
 
     if heist["host"] != user.id:
-        return await update.message.reply_text("❌ Only host can force start.")
+        return await msg.reply_text(
+            "❌ ᴏɴʟʏ ʜᴏꜱᴛ ᴄᴀɴ ꜱᴛᴀʀᴛ."
+        )
 
     await start_heist(chat.id, context)
 
-#start_heist
+
+# ================= START HEIST =================
+
 async def start_heist(chat_id, context):
 
     heist = heists.find_one({"chat_id": chat_id})
@@ -371,7 +415,7 @@ async def start_heist(chat_id, context):
 
         await context.bot.send_message(
             chat_id,
-            "❌ Not enough players for heist."
+            "❌ ɴᴏᴛ ᴇɴᴏᴜɢʜ ᴘʟᴀʏᴇʀꜱ ꜰᴏʀ ʜᴇɪꜱᴛ."
         )
 
         heists.delete_one({"chat_id": chat_id})
@@ -382,19 +426,26 @@ async def start_heist(chat_id, context):
         {"$set": {"started": True}}
     )
 
-    gif_url = "https://media.tenor.com/3zK0F3Xy7TQAAAAC/money-heist-robbery.gif"
+    gif_url = "https://media.tenor.com/U1Xw3ZL0E7kAAAAC/money-heist-mask.gif"
 
     await context.bot.send_animation(
         chat_id,
         gif_url,
-        caption="🏦 Breaking into the vault..."
+        caption="🏦 ʙʀᴇᴀᴋɪɴɢ ɪɴᴛᴏ ᴛʜᴇ ᴠᴀᴜʟᴛ..."
     )
 
-    await asyncio.sleep(6)
+    await asyncio.sleep(5)
 
     await context.bot.send_message(
         chat_id,
-        "💰 The vault is open!\n\nCheck your DM to choose your action."
+        """
+💰 ᴠᴀᴜʟᴛ ᴏᴘᴇɴᴇᴅ
+
+ᴛʜᴇ ᴄʀᴇᴡ ꜱᴜᴄᴄᴇꜱꜱꜰᴜʟʟʏ ʙʀᴏᴋᴇ ɪɴᴛᴏ ᴛʜᴇ ᴠᴀᴜʟᴛ.
+
+📩 ᴄʜᴇᴄᴋ ʏᴏᴜʀ ᴅᴍ
+ᴛᴏ ᴄʜᴏᴏꜱᴇ ʏᴏᴜʀ ᴏᴘᴛɪᴏɴ.
+"""
     )
 
 # ================= PROFILE =================
