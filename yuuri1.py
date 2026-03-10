@@ -37,8 +37,9 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 MONGO_URI = os.getenv("MONGO_URI")
 
 # ================= MONGODB =================
-client = MongoClient(MONGO_URI)  # <- after the DNS fix!
+client = MongoClient(MONGO_URI) 
 db = client["yuuri_db"]
+
 users = db["users"]
 guilds = db["guilds"]
 heists = db["heists"]
@@ -2148,8 +2149,9 @@ async def error_handler(update, context):
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, auto_reply))
     app.add_handler(MessageHandler(filters.ALL, save_chat))
     app.add_error_handler(error_handler)
+
     print("🔥 Yuuri Running...")
-    app.run_polling()
+    app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
     main()
