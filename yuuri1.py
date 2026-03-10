@@ -150,55 +150,6 @@ async def referral(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(text)
 
-#==SetPng==For_Start_Command==
-
-async def set_start_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    msg = update.message
-    if not msg:
-        return
-
-    if update.effective_user.id != OWNER_ID:
-        return await msg.reply_text("❌ Only bot owner can use this command.")
-
-    if not msg.reply_to_message:
-        return await msg.reply_text("⚠️ Reply to a photo or video with /png")
-
-    r = msg.reply_to_message
-
-    file_id = None
-    media_type = None
-
-    if r.photo:
-        file_id = r.photo[-1].file_id
-        media_type = "photo"
-
-    elif r.video:
-        file_id = r.video.file_id
-        media_type = "video"
-
-    else:
-        return await msg.reply_text("❌ Reply must be a photo or video.")
-
-    try:
-
-        settings.update_one(
-            {"type": "start_media"},
-            {
-                "$set": {
-                    "file_id": file_id,
-                    "media_type": media_type
-                }
-            },
-            upsert=True
-        )
-
-        await msg.reply_text("✅ Start media updated successfully.")
-
-    except Exception as e:
-
-        await msg.reply_text("❌ Failed to save media.")
-        print(f"Media Save Error: {e}")
 
 # ================= BOT STATS =================
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -303,41 +254,12 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 💰 Earn 1000 coins per invite
 """
 
-    # ================= START MEDIA =================
-    media = None
+    # ================= SEND MESSAGE =================
 
-    try:
-        media = settings.find_one({"type": "start_media"})
-    except:
-        pass
-
-    if media:
-
-        file_id = media["file_id"]
-        media_type = media["media_type"]
-
-        if media_type == "photo":
-
-            sent_msg = await msg.reply_photo(
-                photo=file_id,
-                caption=caption,
-                reply_markup=InlineKeyboardMarkup(keyboard)
-            )
-
-        elif media_type == "video":
-
-            sent_msg = await msg.reply_video(
-                video=file_id,
-                caption=caption,
-                reply_markup=InlineKeyboardMarkup(keyboard)
-            )
-
-    else:
-
-        sent_msg = await msg.reply_text(
-            caption,
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
+    sent_msg = await msg.reply_text(
+        caption,
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
 
     context.chat_data["start_message_id"] = sent_msg.message_id
 
