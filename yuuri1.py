@@ -42,6 +42,7 @@ db = client["yuuri_db"]
 users = db["users"]
 guilds = db["guilds"]
 heists = db["heists"]
+settings = db["settings"]
 
 # ================= LOG =================
 logging.basicConfig(level=logging.INFO)
