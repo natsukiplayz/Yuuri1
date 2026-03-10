@@ -136,31 +136,33 @@ async def referral(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     link = f"https://t.me/{bot.username}?start=ref_{user.id}"
 
-    await update.message.reply_text(
-f"""
+    text = f"""
 🎁 ʏᴏᴜʀ ʀᴇꜰᴇʀʀᴀʟ ʟɪɴᴋ
 
 🔗 {link}
 
-ɪɴᴠɪᴛᴇ ʏᴏᴜʀ ꜰʀɪᴇɴᴅꜱ ᴜꜱɪɴɢ ᴛʜɪꜱ ʟɪɴᴋ.
+ɪɴᴠɪᴛᴇ ꜰʀɪᴇɴᴅꜱ ᴜꜱɪɴɢ ᴛʜɪꜱ ʟɪɴᴋ
 
 💰 ʀᴇᴡᴀʀᴅ: 1000 ᴄᴏɪɴꜱ
 
-⚠️ ᴇᴀᴄʜ ᴜꜱᴇʀ ᴄᴀɴ ᴏɴʟʏ ᴜꜱᴇ ᴏɴᴇ ʀᴇꜰᴇʀʀᴀʟ.
+⚠️ ᴇᴀᴄʜ ᴜꜱᴇʀ ᴄᴀɴ ᴏɴʟʏ ᴜꜱᴇ ᴏɴᴇ ʀᴇꜰᴇʀʀᴀʟ
 """
-    )
+
+    await update.message.reply_text(text)
 
 #==SetPng==For_Start_Command==
 
 async def set_start_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    if update.effective_user.id != OWNER_ID:
-        return await update.message.reply_text("❌ Only bot owner can use this command.")
-
     msg = update.message
+    if not msg:
+        return
+
+    if update.effective_user.id != OWNER_ID:
+        return await msg.reply_text("❌ Only bot owner can use this command.")
 
     if not msg.reply_to_message:
-        return await msg.reply_text("Reply to a photo or video with /png")
+        return await msg.reply_text("⚠️ Reply to a photo or video with /png")
 
     r = msg.reply_to_message
 
@@ -176,18 +178,27 @@ async def set_start_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
         media_type = "video"
 
     else:
-        return await msg.reply_text("Reply must be a photo or video.")
+        return await msg.reply_text("❌ Reply must be a photo or video.")
 
-    settings.update_one(
-        {"type": "start_media"},
-        {"$set": {
-            "file_id": file_id,
-            "media_type": media_type
-        }},
-        upsert=True
-    )
+    try:
 
-    await msg.reply_text("✅ Start media updated successfully.")
+        settings.update_one(
+            {"type": "start_media"},
+            {
+                "$set": {
+                    "file_id": file_id,
+                    "media_type": media_type
+                }
+            },
+            upsert=True
+        )
+
+        await msg.reply_text("✅ Start media updated successfully.")
+
+    except Exception as e:
+
+        await msg.reply_text("❌ Failed to save media.")
+        print(f"Media Save Error: {e}")
 
 # ================= BOT STATS =================
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -226,34 +237,41 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_data = get_user(user)
 
-    # Referral system
-    if user_data.get("referred_by") is None and args and users.count_documents({"id": user.id}) == 1:
+    # ================= REFERRAL SYSTEM =================
+    if user_data.get("referred_by") is None and args:
 
         ref = args[0]
 
         if ref.startswith("ref_"):
 
-            referrer_id = int(ref.split("_")[1])
+            try:
+                referrer_id = int(ref.split("_")[1])
 
-            if referrer_id != user.id:
+                if referrer_id != user.id:
 
-                users.update_one(
-                    {"id": user.id},
-                    {"$set": {"referred_by": referrer_id}}
-                )
-
-                users.update_one(
-                    {"id": referrer_id},
-                    {"$inc": {"coins": 1000}}
-                )
-
-                try:
-                    await context.bot.send_message(
-                        referrer_id,
-                        f"🎉 {first_name} joined using your referral!\n💰 You earned 1000 coins!"
+                    users.update_one(
+                        {"id": user.id},
+                        {"$set": {"referred_by": referrer_id}}
                     )
-                except:
-                    pass
+
+                    users.update_one(
+                        {"id": referrer_id},
+                        {"$inc": {"coins": 1000}}
+                    )
+
+                    try:
+                        await context.bot.send_message(
+                            referrer_id,
+                            f"🎉 {first_name} joined using your referral!\n💰 You earned 1000 coins!"
+                        )
+                    except:
+                        pass
+
+            except:
+                pass
+
+    # ================= BUTTONS =================
+    bot = await context.bot.get_me()
 
     keyboard = [
         [
@@ -266,7 +284,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [
             InlineKeyboardButton(
                 "➕ Aᴅᴅ Mᴇ Tᴏ Gʀᴏᴜᴘ",
-                url=f"https://t.me/{context.bot.username}?startgroup=true"
+                url=f"https://t.me/{bot.username}?startgroup=true"
             )
         ]
     ]
@@ -285,7 +303,13 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 💰 Earn 1000 coins per invite
 """
 
-    media = settings.find_one({"type": "start_media"})
+    # ================= START MEDIA =================
+    media = None
+
+    try:
+        media = settings.find_one({"type": "start_media"})
+    except:
+        pass
 
     if media:
 
