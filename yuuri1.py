@@ -62,6 +62,7 @@ def get_user(user):
         "guild": None,
         "dead": False,
         "inventory": []
+        "referred_by": None
     }
         users.insert_one(data)
 
@@ -264,7 +265,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [
             InlineKeyboardButton(
                 "➕ Aᴅᴅ Mᴇ Tᴏ Gʀᴏᴜᴘ",
-                url="https://t.me/YOUR_BOT_USERNAME?startgroup=true"
+                url=f"https://t.me/{context.bot.username}?startgroup=true"
             )
         ]
     ]
@@ -2103,6 +2104,9 @@ def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
    # BOT_ID = app.bot.id  # set bot id at startup
 
+async def error_handler(update, context):
+    logging.error(msg="Exception while handling update:", exc_info=context.error)
+
     # Command Handlers
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CommandHandler("daily", daily))
@@ -2143,7 +2147,7 @@ def main():
     app.add_handler(CallbackQueryHandler(callback_handler))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, auto_reply))
     app.add_handler(MessageHandler(filters.ALL, save_chat))
-
+    app.add_error_handler(error_handler)
     print("🔥 Yuuri Running...")
     app.run_polling()
 
