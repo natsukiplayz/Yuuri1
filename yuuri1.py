@@ -37,12 +37,12 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 MONGO_URI = os.getenv("MONGO_URI")
 
 # ================= MONGODB =================
-client = MongoClient(MONGO_URI) 
+client = MongoClient(MONGO_URI)
 db = client["yuuri_db"]
 
-users = db["users"]
-guilds = db["guilds"]
-heists = db["heists"]
+users = db.get_collection("users")
+guilds = db.get_collection("guilds")
+heists = db.get_collection("heists")
 settings = db.get_collection("settings")
 
 # ================= LOG =================
