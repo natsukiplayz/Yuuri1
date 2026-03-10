@@ -152,6 +152,9 @@ f"""
 
 async def set_start_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
+    if update.effective_user.id != OWNER_ID:
+        return await update.message.reply_text("❌ Only bot owner can use this command.")
+
     msg = update.message
 
     if not msg.reply_to_message:
@@ -219,43 +222,36 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     first_name = user.first_name or "User"
     args = context.args
 
-    existing = users.find_one({"id": user.id})
+    user_data = get_user(user)
 
-    if not existing:
+    # Referral system
+    if user_data.get("referred_by") is None and args:
 
-        users.insert_one({
-            "id": user.id,
-            "coins": 0,
-            "referred_by": None
-        })
+        ref = args[0]
 
-        if args:
+        if ref.startswith("ref_"):
 
-            ref = args[0]
+            referrer_id = int(ref.split("_")[1])
 
-            if ref.startswith("ref_"):
+            if referrer_id != user.id:
 
-                referrer_id = int(ref.split("_")[1])
+                users.update_one(
+                    {"id": user.id},
+                    {"$set": {"referred_by": referrer_id}}
+                )
 
-                if referrer_id != user.id:
+                users.update_one(
+                    {"id": referrer_id},
+                    {"$inc": {"coins": 1000}}
+                )
 
-                    users.update_one(
-                        {"id": user.id},
-                        {"$set": {"referred_by": referrer_id}}
+                try:
+                    await context.bot.send_message(
+                        referrer_id,
+                        f"🎉 {first_name} joined using your referral!\n💰 You earned 1000 coins!"
                     )
-
-                    users.update_one(
-                        {"id": referrer_id},
-                        {"$inc": {"coins": 1000}}
-                    )
-
-                    try:
-                        await context.bot.send_message(
-                            referrer_id,
-                            f"🎉 {first_name} joined using your referral!\n💰 You earned 1000 coins!"
-                        )
-                    except:
-                        pass
+                except:
+                    pass
 
     keyboard = [
         [
@@ -283,7 +279,8 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 🏦 Join heists
 🎁 Invite friends
 
-Use /referral to invite friends and earn 1000 coins.
+👥 Use /referral to invite friends
+💰 Earn 1000 coins per invite
 """
 
     media = settings.find_one({"type": "start_media"})
