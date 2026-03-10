@@ -125,6 +125,64 @@ async def save_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         upsert=True
     )
 
+#=======================Upgrade Of Bot Steps=======================
+async def referral(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    user = update.effective_user
+    bot = await context.bot.get_me()
+
+    link = f"https://t.me/{bot.username}?start=ref_{user.id}"
+
+    await update.message.reply_text(
+f"""
+🎁 ʏᴏᴜʀ ʀᴇꜰᴇʀʀᴀʟ ʟɪɴᴋ
+
+🔗 {link}
+
+ɪɴᴠɪᴛᴇ ʏᴏᴜʀ ꜰʀɪᴇɴᴅꜱ ᴜꜱɪɴɢ ᴛʜɪꜱ ʟɪɴᴋ.
+
+💰 ʀᴇᴡᴀʀᴅ: 1000 ᴄᴏɪɴꜱ
+
+⚠️ ᴇᴀᴄʜ ᴜꜱᴇʀ ᴄᴀɴ ᴏɴʟʏ ᴜꜱᴇ ᴏɴᴇ ʀᴇꜰᴇʀʀᴀʟ.
+"""
+    )
+
+#==SetPng==For_Start_Command==
+
+async def set_start_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    msg = update.message
+
+    if not msg.reply_to_message:
+        return await msg.reply_text("Reply to a photo or video with /png")
+
+    r = msg.reply_to_message
+
+    file_id = None
+    media_type = None
+
+    if r.photo:
+        file_id = r.photo[-1].file_id
+        media_type = "photo"
+
+    elif r.video:
+        file_id = r.video.file_id
+        media_type = "video"
+
+    else:
+        return await msg.reply_text("Reply must be a photo or video.")
+
+    settings.update_one(
+        {"type": "start_media"},
+        {"$set": {
+            "file_id": file_id,
+            "media_type": media_type
+        }},
+        upsert=True
+    )
+
+    await msg.reply_text("✅ Start media updated successfully.")
+
 # ================= BOT STATS =================
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -149,46 +207,113 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(text, parse_mode="Markdown")
 
-#start_command
+#=======================Main StartUp Of Yuuri======================
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     msg = update.message
     if not msg:
         return
 
-    # Save user to database
-    get_user(msg.from_user)
+    user = msg.from_user
+    first_name = user.first_name or "User"
+    args = context.args
 
-    first_name = msg.from_user.first_name or "User"
+    existing = users.find_one({"id": user.id})
 
-    # Inline keyboard
+    if not existing:
+
+        users.insert_one({
+            "id": user.id,
+            "coins": 0,
+            "referred_by": None
+        })
+
+        if args:
+
+            ref = args[0]
+
+            if ref.startswith("ref_"):
+
+                referrer_id = int(ref.split("_")[1])
+
+                if referrer_id != user.id:
+
+                    users.update_one(
+                        {"id": user.id},
+                        {"$set": {"referred_by": referrer_id}}
+                    )
+
+                    users.update_one(
+                        {"id": referrer_id},
+                        {"$inc": {"coins": 1000}}
+                    )
+
+                    try:
+                        await context.bot.send_message(
+                            referrer_id,
+                            f"🎉 {first_name} joined using your referral!\n💰 You earned 1000 coins!"
+                        )
+                    except:
+                        pass
+
     keyboard = [
         [
             InlineKeyboardButton("📰 Uᴘᴅᴀᴛᴇs", url="https://t.me/yuuriXupdates"),
-            InlineKeyboardButton("💬 Sᴜᴘᴘᴏʀᴛ ᴄʜᴀᴛ", url="https://t.me/DreamSpaceZ")
+            InlineKeyboardButton("💬 Sᴜᴘᴘᴏʀᴛ", url="https://t.me/DreamSpaceZ")
         ],
         [
             InlineKeyboardButton("🤖 Sᴇᴄᴏɴᴅ ʙᴏᴛ", url="https://t.me/Im_yuukibot")
         ],
         [
             InlineKeyboardButton(
-                "➕ Aᴅᴅ Mᴇ Tᴏ Yᴏᴜʀ Gʀᴏᴜᴘ",
+                "➕ Aᴅᴅ Mᴇ Tᴏ Gʀᴏᴜᴘ",
                 url="https://t.me/YOUR_BOT_USERNAME?startgroup=true"
             )
         ]
     ]
 
-    welcome_text = (
-        f"✨🎉 𝗛ᴇʟʟᴏ {first_name}! 🎉✨\n\n"
-        "💥 𝗪ᴇʟᴄᴏᴍᴇ 𝘁ᴏ 𝗬𝘂𝘂𝗿𝗶 𝗕𝗼𝘁 💥\n\n"
-        "📌 𝗧ʜɪs 𝗯𝗼𝘁 𝗵𝗲𝗹𝗽𝘀 𝘆𝗼𝘂 𝗴𝗲𝘁 𝘂𝗽𝗱𝗮𝘁𝗲𝘀, 𝗷𝗼𝗶𝗻 𝗰𝗼𝗺𝗺𝘂𝗻𝗶𝘁𝗶𝗲𝘀,\n"
-        "𝗮𝗻𝗱 𝘂𝘀𝗲 𝗺𝗮𝗻𝘆 𝗳𝘂𝗻 𝗳𝗲𝗮𝘁𝘂𝗿𝗲𝘀.\n\n"
-        "💡 𝗬𝗼𝘂 𝗰𝗮𝗻 𝗮𝗹𝘀𝗼 𝗮𝗱𝗱 𝗺𝗲 𝘁𝗼 𝘆𝗼𝘂𝗿 𝗴𝗿𝗼𝘂𝗽!"
-    )
+    caption = f"""
+✨ 𝗛ᴇʟʟᴏ {first_name}
 
-    sent_msg = await msg.reply_text(
-        welcome_text,
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+💥 𝗪ᴇʟᴄᴏᴍᴇ 𝘁𝗼 𝗬𝘂𝘂𝗿𝗶 𝗕𝗼𝘁
+
+🎮 Play games
+💰 Earn coins
+🏦 Join heists
+🎁 Invite friends
+
+Use /referral to invite friends and earn 1000 coins.
+"""
+
+    media = settings.find_one({"type": "start_media"})
+
+    if media:
+
+        file_id = media["file_id"]
+        media_type = media["media_type"]
+
+        if media_type == "photo":
+
+            sent_msg = await msg.reply_photo(
+                photo=file_id,
+                caption=caption,
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+
+        elif media_type == "video":
+
+            sent_msg = await msg.reply_video(
+                video=file_id,
+                caption=caption,
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+
+    else:
+
+        sent_msg = await msg.reply_text(
+            caption,
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
 
     context.chat_data["start_message_id"] = sent_msg.message_id
 
@@ -2008,6 +2133,8 @@ def main():
     app.add_handler(CommandHandler("joinheist", joinheist))
     app.add_handler(CommandHandler("stfast", stfast))
     app.add_handler(CommandHandler("stopheist", stopheist))
+    app.add_handler(CommandHandler("png", set_start_media))
+    app.add_handler(CommandHandler("referral", referral))
 
     app.add_handler(CallbackQueryHandler(heist_choice, pattern="heist_"))
 
