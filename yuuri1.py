@@ -43,7 +43,7 @@ db = client["yuuri_db"]
 users = db["users"]
 guilds = db["guilds"]
 heists = db["heists"]
-settings = db["settings"]
+settings = db.get_collection("settings")
 
 # ================= LOG =================
 logging.basicConfig(level=logging.INFO)
@@ -62,7 +62,7 @@ def get_user(user):
         "kills": 0,
         "guild": None,
         "dead": False,
-        "inventory": []
+        "inventory": [],
         "referred_by": None
     }
         users.insert_one(data)
@@ -227,7 +227,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_data = get_user(user)
 
     # Referral system
-    if user_data.get("referred_by") is None and args:
+    if user_data.get("referred_by") is None and args and users.count_documents({"id": user.id}) == 1:
 
         ref = args[0]
 
