@@ -2114,6 +2114,9 @@ def main():
     app.add_handler(CommandHandler("rob", robe))
     app.add_handler(CommandHandler("bounty", bounty))
 
+    #===== Group Management =====
+    app.add_handler(CommandHandler("user", user_command))
+
     # ===== CALLBACK HANDLERS =====
     app.add_handler(CallbackQueryHandler(heist_choice, pattern="^heist_"))
 
