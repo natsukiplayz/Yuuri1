@@ -54,7 +54,9 @@ db = client["yuuri_db"]
 
 users = db["users"]
 guilds = db["guilds"]
+sticker_packs = db["sticker_packs"]
 heists = db["heists"]
+
 
 # ================= LOG =================
 logging.basicConfig(level=logging.INFO)
@@ -243,54 +245,82 @@ async def obt(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     sticker = msg.reply_to_message.sticker
 
-    # Loading animation
     loading = await msg.reply_text("⚙️ Cʀᴇᴀᴛɪɴɢ Pᴀᴄᴋ...")
 
-    try:
+    bot_username = (await bot.get_me()).username
 
-        bot_username = (await bot.get_me()).username
+    # Check DB if user already has pack
+    pack_data = sticker_packs.find_one({"user_id": user.id})
 
-        pack_name = f"{user.id}_by_{bot_username}"
-        pack_title = f"{user.first_name}'s Pack"
+    if not pack_data:
 
-        emoji = "✨"
+        # Create pack
+        pack_name = f"yuuri_{user.id}_by_{bot_username}"
+        pack_title = f"{user.first_name}'s Yuuri Pack"
 
-        # Try creating pack
-        await bot.create_new_sticker_set(
-            user_id=user.id,
-            name=pack_name,
-            title=pack_title,
-            stickers=[
-                {
+        try:
+
+            await bot.create_new_sticker_set(
+                user_id=user.id,
+                name=pack_name,
+                title=pack_title,
+                stickers=[{
                     "sticker": sticker.file_id,
-                    "emoji_list": [emoji]
+                    "emoji_list": ["✨"]
+                }]
+            )
+
+            # Save pack in DB
+            sticker_packs.insert_one({
+                "user_id": user.id,
+                "pack_name": pack_name
+            })
+
+            pack_link = f"https://t.me/addstickers/{pack_name}"
+
+            button = InlineKeyboardMarkup(
+                [[InlineKeyboardButton("👀 Sᴇᴇ Tʜᴇ Pᴀᴄᴋ", url=pack_link)]]
+            )
+
+            await loading.edit_text(
+                "✅ Sᴜᴄᴄᴇꜱꜱꜰᴜʟʟʏ Cʀᴇᴀᴛᴇᴅ Yᴏᴜʀ Sᴛɪᴄᴋᴇʀ Pᴀᴄᴋ!",
+                reply_markup=button
+            )
+
+        except Exception as e:
+            await loading.edit_text("❌ Fᴀɪʟᴇᴅ Tᴏ Cʀᴇᴀᴛᴇ Pᴀᴄᴋ.")
+            print(e)
+
+    else:
+
+        # Pack already exists → add sticker
+        pack_name = pack_data["pack_name"]
+
+        try:
+
+            await bot.add_sticker_to_set(
+                user_id=user.id,
+                name=pack_name,
+                sticker={
+                    "sticker": sticker.file_id,
+                    "emoji_list": ["✨"]
                 }
-            ]
-        )
+            )
 
-    except Exception:
+            pack_link = f"https://t.me/addstickers/{pack_name}"
 
-        # If pack already exists → add sticker
-        await bot.add_sticker_to_set(
-            user_id=user.id,
-            name=pack_name,
-            sticker={
-                "sticker": sticker.file_id,
-                "emoji_list": [emoji]
-            }
-        )
+            button = InlineKeyboardMarkup(
+                [[InlineKeyboardButton("👀 Sᴇᴇ Tʜᴇ Pᴀᴄᴋ", url=pack_link)]]
+            )
 
-    pack_link = f"https://t.me/addstickers/{pack_name}"
+            await loading.edit_text(
+                "✨ Sᴛɪᴄᴋᴇʀ Aᴅᴅᴇᴅ Tᴏ Yᴏᴜʀ Pᴀᴄᴋ!",
+                reply_markup=button
+            )
 
-    button = InlineKeyboardMarkup(
-        [[InlineKeyboardButton("👀 Sᴇᴇ Pᴀᴄᴋ", url=pack_link)]]
-    )
-
-    await loading.edit_text(
-        "✅ Pᴀᴄᴋ Cʀᴇᴀᴛᴇᴅ!\n\n"
-        "✨ Sᴛɪᴄᴋᴇʀ Pᴀᴄᴋ Mᴀᴅᴇ Bʏ Yᴜᴜʀɪ",
-        reply_markup=button
-    )
+        except Exception as e:
+            await loading.edit_text("❌ Fᴀɪʟᴇᴅ Tᴏ Aᴅᴅ Sᴛɪᴄᴋᴇʀ.")
+            print(e)
 
 # ================= BOT STATS =================
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
