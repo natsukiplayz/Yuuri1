@@ -2253,6 +2253,7 @@ def main():
 
     #==== Side Features =========
     app.add_handler(CommandHandler("q", quote))
+    app.add_handler(CommandHandler("obt", obt))
 
     # ===== CALLBACK HANDLERS =====
     app.add_handler(CallbackQueryHandler(heist_choice, pattern="^heist_"))
