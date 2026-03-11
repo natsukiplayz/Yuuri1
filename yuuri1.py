@@ -2065,6 +2065,10 @@ def main():
     app.add_handler(CommandHandler("register", register))
     app.add_handler(CommandHandler("revive", revive))
     app.add_handler(CommandHandler("givee", givee))
+    app.add_handler(CommandHandler("broad_gc", broad_gc))
+    app.add_handler(CommandHandler("broad_c", broad_c))
+    app.add_handler(CommandHandler("stop_b", cancel_broadcast))
+    app.add_handler(CommandHandler("toprichh", richest))
 
     # ===== HEIST =====
     app.add_handler(CommandHandler("heist", heist))
