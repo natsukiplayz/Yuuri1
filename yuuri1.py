@@ -2170,6 +2170,9 @@ def main():
     #===== Group Management =====
     app.add_handler(CommandHandler("user", user_command))
 
+    #==== Side Features =========
+    app.add_handler(CommandHandler("q", quote))
+
     # ===== CALLBACK HANDLERS =====
     app.add_handler(CallbackQueryHandler(heist_choice, pattern="^heist_"))
 
