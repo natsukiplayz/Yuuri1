@@ -245,24 +245,28 @@ async def obt(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await msg.reply_text("❌ Rᴇᴘʟʏ ᴛᴏ ᴀ Sᴛɪᴄᴋᴇʀ Tᴏ Cʀᴇᴀᴛᴇ Yᴏᴜʀ Pᴀᴄᴋ.")
 
     sticker = msg.reply_to_message.sticker
-
     loading = await msg.reply_text("⚙️ Cʀᴇᴀᴛɪɴɢ Pᴀᴄᴋ...")
 
     bot_username = (await bot.get_me()).username
 
+    # Detect format
+    if sticker.is_animated:
+        sticker_format = "animated"
+    elif sticker.is_video:
+        sticker_format = "video"
+    else:
+        sticker_format = "static"
+
     pack_data = sticker_packs.find_one({"user_id": user.id})
 
-    # Detect sticker type
-    if sticker.is_animated:
-        sticker_type = "animated"
-    elif sticker.is_video:
-        sticker_type = "video"
-    else:
-        sticker_type = "regular"
+    # Download sticker file
+    file = await bot.get_file(sticker.file_id)
+    sticker_bytes = await file.download_as_bytearray()
+    sticker_file = BytesIO(sticker_bytes)
 
     if not pack_data:
 
-        pack_name = f"yuuri_{user.id}_{sticker_type}_by_{bot_username}"
+        pack_name = f"yuuri_{user.id}_{sticker_format}_by_{bot_username}"
         pack_title = f"{user.first_name}'s Yuuri Pack"
 
         try:
@@ -271,10 +275,10 @@ async def obt(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 user_id=user.id,
                 name=pack_name,
                 title=pack_title,
-                sticker_format=sticker_type,
+                sticker_format=sticker_format,
                 stickers=[
                     InputSticker(
-                        sticker=sticker.file_id,
+                        sticker=sticker_file,
                         emoji_list=["✨"]
                     )
                 ]
@@ -310,7 +314,7 @@ async def obt(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 user_id=user.id,
                 name=pack_name,
                 sticker=InputSticker(
-                    sticker=sticker.file_id,
+                    sticker=sticker_file,
                     emoji_list=["✨"]
                 )
             )
@@ -329,7 +333,6 @@ async def obt(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             print("ADD ERROR:", e)
             await loading.edit_text("❌ Fᴀɪʟᴇᴅ Tᴏ Aᴅᴅ Sᴛɪᴄᴋᴇʀ.")
-
 
 # ================= BOT STATS =================
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
