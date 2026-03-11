@@ -250,12 +250,10 @@ async def obt(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     bot_username = (await bot.get_me()).username
 
-    # Check DB if user already has pack
     pack_data = sticker_packs.find_one({"user_id": user.id})
 
     if not pack_data:
 
-        # Create pack
         pack_name = f"yuuri_{user.id}_by_{bot_username}"
         pack_title = f"{user.first_name}'s Yuuri Pack"
 
@@ -265,13 +263,14 @@ async def obt(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 user_id=user.id,
                 name=pack_name,
                 title=pack_title,
-                stickers=[{
-                    "sticker": sticker.file_id,
-                    "emoji_list": ["✨"]
-                }]
+                stickers=[
+                    InputSticker(
+                        sticker=sticker.file_id,
+                        emoji_list=["✨"]
+                    )
+                ]
             )
 
-            # Save pack in DB
             sticker_packs.insert_one({
                 "user_id": user.id,
                 "pack_name": pack_name
@@ -290,11 +289,10 @@ async def obt(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         except Exception as e:
             await loading.edit_text("❌ Fᴀɪʟᴇᴅ Tᴏ Cʀᴇᴀᴛᴇ Pᴀᴄᴋ.")
-            print(e)
+            print("CREATE ERROR:", e)
 
     else:
 
-        # Pack already exists → add sticker
         pack_name = pack_data["pack_name"]
 
         try:
@@ -302,10 +300,10 @@ async def obt(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await bot.add_sticker_to_set(
                 user_id=user.id,
                 name=pack_name,
-                sticker={
-                    "sticker": sticker.file_id,
-                    "emoji_list": ["✨"]
-                }
+                sticker=InputSticker(
+                    sticker=sticker.file_id,
+                    emoji_list=["✨"]
+                )
             )
 
             pack_link = f"https://t.me/addstickers/{pack_name}"
@@ -321,7 +319,7 @@ async def obt(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         except Exception as e:
             await loading.edit_text("❌ Fᴀɪʟᴇᴅ Tᴏ Aᴅᴅ Sᴛɪᴄᴋᴇʀ.")
-            print(e)
+            print("ADD ERROR:", e)
 
 # ================= BOT STATS =================
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
