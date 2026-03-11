@@ -1964,26 +1964,26 @@ async def finish_heist(chat_id, context):
 #===============Management_Commands============
 #--
 #===user_id_command======
-#===user_id_command======
 async def user_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     msg = update.message
     user = msg.from_user
     chat = update.effective_chat
 
-    # If replying to someone
     if msg.reply_to_message:
         target_user = msg.reply_to_message.from_user
+        user_id = target_user.id
+        label = "👤 Rᴇᴘʟɪᴇᴅ Uꜱᴇʀ Iᴅ"
     else:
-        target_user = user
+        user_id = user.id
+        label = "👤 Uꜱᴇʀ Iᴅ"
 
     text = (
-        f"❖ Mᴇꜱꜱᴀɢᴇ Iᴅ: <code>{msg.message_id}</code>\n"
-        f"❖ Uꜱᴇʀ Iᴅ: <code>{target_user.id}</code>\n"
-        f"❖ Cʜᴀᴛ Iᴅ: <code>{chat.id}</code>"
+        f"{label}: `{user_id}`\n"
+        f"👥 Gʀᴏᴜᴘ Iᴅ: `{chat.id}`"
     )
 
-    await msg.reply_text(text, parse_mode="HTML", disable_web_page_preview=True)
+    await msg.reply_text(text, parse_mode="Markdown")
 
 # ---------------- AI FUNCTION ----------------
 import httpx
@@ -2094,7 +2094,7 @@ def main():
     app.add_handler(CommandHandler("broad_gc", broad_gc))
     app.add_handler(CommandHandler("broad_c", broad_c))
     app.add_handler(CommandHandler("stop_b", cancel_broadcast))
-    app.add_handler(CommandHandler("toprichh", richest))
+    app.add_handler(CommandHandler("richest", richest))
 
     # ===== HEIST =====
     app.add_handler(CommandHandler("heist", heist))
