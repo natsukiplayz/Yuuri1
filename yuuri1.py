@@ -235,119 +235,95 @@ async def quote(update: Update, context: ContextTypes.DEFAULT_TYPE):
 #========== Sticker Create ========
 #--
 # === Own Sticker Pack Creator ===
-async def obt(update: Update, context: ContextTypes.DEFAULT_TYPE):
+BOT_USERNAME = "im_yuuribot"
 
-    msg = update.message
-    user = msg.from_user
-    bot = context.bot
+async def save_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    message = update.effective_message
+    user = update.effective_user
+    user_id = user.id
 
-    # Must reply to sticker
-    if not msg.reply_to_message or not msg.reply_to_message.sticker:
-        return await msg.reply_text(
-            "❌ Rᴇᴘʟʏ ᴛᴏ ᴀ sᴛɪᴄᴋᴇʀ ᴛᴏ ᴄʀᴇᴀᴛᴇ ʏᴏᴜʀ ᴘᴀᴄᴋ."
+    if not message.reply_to_message or not message.reply_to_message.sticker:
+        await message.reply_text("❌ Sticker ko reply karke command use karo")
+        return
+
+    sticker = message.reply_to_message.sticker
+
+    if sticker.is_animated:
+        sticker_format = "animated"   
+    elif sticker.is_video:
+        sticker_format = "video"   
+    else:
+        sticker_format = "static"   
+    pack_name = f"user_{user_id}_{sticker_format}_by_{BOT_USERNAME}"
+    pack_title = f"{user.first_name[:15]} {sticker_format.capitalize()} Pack (@{BOT_USERNAME})"
+
+    saving_msg = await message.reply_text("🪄 Saving sticker...")
+
+    try:
+        
+        file = await context.bot.get_file(sticker.file_id)
+        file_bytes = io.BytesIO()
+        await file.download_to_memory(out=file_bytes)
+        file_bytes.seek(0)
+
+        input_sticker = InputSticker(
+            sticker=file_bytes,
+            emoji_list=[sticker.emoji or "🙂"]
         )
 
-    sticker = msg.reply_to_message.sticker
-
-    loading = await msg.reply_text("⚙️ Cʀᴇᴀᴛɪɴɢ Pᴀᴄᴋ...")
-
-    bot_username = (await bot.get_me()).username
-
-    # Detect sticker format
-    if sticker.is_animated:
-        sticker_format = "animated"
-    elif sticker.is_video:
-        sticker_format = "video"
-    else:
-        sticker_format = "static"
-
-    # Check database
-    pack_data = sticker_packs.find_one({"user_id": user.id})
-
-    sticker_file = sticker.file_id
-
-    # ================= CREATE PACK =================
-    if not pack_data:
-
-        pack_name = f"yuuri_{user.id}_by_{bot_username}"
-        pack_title = f"{user.first_name}'s Yuuri Pack"
-
         try:
-
-            await bot.create_new_sticker_set(
-                user_id=user.id,
+            
+            await context.bot.add_sticker_to_set(
+                user_id=user_id,
                 name=pack_name,
-                title=pack_title,
-                sticker_format=sticker_format,
-                stickers=[
-                    InputSticker(
-                        sticker=sticker_file,
-                        emoji_list=["✨"],
-                        format=sticker_format
-                    )
-                ]
-            )
-
-            # Save pack
-            sticker_packs.insert_one({
-                "user_id": user.id,
-                "pack_name": pack_name
-            })
-
-            pack_link = f"https://t.me/addstickers/{pack_name}"
-
-            button = InlineKeyboardMarkup([
-                [InlineKeyboardButton("👀 Sᴇᴇ Tʜᴇ Pᴀᴄᴋ", url=pack_link)]
-            ])
-
-            await loading.edit_text(
-                "✅ Sᴛɪᴄᴋᴇʀ Pᴀᴄᴋ Cʀᴇᴀᴛᴇᴅ!",
-                reply_markup=button
+                sticker=input_sticker
             )
 
         except Exception as e:
+            err = str(e).lower()
 
-            print("CREATE ERROR:", e)
-
-            await loading.edit_text(
-                "❌ Fᴀɪʟᴇᴅ Tᴏ Cʀᴇᴀᴛᴇ Pᴀᴄᴋ."
-            )
-
-    # ================= ADD STICKER =================
-    else:
-
-        pack_name = pack_data["pack_name"]
-
-        try:
-
-            await bot.add_sticker_to_set(
-                user_id=user.id,
-                name=pack_name,
-                sticker=InputSticker(
-                    sticker=sticker_file,
-                    emoji_list=["✨"],
-                    format=sticker_format
+            
+            if (
+                "stickerset_invalid" in err
+                or "not found" in err
+                or "invalid sticker set name" in err
+            ):
+                await context.bot.create_new_sticker_set(
+                    user_id=user_id,
+                    name=pack_name,
+                    title=pack_title,
+                    stickers=[input_sticker],
+                    sticker_format=sticker_format  
                 )
+            else:
+                raise e
+
+        
+        await saving_msg.edit_text(
+            f"✅ Sticker saved to your *{sticker_format}* pack 💖",
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=InlineKeyboardMarkup(
+                [[
+                    InlineKeyboardButton(
+                        "👉 Open Sticker Pack",
+                        url=f"https://t.me/addstickers/{pack_name}"
+                    )
+                ]]
             )
+        )
 
-            pack_link = f"https://t.me/addstickers/{pack_name}"
+    except Exception as e:
+        err = str(e).lower()
+        logging.error(f"Sticker Error: {err}")
 
-            button = InlineKeyboardMarkup([
-                [InlineKeyboardButton("👀 Sᴇᴇ Tʜᴇ Pᴀᴄᴋ", url=pack_link)]
-            ])
-
-            await loading.edit_text(
-                "✨ Sᴛɪᴄᴋᴇʀ Aᴅᴅᴇᴅ Tᴏ Yᴏᴜʀ Pᴀᴄᴋ!",
-                reply_markup=button
-            )
-
-        except Exception as e:
-
-            print("ADD ERROR:", e)
-
-            await loading.edit_text(
-                "❌ Fᴀɪʟᴇᴅ Tᴏ Aᴅᴅ Sᴛɪᴄᴋᴇʀ."
-            )
+        if "bot was blocked" in err or "peer_id_invalid" in err:
+            await saving_msg.edit_text("⚠️ Start me in private dm 1st then retry.")
+        elif "stickers_too_much" in err:
+            await saving_msg.edit_text("⚠️ Your sticker pack has been full (Max 120 stickers).")
+        elif "webm" in err:
+            await saving_msg.edit_text("⚠️ Video sticker sirf .webm hona chahiye")
+        else:
+            await saving_msg.edit_text("❌ Can't save this sticker ")
 
 # ================= BOT STATS =================
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -2310,7 +2286,7 @@ def main():
 
     #==== Side Features =========
     app.add_handler(CommandHandler("q", quote))
-    app.add_handler(CommandHandler("obt", obt))
+    app.add_handler(CommandHandler("obt", save_sticker))
 
     # ===== CALLBACK HANDLERS =====
     app.add_handler(CallbackQueryHandler(heist_choice, pattern="^heist_"))
