@@ -2055,7 +2055,7 @@ def main():
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CommandHandler("referral", referral))
     app.add_handler(CommandHandler("stats", stats))
-    app.add_handler(CommandHandler("profile", profile))
+    app.add_handler(CommandHandler("status", profile))
     app.add_handler(CommandHandler("rankers", rankers))
     app.add_handler(CommandHandler("daily", daily))
     app.add_handler(CommandHandler("protect", protect))
