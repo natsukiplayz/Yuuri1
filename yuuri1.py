@@ -251,17 +251,11 @@ async def save_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     sticker = message.reply_to_message.sticker
 
-    if sticker.is_animated:
-        sticker_format = "animated"
-    elif sticker.is_video:
-        sticker_format = "video"
-    else:
-        sticker_format = "static"
+    # SINGLE PACK NAME
+    pack_name = f"user_{user_id}_pack_by_{BOT_USERNAME}"
+    pack_title = f"{user.first_name[:15]}'s Sᴛɪᴄᴋᴇʀ Pᴀᴄᴋ"
 
-    pack_name = f"user_{user_id}_{sticker_format}_by_{BOT_USERNAME}"
-    pack_title = f"{user.first_name[:15]}'s {sticker_format.capitalize()} Pᴀᴄᴋ"
-
-    saving_msg = await message.reply_text("🪄 Sᴀᴠɪɴɢ Sᴛɪᴄᴋᴇʀ...")
+    saving_msg = await message.reply_text("🪄 Cʀᴇᴀᴛɪɴɢ Pᴀᴄᴋ...")
 
     try:
 
@@ -285,7 +279,6 @@ async def save_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if (
                 "stickerset_invalid" in err
                 or "not found" in err
-                or "invalid sticker set name" in err
             ):
 
                 await context.bot.create_new_sticker_set(
@@ -293,19 +286,18 @@ async def save_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     name=pack_name,
                     title=pack_title,
                     stickers=[input_sticker],
-                    sticker_format=sticker_format
+                    sticker_format="static"
                 )
 
             else:
                 raise e
 
         await saving_msg.edit_text(
-            f"✨ Sᴛɪᴄᴋᴇʀ Sᴀᴠᴇᴅ Tᴏ Yᴏᴜʀ {sticker_format.upper()} Pᴀᴄᴋ!",
-            parse_mode="Markdown",
+            "✨ Sᴛɪᴄᴋᴇʀ Sᴀᴠᴇᴅ Tᴏ Yᴏᴜʀ Pᴀᴄᴋ!",
             reply_markup=InlineKeyboardMarkup(
                 [[
                     InlineKeyboardButton(
-                        "👀 Oᴘᴇɴ Sᴛɪᴄᴋᴇʀ Pᴀᴄᴋ",
+                        "👀 Sᴇᴇ Pᴀᴄᴋ",
                         url=f"https://t.me/addstickers/{pack_name}"
                     )
                 ]]
@@ -317,14 +309,8 @@ async def save_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
         err = str(e).lower()
         logging.error(f"Sticker Error: {err}")
 
-        if "bot was blocked" in err or "peer_id_invalid" in err:
-            await saving_msg.edit_text("⚠️ Sᴛᴀʀᴛ Mᴇ Iɴ Pʀɪᴠᴀᴛᴇ Fɪʀsᴛ Tʜᴇɴ Tʀʏ Aɢᴀɪɴ.")
-
-        elif "stickers_too_much" in err:
-            await saving_msg.edit_text("⚠️ Yᴏᴜʀ Sᴛɪᴄᴋᴇʀ Pᴀᴄᴋ Is Fᴜʟʟ (120 Lɪᴍɪᴛ).")
-
-        elif "webm" in err:
-            await saving_msg.edit_text("⚠️ Vɪᴅᴇᴏ Sᴛɪᴄᴋᴇʀ Mᴜsᴛ Bᴇ .WEBM Fᴏʀᴍᴀᴛ.")
+        if "stickers_too_much" in err:
+            await saving_msg.edit_text("⚠️ Pᴀᴄᴋ Is Fᴜʟʟ (120 Lɪᴍɪᴛ).")
 
         else:
             await saving_msg.edit_text("❌ Cᴀɴ'ᴛ Sᴀᴠᴇ Tʜɪs Sᴛɪᴄᴋᴇʀ.")
