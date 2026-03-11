@@ -1961,6 +1961,29 @@ async def finish_heist(chat_id, context):
 
     heists.delete_one({"chat_id": chat_id})
 
+#===============Management_Commands============
+#--
+#===user_id_command======
+async def user_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    msg = update.message
+    user = msg.from_user
+    chat = update.effective_chat
+
+    # If replying to someone
+    if msg.reply_to_message:
+        target_user = msg.reply_to_message.from_user
+    else:
+        target_user = user
+
+    text = f"""
+❖ Mᴇꜱꜱᴀɢᴇ Iᴅ: {msg.message_id}
+❖ Yᴏᴜʀ Iᴅ: {target_user.id}
+❖ Cʜᴀᴛ Iᴅ: {chat.id}
+"""
+
+    await msg.reply_text(text)
+
 # ---------------- AI FUNCTION ----------------
 import httpx
 
