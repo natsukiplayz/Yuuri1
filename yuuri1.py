@@ -2085,6 +2085,16 @@ def main():
     # ===== CALLBACK HANDLERS =====
     app.add_handler(CallbackQueryHandler(heist_choice, pattern="^heist_"))
 
+    # ===== CALLBACK BUTTON HANDLER =====
+    app.add_handler(CallbackQueryHandler(callback_handler))
+
+    # ===== MESSAGE HANDLERS =====
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, auto_reply))
+    app.add_handler(MessageHandler(filters.ALL, save_chat))
+
+    # ===== ERROR HANDLER =====
+    app.add_error_handler(error_handler)
+
     print("🚀 Yuuri Bot Running...")
 
     app.run_polling()
