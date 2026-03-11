@@ -267,8 +267,7 @@ async def save_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         input_sticker = InputSticker(
             sticker=sticker.file_id,
-            emoji_list=[sticker.emoji or "🙂"],
-            format=sticker_format
+            emoji_list=[sticker.emoji or "🙂"]
         )
 
         try:
@@ -319,7 +318,7 @@ async def save_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logging.error(f"Sticker Error: {err}")
 
         if "bot was blocked" in err or "peer_id_invalid" in err:
-            await saving_msg.edit_text("⚠️ Sᴛᴀʀᴛ Mᴇ Iɴ Pʀɪᴠᴀᴛᴇ Fɪʀsᴛ Aɴᴅ Tʀʏ Aɢᴀɪɴ.")
+            await saving_msg.edit_text("⚠️ Sᴛᴀʀᴛ Mᴇ Iɴ Pʀɪᴠᴀᴛᴇ Fɪʀsᴛ Tʜᴇɴ Tʀʏ Aɢᴀɪɴ.")
 
         elif "stickers_too_much" in err:
             await saving_msg.edit_text("⚠️ Yᴏᴜʀ Sᴛɪᴄᴋᴇʀ Pᴀᴄᴋ Is Fᴜʟʟ (120 Lɪᴍɪᴛ).")
