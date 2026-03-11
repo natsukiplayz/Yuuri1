@@ -302,7 +302,7 @@ async def save_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         await saving_msg.edit_text(
             f"✅ Sticker saved to your *{sticker_format}* pack 💖",
-            parse_mode=ParseMode.MARKDOWN,
+            parse_mode=Parse_mode.MARKDOWN,
             reply_markup=InlineKeyboardMarkup(
                 [[
                     InlineKeyboardButton(
