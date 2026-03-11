@@ -2096,7 +2096,7 @@ async def error_handler(update, context):
     app.add_error_handler(error_handler)
 
     print("🔥 Yuuri Running...")
-    app.run_polling(drop_pending_updates=True)
+    app.run_polling()
 
 if __name__ == "__main__":
     main()
