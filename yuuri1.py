@@ -1,14 +1,19 @@
 #!/usr/bin/env python3
 
 import os
-import httpx
 import logging
 import random
+import base64
+from io import BytesIO
+
 import requests
-from telegram.constants import ChatAction
-from telegram.ext import CallbackQueryHandler
+import httpx
+
 from pymongo import MongoClient
+
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.constants import ChatAction
+
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -166,7 +171,7 @@ async def quote(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
 
     if not msg.reply_to_message:
-        return await msg.reply_text("❌ Reply to a message to create a quote.")
+        return await msg.reply_text("❌ Rᴇᴘʟʏ ᴛᴏ ᴀ ᴍᴇꜱꜱᴀɢᴇ ᴛᴏ ᴄʀᴇᴀᴛᴇ Qᴜᴏᴛᴇ.")
 
     replied = msg.reply_to_message
     user = replied.from_user
@@ -174,14 +179,17 @@ async def quote(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = replied.text or replied.caption
 
     if not text:
-        return await msg.reply_text("❌ I can only quote text messages.")
+        return await msg.reply_text("❌ I ᴄᴀɴ ᴏɴʟʏ Qᴜᴏᴛᴇ ᴛᴇxᴛ ᴍᴇꜱꜱᴀɢᴇꜱ.")
+
+    # Generating animation
+    loading = await msg.reply_text("⚙️ Gᴇɴᴇʀᴀᴛɪɴɢ Qᴜᴏᴛᴇ...")
 
     payload = {
         "type": "quote",
-        "format": "png",
+        "format": "webp",   # sticker format
         "backgroundColor": "#1b1429",
         "width": 512,
-        "height": 768,
+        "height": 512,
         "scale": 2,
         "messages": [
             {
@@ -189,27 +197,37 @@ async def quote(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "avatar": True,
                 "from": {
                     "id": user.id,
-                    "name": user.first_name,
+                    "name": user.first_name
                 },
-                "text": text,
-                "replyMessage": {}
+                "text": text
             }
         ]
     }
 
-    res = requests.post(
-        "https://bot.lyo.su/quote/generate",
-        json=payload
-    )
+    try:
 
-    if res.status_code != 200:
-        return await msg.reply_text("❌ Failed to generate quote.")
+        res = requests.post(
+            "https://bot.lyo.su/quote/generate",
+            json=payload
+        )
 
-    data = res.json()
+        if res.status_code != 200:
+            await loading.edit_text("❌ Fᴀɪʟᴇᴅ ᴛᴏ ɢᴇɴᴇʀᴀᴛᴇ Qᴜᴏᴛᴇ.")
+            return
 
-    image = data["result"]["image"]
+        data = res.json()
 
-    await msg.reply_photo(photo=image)
+        image = base64.b64decode(data["result"]["image"])
+
+        sticker = BytesIO(image)
+        sticker.name = "quote.webp"
+
+        await msg.reply_sticker(sticker=sticker)
+
+        await loading.delete()
+
+    except Exception:
+        await loading.edit_text("❌ Eʀʀᴏʀ ᴡʜɪʟᴇ ɢᴇɴᴇʀᴀᴛɪɴɢ Qᴜᴏᴛᴇ.")
 
 # ================= BOT STATS =================
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
