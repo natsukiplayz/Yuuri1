@@ -236,44 +236,43 @@ async def quote(update: Update, context: ContextTypes.DEFAULT_TYPE):
 #========== Sticker Create ========
 #--
 # === Own Sticker Pack Creator ===
+
 BOT_USERNAME = "im_yuuribot"
 
 async def save_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     message = update.effective_message
     user = update.effective_user
     user_id = user.id
 
     if not message.reply_to_message or not message.reply_to_message.sticker:
-        await message.reply_text("❌ Sticker ko reply karke command use karo")
+        await message.reply_text("❌ Rᴇᴘʟʏ Tᴏ A Sᴛɪᴄᴋᴇʀ Tᴏ Sᴀᴠᴇ Iᴛ.")
         return
 
     sticker = message.reply_to_message.sticker
 
     if sticker.is_animated:
-        sticker_format = "animated"   
+        sticker_format = "animated"
     elif sticker.is_video:
-        sticker_format = "video"   
+        sticker_format = "video"
     else:
-        sticker_format = "static"   
-    pack_name = f"user_{user_id}_{sticker_format}_by_{BOT_USERNAME}"
-    pack_title = f"{user.first_name[:15]} {sticker_format.capitalize()} Pack (@{BOT_USERNAME})"
+        sticker_format = "static"
 
-    saving_msg = await message.reply_text("🪄 Saving sticker...")
+    pack_name = f"user_{user_id}_{sticker_format}_by_{BOT_USERNAME}"
+    pack_title = f"{user.first_name[:15]}'s {sticker_format.capitalize()} Pᴀᴄᴋ"
+
+    saving_msg = await message.reply_text("🪄 Sᴀᴠɪɴɢ Sᴛɪᴄᴋᴇʀ...")
 
     try:
-        
-        file = await context.bot.get_file(sticker.file_id)
-        file_bytes = io.BytesIO()
-        await file.download_to_memory(out=file_bytes)
-        file_bytes.seek(0)
 
         input_sticker = InputSticker(
-            sticker=file_bytes,
-            emoji_list=[sticker.emoji or "🙂"]
+            sticker=sticker.file_id,
+            emoji_list=[sticker.emoji or "🙂"],
+            format=sticker_format
         )
 
         try:
-            
+
             await context.bot.add_sticker_to_set(
                 user_id=user_id,
                 name=pack_name,
@@ -281,32 +280,33 @@ async def save_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
 
         except Exception as e:
+
             err = str(e).lower()
 
-            
             if (
                 "stickerset_invalid" in err
                 or "not found" in err
                 or "invalid sticker set name" in err
             ):
+
                 await context.bot.create_new_sticker_set(
                     user_id=user_id,
                     name=pack_name,
                     title=pack_title,
                     stickers=[input_sticker],
-                    sticker_format=sticker_format  
+                    sticker_format=sticker_format
                 )
+
             else:
                 raise e
 
-        
         await saving_msg.edit_text(
-            f"✅ Sticker saved to your *{sticker_format}* pack 💖",
-            parse_mode=Parse_mode.MARKDOWN,
+            f"✨ Sᴛɪᴄᴋᴇʀ Sᴀᴠᴇᴅ Tᴏ Yᴏᴜʀ {sticker_format.upper()} Pᴀᴄᴋ!",
+            parse_mode="Markdown",
             reply_markup=InlineKeyboardMarkup(
                 [[
                     InlineKeyboardButton(
-                        "👉 Open Sticker Pack",
+                        "👀 Oᴘᴇɴ Sᴛɪᴄᴋᴇʀ Pᴀᴄᴋ",
                         url=f"https://t.me/addstickers/{pack_name}"
                     )
                 ]]
@@ -314,17 +314,21 @@ async def save_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
     except Exception as e:
+
         err = str(e).lower()
         logging.error(f"Sticker Error: {err}")
 
         if "bot was blocked" in err or "peer_id_invalid" in err:
-            await saving_msg.edit_text("⚠️ Start me in private dm 1st then retry.")
+            await saving_msg.edit_text("⚠️ Sᴛᴀʀᴛ Mᴇ Iɴ Pʀɪᴠᴀᴛᴇ Fɪʀsᴛ Aɴᴅ Tʀʏ Aɢᴀɪɴ.")
+
         elif "stickers_too_much" in err:
-            await saving_msg.edit_text("⚠️ Your sticker pack has been full (Max 120 stickers).")
+            await saving_msg.edit_text("⚠️ Yᴏᴜʀ Sᴛɪᴄᴋᴇʀ Pᴀᴄᴋ Is Fᴜʟʟ (120 Lɪᴍɪᴛ).")
+
         elif "webm" in err:
-            await saving_msg.edit_text("⚠️ Video sticker sirf .webm hona chahiye")
+            await saving_msg.edit_text("⚠️ Vɪᴅᴇᴏ Sᴛɪᴄᴋᴇʀ Mᴜsᴛ Bᴇ .WEBM Fᴏʀᴍᴀᴛ.")
+
         else:
-            await saving_msg.edit_text("❌ Can't save this sticker ")
+            await saving_msg.edit_text("❌ Cᴀɴ'ᴛ Sᴀᴠᴇ Tʜɪs Sᴛɪᴄᴋᴇʀ.")
 
 # ================= BOT STATS =================
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
