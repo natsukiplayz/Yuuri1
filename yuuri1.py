@@ -241,10 +241,14 @@ async def obt(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = msg.from_user
     bot = context.bot
 
+    # Must reply to sticker
     if not msg.reply_to_message or not msg.reply_to_message.sticker:
-        return await msg.reply_text("❌ Rᴇᴘʟʏ ᴛᴏ ᴀ Sᴛɪᴄᴋᴇʀ Tᴏ Cʀᴇᴀᴛᴇ Yᴏᴜʀ Pᴀᴄᴋ.")
+        return await msg.reply_text(
+            "❌ Rᴇᴘʟʏ ᴛᴏ ᴀ sᴛɪᴄᴋᴇʀ ᴛᴏ ᴄʀᴇᴀᴛᴇ ʏᴏᴜʀ ᴘᴀᴄᴋ."
+        )
 
     sticker = msg.reply_to_message.sticker
+
     loading = await msg.reply_text("⚙️ Cʀᴇᴀᴛɪɴɢ Pᴀᴄᴋ...")
 
     bot_username = (await bot.get_me()).username
@@ -257,18 +261,15 @@ async def obt(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         sticker_format = "static"
 
+    # Check database
     pack_data = sticker_packs.find_one({"user_id": user.id})
 
-    # Download sticker
-    file = await bot.get_file(sticker.file_id)
-    sticker_bytes = await file.download_as_bytearray()
+    sticker_file = sticker.file_id
 
-    sticker_file = BytesIO(sticker_bytes)
-    sticker_file.seek(0)
-
+    # ================= CREATE PACK =================
     if not pack_data:
 
-        pack_name = f"yuuri_{user.id}_{sticker_format}_by_{bot_username}"
+        pack_name = f"yuuri_{user.id}_by_{bot_username}"
         pack_title = f"{user.first_name}'s Yuuri Pack"
 
         try:
@@ -287,6 +288,7 @@ async def obt(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 ]
             )
 
+            # Save pack
             sticker_packs.insert_one({
                 "user_id": user.id,
                 "pack_name": pack_name
@@ -299,14 +301,19 @@ async def obt(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ])
 
             await loading.edit_text(
-                "✅ Sᴜᴄᴄᴇꜱꜱꜰᴜʟʟʏ Cʀᴇᴀᴛᴇᴅ Yᴏᴜʀ Sᴛɪᴄᴋᴇʀ Pᴀᴄᴋ!",
+                "✅ Sᴛɪᴄᴋᴇʀ Pᴀᴄᴋ Cʀᴇᴀᴛᴇᴅ!",
                 reply_markup=button
             )
 
         except Exception as e:
-            print("CREATE ERROR:", e)
-            await loading.edit_text("❌ Fᴀɪʟᴇᴅ Tᴏ Cʀᴇᴀᴛᴇ Pᴀᴄᴋ.")
 
+            print("CREATE ERROR:", e)
+
+            await loading.edit_text(
+                "❌ Fᴀɪʟᴇᴅ Tᴏ Cʀᴇᴀᴛᴇ Pᴀᴄᴋ."
+            )
+
+    # ================= ADD STICKER =================
     else:
 
         pack_name = pack_data["pack_name"]
@@ -335,8 +342,12 @@ async def obt(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
 
         except Exception as e:
+
             print("ADD ERROR:", e)
-            await loading.edit_text("❌ Fᴀɪʟᴇᴅ Tᴏ Aᴅᴅ Sᴛɪᴄᴋᴇʀ.")
+
+            await loading.edit_text(
+                "❌ Fᴀɪʟᴇᴅ Tᴏ Aᴅᴅ Sᴛɪᴄᴋᴇʀ."
+            )
 
 # ================= BOT STATS =================
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
