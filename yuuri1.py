@@ -4,6 +4,7 @@ import os
 import logging
 import random
 import base64
+import io
 from io import BytesIO
 
 import requests
