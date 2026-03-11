@@ -158,7 +158,58 @@ async def save_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         upsert=True
     )
 
-#====================Upgrade Of Bot Steps====================
+#============ Side_Features ========
+#--
+#=== Quote_transformer =======
+async def quote(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    msg = update.message
+
+    if not msg.reply_to_message:
+        return await msg.reply_text("❌ Reply to a message to create a quote.")
+
+    replied = msg.reply_to_message
+    user = replied.from_user
+
+    text = replied.text or replied.caption
+
+    if not text:
+        return await msg.reply_text("❌ I can only quote text messages.")
+
+    payload = {
+        "type": "quote",
+        "format": "png",
+        "backgroundColor": "#1b1429",
+        "width": 512,
+        "height": 768,
+        "scale": 2,
+        "messages": [
+            {
+                "entities": [],
+                "avatar": True,
+                "from": {
+                    "id": user.id,
+                    "name": user.first_name,
+                },
+                "text": text,
+                "replyMessage": {}
+            }
+        ]
+    }
+
+    res = requests.post(
+        "https://bot.lyo.su/quote/generate",
+        json=payload
+    )
+
+    if res.status_code != 200:
+        return await msg.reply_text("❌ Failed to generate quote.")
+
+    data = res.json()
+
+    image = data["result"]["image"]
+
+    await msg.reply_photo(photo=image)
 
 # ================= BOT STATS =================
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
