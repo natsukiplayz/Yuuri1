@@ -234,7 +234,7 @@ async def quote(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 #========== Sticker Create ========
 #--
-#=== Own Sticker Pack Creator =======
+# === Own Sticker Pack Creator ===
 async def obt(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     msg = update.message
@@ -249,7 +249,7 @@ async def obt(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     bot_username = (await bot.get_me()).username
 
-    # Detect format
+    # Detect sticker format
     if sticker.is_animated:
         sticker_format = "animated"
     elif sticker.is_video:
@@ -259,10 +259,12 @@ async def obt(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     pack_data = sticker_packs.find_one({"user_id": user.id})
 
-    # Download sticker file
+    # Download sticker
     file = await bot.get_file(sticker.file_id)
     sticker_bytes = await file.download_as_bytearray()
+
     sticker_file = BytesIO(sticker_bytes)
+    sticker_file.seek(0)
 
     if not pack_data:
 
@@ -279,7 +281,8 @@ async def obt(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 stickers=[
                     InputSticker(
                         sticker=sticker_file,
-                        emoji_list=["✨"]
+                        emoji_list=["✨"],
+                        format=sticker_format
                     )
                 ]
             )
@@ -291,9 +294,9 @@ async def obt(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             pack_link = f"https://t.me/addstickers/{pack_name}"
 
-            button = InlineKeyboardMarkup(
-                [[InlineKeyboardButton("👀 Sᴇᴇ Tʜᴇ Pᴀᴄᴋ", url=pack_link)]]
-            )
+            button = InlineKeyboardMarkup([
+                [InlineKeyboardButton("👀 Sᴇᴇ Tʜᴇ Pᴀᴄᴋ", url=pack_link)]
+            ])
 
             await loading.edit_text(
                 "✅ Sᴜᴄᴄᴇꜱꜱꜰᴜʟʟʏ Cʀᴇᴀᴛᴇᴅ Yᴏᴜʀ Sᴛɪᴄᴋᴇʀ Pᴀᴄᴋ!",
@@ -315,15 +318,16 @@ async def obt(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 name=pack_name,
                 sticker=InputSticker(
                     sticker=sticker_file,
-                    emoji_list=["✨"]
+                    emoji_list=["✨"],
+                    format=sticker_format
                 )
             )
 
             pack_link = f"https://t.me/addstickers/{pack_name}"
 
-            button = InlineKeyboardMarkup(
-                [[InlineKeyboardButton("👀 Sᴇᴇ Tʜᴇ Pᴀᴄᴋ", url=pack_link)]]
-            )
+            button = InlineKeyboardMarkup([
+                [InlineKeyboardButton("👀 Sᴇᴇ Tʜᴇ Pᴀᴄᴋ", url=pack_link)]
+            ])
 
             await loading.edit_text(
                 "✨ Sᴛɪᴄᴋᴇʀ Aᴅᴅᴇᴅ Tᴏ Yᴏᴜʀ Pᴀᴄᴋ!",
