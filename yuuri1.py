@@ -273,7 +273,7 @@ def add_xp(user_data, amount=10):
 
     save_user(user_data)
 
-    # ================= RANK =================
+# ================= RANK =================
     current_rank, next_rank = get_rank_data(xp)
 
     if next_rank:
@@ -2046,58 +2046,49 @@ async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ================= MAIN =================
 def main():
-    global BOT_ID
+
+    print("🔥 Yuuri Bot Starting...")
+
     app = ApplicationBuilder().token(BOT_TOKEN).build()
-   # BOT_ID = app.bot.id  # set bot id at startup
 
-async def error_handler(update, context):
-    logging.error(msg="Exception while handling update:", exc_info=context.error)
-
-    # Command Handlers
+    # ===== COMMAND HANDLERS =====
     app.add_handler(CommandHandler("start", start_command))
-    app.add_handler(CommandHandler("daily", daily))
-    app.add_handler(CommandHandler("shopp", shop))
-    app.add_handler(CommandHandler("buyy", purchase))
-    app.add_handler(CommandHandler("toprichest", richest))
-    app.add_handler(CommandHandler("broad_c", broad_c))
-    app.add_handler(CommandHandler("broad_gc", broad_gc))
-    app.add_handler(CommandHandler("stop_b", cancel_broadcast))
-    app.add_handler(CommandHandler("register", register))
-    app.add_handler(CommandHandler("kill", kill))
-    app.add_handler(CommandHandler("rob", robe))
-    app.add_handler(CommandHandler("bounty", bounty))
+    app.add_handler(CommandHandler("referral", referral))
     app.add_handler(CommandHandler("stats", stats))
-    app.add_handler(CommandHandler("status", profile))
-    app.add_handler(CommandHandler("protect", protect))
+    app.add_handler(CommandHandler("profile", profile))
     app.add_handler(CommandHandler("rankers", rankers))
-    app.add_handler(CommandHandler("rullate", rullate))
-    app.add_handler(CommandHandler("join", join))
-    app.add_handler(CommandHandler("shot", shot))
-    app.add_handler(CommandHandler("rullrank", rullrank))
-    app.add_handler(CommandHandler("out", out))
+    app.add_handler(CommandHandler("daily", daily))
+    app.add_handler(CommandHandler("protect", protect))
+    app.add_handler(CommandHandler("register", register))
     app.add_handler(CommandHandler("revive", revive))
     app.add_handler(CommandHandler("givee", givee))
+
+    # ===== HEIST =====
     app.add_handler(CommandHandler("heist", heist))
     app.add_handler(CommandHandler("joinheist", joinheist))
     app.add_handler(CommandHandler("stfast", stfast))
     app.add_handler(CommandHandler("stopheist", stopheist))
-    app.add_handler(CommandHandler("png", set_start_media))
-    app.add_handler(CommandHandler("referral", referral))
 
-    app.add_handler(CallbackQueryHandler(heist_choice, pattern="heist_"))
+    # ===== RUSSIAN ROULETTE =====
+    app.add_handler(CommandHandler("rullate", rullate))
+    app.add_handler(CommandHandler("join", join))
+    app.add_handler(CommandHandler("shot", shot))
+    app.add_handler(CommandHandler("on", on))
+    app.add_handler(CommandHandler("out", out))
+    app.add_handler(CommandHandler("rullrank", rullrank))
 
-    #fun cartoons and anime
-    app.add_handler(CommandHandler("aniworld", aniworld_command))
+    # ===== GAME COMMANDS =====
+    app.add_handler(CommandHandler("kill", kill))
+    app.add_handler(CommandHandler("rob", robe))
+    app.add_handler(CommandHandler("bounty", bounty))
 
-    # Message Handlers
-    app.add_handler(CallbackQueryHandler(callback_handler))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, auto_reply))
-    app.add_handler(MessageHandler(filters.ALL, save_chat))
-    app.add_error_handler(error_handler)
+    # ===== CALLBACK HANDLERS =====
+    app.add_handler(CallbackQueryHandler(heist_choice, pattern="^heist_"))
 
-    print("🔥 Yuuri Running...")
+    print("🚀 Yuuri Bot Running...")
 
     app.run_polling()
+
 
 if __name__ == "__main__":
     main()
