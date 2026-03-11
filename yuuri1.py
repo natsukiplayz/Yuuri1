@@ -262,6 +262,319 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     context.chat_data["start_message_id"] = sent_msg.message_id
 
+# ======== PROFILE =======
+async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    msg = update.effective_message
+    if not msg:
+        return
+
+    # Target user
+    if msg.reply_to_message:
+        target_user = msg.reply_to_message.from_user
+    else:
+        target_user = update.effective_user
+
+    # Get user data
+    data = users.find_one({"id": target_user.id})
+
+    if not data:
+        data = {
+            "id": target_user.id,
+            "name": target_user.first_name,
+            "coins": 100,
+            "xp": 0,
+            "level": 1,
+            "kills": 0,
+            "guild": None,
+            "dead": False,
+            "inventory": []
+        }
+        users.insert_one(data)
+
+    name = data.get("name", target_user.first_name)
+    coins = data.get("coins", 0)
+    xp = data.get("xp", 0)
+    kills = data.get("kills", 0)
+    guild = data.get("guild")
+    dead = data.get("dead", False)
+
+    guild_name = guild if guild else "Nᴏɴᴇ"
+
+    # Rank system
+    current_rank, next_rank = get_rank_data(xp)
+
+    if next_rank:
+        progress = xp - current_rank["xp"]
+        needed = next_rank["xp"] - current_rank["xp"]
+
+        percent = int((progress / needed) * 100) if needed > 0 else 0
+        bar = create_progress_bar(percent)
+
+    else:
+        bar = "██████████ 100%"
+
+    # Global Rank
+    all_users = list(users.find())
+
+    sorted_users = sorted(
+        all_users,
+        key=lambda u: u.get("xp", 0),
+        reverse=True
+    )
+
+    global_rank = 0
+    for i, u in enumerate(sorted_users, 1):
+        if u.get("id") == target_user.id:
+            global_rank = i
+            break
+
+    status = "Dead" if dead else "Alive"
+
+    text = (
+        f"👤 Nᴀᴍᴇ: {name}\n"
+        f"🆔 Iᴅ: {target_user.id}\n\n"
+        f"💰 Cᴏɪɴs: {coins}\n"
+        f"🔪 Kɪʟʟs: {kills}\n"
+        f"☠️ Status: {status}\n\n"
+        f"🏅 Rᴀɴᴋ: {current_rank['name']}\n"
+        f"📊 Pʀᴏɢʀᴇss:\n{bar}\n"
+        f"🌐 Gʟᴏʙᴀʟ Rᴀɴᴋ: {global_rank}\n\n"
+        f"🏰 Gᴜɪʟᴅ: {guild_name}"
+    )
+
+    await msg.reply_text(text)
+
+# ======== ROB SYSTEM ========
+from datetime import datetime
+
+# 🔧 CONFIG
+OWNER_ID = 5773908061
+BOT_ID = None
+
+MAX_ROB_PER_ATTEMPT = 10000
+
+async def robe(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    if not update.message:
+        return
+
+    msg = update.message
+    robber_user = update.effective_user
+
+    # ❌ Block in private
+    if update.effective_chat.type == "private":
+        return await msg.reply_text("❌ Tʜɪs Cᴏᴍᴍᴀɴᴅ Cᴀɴ Oɴʟʏ Bᴇ Usᴇᴅ Iɴ Gʀᴏᴜᴘs.")
+
+    # ❌ Must reply
+    if not msg.reply_to_message:
+        return await msg.reply_text("⚠️ Rᴇᴘʟʏ Tᴏ Sᴏᴍᴇᴏɴᴇ Yᴏᴜ Wᴀɴᴛ Tᴏ Rᴏʙ.")
+
+    target_user = msg.reply_to_message.from_user
+
+    # ❌ Cannot rob bot
+    if target_user.id == BOT_ID or target_user.is_bot:
+        return await msg.reply_text("🤖 Yᴏᴜ Cᴀɴɴᴏᴛ Rᴏʙ A Bᴏᴛ.")
+
+    # ❌ Cannot rob yourself
+    if target_user.id == robber_user.id:
+        return await msg.reply_text("❌ Yᴏᴜ Cᴀɴ'ᴛ Rᴏʙ Yᴏᴜʀsᴇʟғ.")
+
+    # 👑 Owner protection
+    if target_user.id == OWNER_ID:
+        return await msg.reply_text("👑 Yᴏᴜ Cᴀɴ'ᴛ Rᴏʙ Mʏ Dᴇᴀʀᴇsᴛ Oᴡɴᴇʀ 😒")
+
+    # ❌ Need amount
+    if not context.args:
+        return await msg.reply_text("⚠️ Uꜱᴀɢᴇ: /rob <amount>")
+
+    try:
+        amount = int(context.args[0])
+    except:
+        return await msg.reply_text("❌ Iɴᴠᴀʟɪᴅ Aᴍᴏᴜɴᴛ.")
+
+    robber = get_user(robber_user)
+    target = get_user(target_user)
+
+    # 🛡️ Protection check
+    if target.get("protect_until"):
+        expire = datetime.strptime(target["protect_until"], "%Y-%m-%d %H:%M:%S")
+        if expire > datetime.utcnow():
+            return await msg.reply_text(
+                "🛡️ Tʜɪꜱ Uꜱᴇʀ Iꜱ Pʀᴏᴛᴇᴄᴛᴇᴅ.\n"
+                "🔒 Yᴏᴜ Cᴀɴɴᴏᴛ Rᴏʙ Tʜᴇᴍ."
+            )
+
+    # 💰 Minimum coins check
+    if robber["coins"] < 50:
+        return await msg.reply_text(
+            "💰 Yᴏᴜ Nᴇᴇᴅ Aᴛ Lᴇᴀsᴛ 50 Cᴏɪɴs Tᴏ Rᴏʙ Sᴏᴍᴇᴏɴᴇ."
+        )
+
+    steal = min(amount, target["coins"], MAX_ROB_PER_ATTEMPT)
+
+    if steal <= 0:
+        return await msg.reply_text(
+            f"💸 {target_user.first_name} Hᴀs Nᴏ Cᴏɪɴs."
+        )
+
+    # ✅ Always success
+    robber["coins"] += steal
+    target["coins"] -= steal
+
+    save_user(robber)
+    save_user(target)
+
+    await msg.reply_text(
+        f"🕵️ {robber_user.first_name} Sᴜᴄᴄᴇssғᴜʟʟʏ Rᴏʙʙᴇᴅ {target_user.first_name}\n"
+        f"💰 Sᴛᴏʟᴇɴ: {steal} Cᴏɪɴs"
+    )
+
+#========Kill=======
+import random
+from datetime import datetime
+from telegram import Update
+from telegram.ext import ContextTypes
+
+OWNER_ID = 5773908061
+BOT_ID = None
+
+async def kill(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    global BOT_ID
+
+    if BOT_ID is None:
+        BOT_ID = context.bot.id
+
+    if not update.message:
+        return
+
+    msg = update.message
+    user = update.effective_user
+
+    # ❌ Block in private
+    if update.effective_chat.type == "private":
+        return await msg.reply_text("❌ Tʜɪs Cᴏᴍᴍᴀɴᴅ Cᴀɴ Oɴʟʏ Bᴇ Usᴇᴅ Iɴ Gʀᴏᴜᴘs.")
+
+    # ❌ Must reply
+    if not msg.reply_to_message:
+        return await msg.reply_text("⚠️ Rᴇᴘʟʏ Tᴏ Sᴏᴍᴇᴏɴᴇ Yᴏᴜ Wᴀɴᴛ Tᴏ Kɪʟʟ.")
+
+    target_user = msg.reply_to_message.from_user
+
+    # ❌ Invalid target
+    if not target_user:
+        return await msg.reply_text("❌ Iɴᴠᴀʟɪᴅ Tᴀʀɢᴇᴛ.")
+
+    # ❌ Cannot kill bot owner
+    if target_user.id == OWNER_ID:
+        return await msg.reply_text("😒 Yᴏᴜ Cᴀɴ'ᴛ Kɪʟʟ Mʏ Dᴇᴀʀᴇsᴛ Oᴡɴᴇʀ.")
+
+    # ❌ Cannot kill bot
+    if target_user.id == BOT_ID:
+        return await msg.reply_text("😂 Nɪᴄᴇ Tʀʏ Oɴ Mᴇ!")
+
+    # ❌ Cannot kill yourself
+    if target_user.id == user.id:
+        return await msg.reply_text("❌ Yᴏᴜ Cᴀɴ'ᴛ Kɪʟʟ Yᴏᴜʀsᴇʟғ.")
+
+    # ✅ Get MongoDB data
+    killer = get_user(user)
+    victim = get_user(target_user)
+
+    # 🛡️ Protection check
+    if victim.get("protect_until"):
+        expire = datetime.strptime(victim["protect_until"], "%Y-%m-%d %H:%M:%S")
+        if expire > datetime.utcnow():
+            return await msg.reply_text(
+                "🛡️ Tʜɪꜱ Uꜱᴇʀ Iꜱ Pʀᴏᴛᴇᴄᴛᴇᴅ.\n"
+                "🔒 Cʜᴇᴄᴋ Pʀᴏᴛᴇᴄᴛɪᴏɴ Tɪᴍᴇ → Cᴏᴍɪɴɢ Sᴏᴏɴ 🔜"
+            )
+
+    # ❌ Check if already dead
+    if victim.get("dead", False):
+        return await msg.reply_text(f"💀 {target_user.first_name} ɪꜱ ᴀʟʀᴇᴀᴅʏ ᴅᴇᴀᴅ!")
+
+    # 🎲 Random rewards
+    reward = random.randint(50, 299)
+    xp_gain = random.randint(1, 19)
+
+    killer["coins"] += reward
+    killer["xp"] = killer.get("xp", 0) + xp_gain
+    killer["kills"] = killer.get("kills", 0) + 1
+
+    # 🏰 Guild XP
+    guild_name = killer.get("guild")
+    if guild_name:
+        await add_guild_xp(guild_name, context)
+
+    # 🎯 Bounty reward
+    bounty_reward = victim.get("bounty", 0)
+    if bounty_reward > 0:
+        killer["coins"] += bounty_reward
+        victim["bounty"] = 0
+
+    # 💀 Mark victim dead
+    victim["dead"] = True
+
+    # 💾 Save MongoDB
+    save_user(killer)
+    save_user(victim)
+
+    # 📢 Kill message
+    await msg.reply_text(
+        f"👤 {user.first_name} Kɪʟʟᴇᴅ {target_user.first_name}\n"
+        f"💰 Eᴀʀɴᴇᴅ: {reward} Cᴏɪɴs\n"
+        f"⭐ Gᴀɪɴᴇᴅ: +{xp_gain} Xᴘ"
+    )
+
+    # 🎯 Bounty message
+    if bounty_reward > 0:
+        await msg.reply_text(
+            f"🎯 Bᴏᴜɴᴛʏ Cʟᴀɪᴍᴇᴅ!\n"
+            f"💰 Eᴀʀɴᴇᴅ ᴇxᴛʀᴀ: {bounty_reward} Cᴏɪɴs!"
+        )
+
+# ========== BOUNTY =========
+async def bounty(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message.reply_to_message:
+        return await update.message.reply_text("Reply to someone to place bounty.")
+
+    if not context.args:
+        return await update.message.reply_text("Use: /bounty <amount>")
+
+    try:
+        amount = int(context.args[0])
+    except ValueError:
+        return await update.message.reply_text("❌ Aᴍᴏᴜɴᴛ ᴍᴜsᴛ ʙᴇ ᴀ ɴᴜᴍʙᴇʀ.")
+
+    sender = get_user(update.effective_user)
+    target_user = update.message.reply_to_message.from_user
+    target = get_user(target_user)
+
+    if sender["coins"] < amount:
+        return await update.message.reply_text("❌ Nᴏᴛ ᴇɴᴏᴜɢʜ Cᴏɪɴs.")
+
+    if target_user.id == update.effective_user.id:
+        return await update.message.reply_text("❌ Yᴏᴜ ᴄᴀɴ'ᴛ ᴘʟᴀᴄᴇ ʙᴏᴜɴᴛʏ ᴏɴ ʏᴏᴜʀsᴇʟғ.")
+
+    # Deduct coins from sender
+    sender["coins"] -= amount
+    # Add bounty to target
+    target["bounty"] = target.get("bounty", 0) + amount
+
+    # Save to MongoDB
+    save_user(sender)
+    save_user(target)
+
+    # Fancy reply
+    await update.message.reply_text(
+            f"🎯 Bᴏᴜɴᴛʏ Pʟᴀᴄᴇᴅ!\n\n"
+            f"👤 Tᴀʀɢᴇᴛ: {target_user.first_name}\n"
+            f"💰 Rᴇᴡᴀʀᴅ: {amount} Cᴏɪɴs\n\n"
+            f"⚔️ Kɪʟʟ ᴛʜᴇᴍ Tᴏ Cʟᴀɪᴍ!"
+        )
+
+
 # ================= LEVEL SYSTEM =================
 def add_xp(user_data, amount=10):
     user_data["xp"] += amount
@@ -689,128 +1002,7 @@ async def finish_heist(chat_id, context):
 
     heists.delete_one({"chat_id": chat_id})
 
-# ================= PROFILE =================
-async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    msg = update.effective_message
-    if not msg:
-        return
-
-    # Target user
-    if msg.reply_to_message:
-        target_user = msg.reply_to_message.from_user
-    else:
-        target_user = update.effective_user
-
-    # Get user data
-    data = users.find_one({"id": target_user.id})
-
-    if not data:
-        data = {
-            "id": target_user.id,
-            "name": target_user.first_name,
-            "coins": 100,
-            "xp": 0,
-            "level": 1,
-            "kills": 0,
-            "guild": None,
-            "dead": False,
-            "inventory": []
-        }
-        users.insert_one(data)
-
-    name = data.get("name", target_user.first_name)
-    coins = data.get("coins", 0)
-    xp = data.get("xp", 0)
-    kills = data.get("kills", 0)
-    guild = data.get("guild")
-    dead = data.get("dead", False)
-
-    guild_name = guild if guild else "Nᴏɴᴇ"
-
-    # Rank system
-    current_rank, next_rank = get_rank_data(xp)
-
-    if next_rank:
-        progress = xp - current_rank["xp"]
-        needed = next_rank["xp"] - current_rank["xp"]
-
-        percent = int((progress / needed) * 100) if needed > 0 else 0
-        bar = create_progress_bar(percent)
-
-    else:
-        bar = "██████████ 100%"
-
-    # Global Rank
-    all_users = list(users.find())
-
-    sorted_users = sorted(
-        all_users,
-        key=lambda u: u.get("xp", 0),
-        reverse=True
-    )
-
-    global_rank = 0
-    for i, u in enumerate(sorted_users, 1):
-        if u.get("id") == target_user.id:
-            global_rank = i
-            break
-
-    status = "Dead" if dead else "Alive"
-
-    text = (
-        f"👤 Nᴀᴍᴇ: {name}\n"
-        f"🆔 Iᴅ: {target_user.id}\n\n"
-        f"💰 Cᴏɪɴs: {coins}\n"
-        f"🔪 Kɪʟʟs: {kills}\n"
-        f"☠️ Status: {status}\n\n"
-        f"🏅 Rᴀɴᴋ: {current_rank['name']}\n"
-        f"📊 Pʀᴏɢʀᴇss:\n{bar}\n"
-        f"🌐 Gʟᴏʙᴀʟ Rᴀɴᴋ: {global_rank}\n\n"
-        f"🏰 Gᴜɪʟᴅ: {guild_name}"
-    )
-
-    await msg.reply_text(text)
-
-# ================= BOUNTY =================
-async def bounty(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message.reply_to_message:
-        return await update.message.reply_text("Reply to someone to place bounty.")
-
-    if not context.args:
-        return await update.message.reply_text("Use: /bounty <amount>")
-
-    try:
-        amount = int(context.args[0])
-    except ValueError:
-        return await update.message.reply_text("❌ Aᴍᴏᴜɴᴛ ᴍᴜsᴛ ʙᴇ ᴀ ɴᴜᴍʙᴇʀ.")
-
-    sender = get_user(update.effective_user)
-    target_user = update.message.reply_to_message.from_user
-    target = get_user(target_user)
-
-    if sender["coins"] < amount:
-        return await update.message.reply_text("❌ Nᴏᴛ ᴇɴᴏᴜɢʜ Cᴏɪɴs.")
-
-    if target_user.id == update.effective_user.id:
-        return await update.message.reply_text("❌ Yᴏᴜ ᴄᴀɴ'ᴛ ᴘʟᴀᴄᴇ ʙᴏᴜɴᴛʏ ᴏɴ ʏᴏᴜʀsᴇʟғ.")
-
-    # Deduct coins from sender
-    sender["coins"] -= amount
-    # Add bounty to target
-    target["bounty"] = target.get("bounty", 0) + amount
-
-    # Save to MongoDB
-    save_user(sender)
-    save_user(target)
-
-    # Fancy reply
-    await update.message.reply_text(
-            f"🎯 Bᴏᴜɴᴛʏ Pʟᴀᴄᴇᴅ!\n\n"
-            f"👤 Tᴀʀɢᴇᴛ: {target_user.first_name}\n"
-            f"💰 Rᴇᴡᴀʀᴅ: {amount} Cᴏɪɴs\n\n"
-            f"⚔️ Kɪʟʟ ᴛʜᴇᴍ Tᴏ Cʟᴀɪᴍ!"
-        )
 
 import random
 import asyncio
@@ -1210,194 +1402,7 @@ async def rullrank(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="Markdown"
     )
 
-#============================KILL (MongoDB + Styled Text)==========================
-import random
-from datetime import datetime
-from telegram import Update
-from telegram.ext import ContextTypes
 
-OWNER_ID = 5773908061
-BOT_ID = None
-
-async def kill(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    global BOT_ID
-
-    if BOT_ID is None:
-        BOT_ID = context.bot.id
-
-    if not update.message:
-        return
-
-    msg = update.message
-    user = update.effective_user
-
-    # ❌ Block in private
-    if update.effective_chat.type == "private":
-        return await msg.reply_text("❌ Tʜɪs Cᴏᴍᴍᴀɴᴅ Cᴀɴ Oɴʟʏ Bᴇ Usᴇᴅ Iɴ Gʀᴏᴜᴘs.")
-
-    # ❌ Must reply
-    if not msg.reply_to_message:
-        return await msg.reply_text("⚠️ Rᴇᴘʟʏ Tᴏ Sᴏᴍᴇᴏɴᴇ Yᴏᴜ Wᴀɴᴛ Tᴏ Kɪʟʟ.")
-
-    target_user = msg.reply_to_message.from_user
-
-    # ❌ Invalid target
-    if not target_user:
-        return await msg.reply_text("❌ Iɴᴠᴀʟɪᴅ Tᴀʀɢᴇᴛ.")
-
-    # ❌ Cannot kill bot owner
-    if target_user.id == OWNER_ID:
-        return await msg.reply_text("😒 Yᴏᴜ Cᴀɴ'ᴛ Kɪʟʟ Mʏ Dᴇᴀʀᴇsᴛ Oᴡɴᴇʀ.")
-
-    # ❌ Cannot kill bot
-    if target_user.id == BOT_ID:
-        return await msg.reply_text("😂 Nɪᴄᴇ Tʀʏ Oɴ Mᴇ!")
-
-    # ❌ Cannot kill yourself
-    if target_user.id == user.id:
-        return await msg.reply_text("❌ Yᴏᴜ Cᴀɴ'ᴛ Kɪʟʟ Yᴏᴜʀsᴇʟғ.")
-
-    # ✅ Get MongoDB data
-    killer = get_user(user)
-    victim = get_user(target_user)
-
-    # 🛡️ Protection check
-    if victim.get("protect_until"):
-        expire = datetime.strptime(victim["protect_until"], "%Y-%m-%d %H:%M:%S")
-        if expire > datetime.utcnow():
-            return await msg.reply_text(
-                "🛡️ Tʜɪꜱ Uꜱᴇʀ Iꜱ Pʀᴏᴛᴇᴄᴛᴇᴅ.\n"
-                "🔒 Cʜᴇᴄᴋ Pʀᴏᴛᴇᴄᴛɪᴏɴ Tɪᴍᴇ → Cᴏᴍɪɴɢ Sᴏᴏɴ 🔜"
-            )
-
-    # ❌ Check if already dead
-    if victim.get("dead", False):
-        return await msg.reply_text(f"💀 {target_user.first_name} ɪꜱ ᴀʟʀᴇᴀᴅʏ ᴅᴇᴀᴅ!")
-
-    # 🎲 Random rewards
-    reward = random.randint(50, 299)
-    xp_gain = random.randint(1, 19)
-
-    killer["coins"] += reward
-    killer["xp"] = killer.get("xp", 0) + xp_gain
-    killer["kills"] = killer.get("kills", 0) + 1
-
-    # 🏰 Guild XP
-    guild_name = killer.get("guild")
-    if guild_name:
-        await add_guild_xp(guild_name, context)
-
-    # 🎯 Bounty reward
-    bounty_reward = victim.get("bounty", 0)
-    if bounty_reward > 0:
-        killer["coins"] += bounty_reward
-        victim["bounty"] = 0
-
-    # 💀 Mark victim dead
-    victim["dead"] = True
-
-    # 💾 Save MongoDB
-    save_user(killer)
-    save_user(victim)
-
-    # 📢 Kill message
-    await msg.reply_text(
-        f"👤 {user.first_name} Kɪʟʟᴇᴅ {target_user.first_name}\n"
-        f"💰 Eᴀʀɴᴇᴅ: {reward} Cᴏɪɴs\n"
-        f"⭐ Gᴀɪɴᴇᴅ: +{xp_gain} Xᴘ"
-    )
-
-    # 🎯 Bounty message
-    if bounty_reward > 0:
-        await msg.reply_text(
-            f"🎯 Bᴏᴜɴᴛʏ Cʟᴀɪᴍᴇᴅ!\n"
-            f"💰 Eᴀʀɴᴇᴅ ᴇxᴛʀᴀ: {bounty_reward} Cᴏɪɴs!"
-        )
-
-# ================= ROB SYSTEM =================
-from datetime import datetime
-
-# 🔧 CONFIG
-OWNER_ID = 5773908061
-BOT_ID = None
-
-MAX_ROB_PER_ATTEMPT = 10000
-
-async def robe(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    if not update.message:
-        return
-
-    msg = update.message
-    robber_user = update.effective_user
-
-    # ❌ Block in private
-    if update.effective_chat.type == "private":
-        return await msg.reply_text("❌ Tʜɪs Cᴏᴍᴍᴀɴᴅ Cᴀɴ Oɴʟʏ Bᴇ Usᴇᴅ Iɴ Gʀᴏᴜᴘs.")
-
-    # ❌ Must reply
-    if not msg.reply_to_message:
-        return await msg.reply_text("⚠️ Rᴇᴘʟʏ Tᴏ Sᴏᴍᴇᴏɴᴇ Yᴏᴜ Wᴀɴᴛ Tᴏ Rᴏʙ.")
-
-    target_user = msg.reply_to_message.from_user
-
-    # ❌ Cannot rob bot
-    if target_user.id == BOT_ID or target_user.is_bot:
-        return await msg.reply_text("🤖 Yᴏᴜ Cᴀɴɴᴏᴛ Rᴏʙ A Bᴏᴛ.")
-
-    # ❌ Cannot rob yourself
-    if target_user.id == robber_user.id:
-        return await msg.reply_text("❌ Yᴏᴜ Cᴀɴ'ᴛ Rᴏʙ Yᴏᴜʀsᴇʟғ.")
-
-    # 👑 Owner protection
-    if target_user.id == OWNER_ID:
-        return await msg.reply_text("👑 Yᴏᴜ Cᴀɴ'ᴛ Rᴏʙ Mʏ Dᴇᴀʀᴇsᴛ Oᴡɴᴇʀ 😒")
-
-    # ❌ Need amount
-    if not context.args:
-        return await msg.reply_text("⚠️ Uꜱᴀɢᴇ: /rob <amount>")
-
-    try:
-        amount = int(context.args[0])
-    except:
-        return await msg.reply_text("❌ Iɴᴠᴀʟɪᴅ Aᴍᴏᴜɴᴛ.")
-
-    robber = get_user(robber_user)
-    target = get_user(target_user)
-
-    # 🛡️ Protection check
-    if target.get("protect_until"):
-        expire = datetime.strptime(target["protect_until"], "%Y-%m-%d %H:%M:%S")
-        if expire > datetime.utcnow():
-            return await msg.reply_text(
-                "🛡️ Tʜɪꜱ Uꜱᴇʀ Iꜱ Pʀᴏᴛᴇᴄᴛᴇᴅ.\n"
-                "🔒 Yᴏᴜ Cᴀɴɴᴏᴛ Rᴏʙ Tʜᴇᴍ."
-            )
-
-    # 💰 Minimum coins check
-    if robber["coins"] < 50:
-        return await msg.reply_text(
-            "💰 Yᴏᴜ Nᴇᴇᴅ Aᴛ Lᴇᴀsᴛ 50 Cᴏɪɴs Tᴏ Rᴏʙ Sᴏᴍᴇᴏɴᴇ."
-        )
-
-    steal = min(amount, target["coins"], MAX_ROB_PER_ATTEMPT)
-
-    if steal <= 0:
-        return await msg.reply_text(
-            f"💸 {target_user.first_name} Hᴀs Nᴏ Cᴏɪɴs."
-        )
-
-    # ✅ Always success
-    robber["coins"] += steal
-    target["coins"] -= steal
-
-    save_user(robber)
-    save_user(target)
-
-    await msg.reply_text(
-        f"🕵️ {robber_user.first_name} Sᴜᴄᴄᴇssғᴜʟʟʏ Rᴏʙʙᴇᴅ {target_user.first_name}\n"
-        f"💰 Sᴛᴏʟᴇɴ: {steal} Cᴏɪɴs"
-    )
 
 # ================= DAILY (MongoDB Version, TinyDB Style) =================
 from datetime import datetime
