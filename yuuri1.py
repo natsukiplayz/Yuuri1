@@ -252,9 +252,17 @@ async def obt(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     pack_data = sticker_packs.find_one({"user_id": user.id})
 
+    # Detect sticker type
+    if sticker.is_animated:
+        sticker_type = "animated"
+    elif sticker.is_video:
+        sticker_type = "video"
+    else:
+        sticker_type = "regular"
+
     if not pack_data:
 
-        pack_name = f"yuuri_{user.id}_by_{bot_username}"
+        pack_name = f"yuuri_{user.id}_{sticker_type}_by_{bot_username}"
         pack_title = f"{user.first_name}'s Yuuri Pack"
 
         try:
@@ -263,6 +271,7 @@ async def obt(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 user_id=user.id,
                 name=pack_name,
                 title=pack_title,
+                sticker_format=sticker_type,
                 stickers=[
                     InputSticker(
                         sticker=sticker.file_id,
@@ -288,8 +297,8 @@ async def obt(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
 
         except Exception as e:
-            await loading.edit_text("❌ Fᴀɪʟᴇᴅ Tᴏ Cʀᴇᴀᴛᴇ Pᴀᴄᴋ.")
             print("CREATE ERROR:", e)
+            await loading.edit_text("❌ Fᴀɪʟᴇᴅ Tᴏ Cʀᴇᴀᴛᴇ Pᴀᴄᴋ.")
 
     else:
 
@@ -318,8 +327,9 @@ async def obt(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
 
         except Exception as e:
-            await loading.edit_text("❌ Fᴀɪʟᴇᴅ Tᴏ Aᴅᴅ Sᴛɪᴄᴋᴇʀ.")
             print("ADD ERROR:", e)
+            await loading.edit_text("❌ Fᴀɪʟᴇᴅ Tᴏ Aᴅᴅ Sᴛɪᴄᴋᴇʀ.")
+
 
 # ================= BOT STATS =================
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
