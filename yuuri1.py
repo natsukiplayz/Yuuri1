@@ -229,6 +229,69 @@ async def quote(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception:
         await loading.edit_text("❌ Eʀʀᴏʀ ᴡʜɪʟᴇ ɢᴇɴᴇʀᴀᴛɪɴɢ Qᴜᴏᴛᴇ.")
 
+#========== Sticker Create ========
+#--
+#=== Own Sticker Pack Creator =======
+async def obt(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    msg = update.message
+    user = msg.from_user
+    bot = context.bot
+
+    if not msg.reply_to_message or not msg.reply_to_message.sticker:
+        return await msg.reply_text("❌ Rᴇᴘʟʏ ᴛᴏ ᴀ Sᴛɪᴄᴋᴇʀ Tᴏ Cʀᴇᴀᴛᴇ Yᴏᴜʀ Pᴀᴄᴋ.")
+
+    sticker = msg.reply_to_message.sticker
+
+    # Loading animation
+    loading = await msg.reply_text("⚙️ Cʀᴇᴀᴛɪɴɢ Pᴀᴄᴋ...")
+
+    try:
+
+        bot_username = (await bot.get_me()).username
+
+        pack_name = f"{user.id}_by_{bot_username}"
+        pack_title = f"{user.first_name}'s Pack"
+
+        emoji = "✨"
+
+        # Try creating pack
+        await bot.create_new_sticker_set(
+            user_id=user.id,
+            name=pack_name,
+            title=pack_title,
+            stickers=[
+                {
+                    "sticker": sticker.file_id,
+                    "emoji_list": [emoji]
+                }
+            ]
+        )
+
+    except Exception:
+
+        # If pack already exists → add sticker
+        await bot.add_sticker_to_set(
+            user_id=user.id,
+            name=pack_name,
+            sticker={
+                "sticker": sticker.file_id,
+                "emoji_list": [emoji]
+            }
+        )
+
+    pack_link = f"https://t.me/addstickers/{pack_name}"
+
+    button = InlineKeyboardMarkup(
+        [[InlineKeyboardButton("👀 Sᴇᴇ Pᴀᴄᴋ", url=pack_link)]]
+    )
+
+    await loading.edit_text(
+        "✅ Pᴀᴄᴋ Cʀᴇᴀᴛᴇᴅ!\n\n"
+        "✨ Sᴛɪᴄᴋᴇʀ Pᴀᴄᴋ Mᴀᴅᴇ Bʏ Yᴜᴜʀɪ",
+        reply_markup=button
+    )
+
 # ================= BOT STATS =================
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
