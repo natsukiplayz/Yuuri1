@@ -11,6 +11,7 @@ import httpx
 
 from pymongo import MongoClient
 
+from telegram import InputSticker
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ChatAction
 
