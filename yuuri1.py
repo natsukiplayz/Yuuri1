@@ -141,22 +141,6 @@ def create_progress_bar(percent):
 
 #=========The_Important_System========
 #--
-# ========= RANK =========
-    current_rank, next_rank = get_rank_data(xp)
-
-    if next_rank:
-
-        progress = xp - current_rank["xp"]
-        needed = next_rank["xp"] - current_rank["xp"]
-
-        percent = int((progress / needed) * 100)
-
-        bar = create_progress_bar(percent)
-
-    else:
-        percent = 100
-        bar = create_progress_bar(percent)
-
 # ======= AUTO SAVE CHATS =======
 async def save_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
