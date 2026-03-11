@@ -90,39 +90,6 @@ from telegram.ext import ContextTypes
 # Broadcast control dictionary
 broadcast_control = {"running": False, "cancel": False}
 
-# ======= REFERRAL SYSTEM ========
-    if user_data.get("referred_by") is None and args:
-
-        ref = args[0]
-
-        if ref.startswith("ref_"):
-
-            try:
-                referrer_id = int(ref.split("_")[1])
-
-                if referrer_id != user.id:
-
-                    users.update_one(
-                        {"id": user.id},
-                        {"$set": {"referred_by": referrer_id}}
-                    )
-
-                    users.update_one(
-                        {"id": referrer_id},
-                        {"$inc": {"coins": 1000}}
-                    )
-
-                    try:
-                        await context.bot.send_message(
-                            referrer_id,
-                            f"🎉 {first_name} joined using your referral!\n💰 You earned 1000 coins!"
-                        )
-                    except:
-                        pass
-
-            except:
-                pass
-
 # ========== LEVEL SYSTEM ========
 def add_xp(user_data, amount=10):
     user_data["xp"] += amount
@@ -245,6 +212,38 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     args = context.args
 
     user_data = get_user(user)
+
+    if user_data.get("referred_by") is None and args:
+
+        ref = args[0]
+
+        if ref.startswith("ref_"):
+
+            try:
+                referrer_id = int(ref.split("_")[1])
+
+                if referrer_id != user.id:
+
+                    users.update_one(
+                        {"id": user.id},
+                        {"$set": {"referred_by": referrer_id}}
+                    )
+
+                    users.update_one(
+                        {"id": referrer_id},
+                        {"$inc": {"coins": 1000}}
+                    )
+
+                    try:
+                        await context.bot.send_message(
+                            referrer_id,
+                            f"🎉 {first_name} joined using your referral!\n💰 You earned 1000 coins!"
+                        )
+                    except:
+                        pass
+
+            except:
+                pass
 
     # ================= BUTTONS =================
     bot = await context.bot.get_me()
