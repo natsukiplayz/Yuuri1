@@ -1964,6 +1964,7 @@ async def finish_heist(chat_id, context):
 #===============Management_Commands============
 #--
 #===user_id_command======
+#===user_id_command======
 async def user_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     msg = update.message
@@ -1976,13 +1977,13 @@ async def user_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         target_user = user
 
-    text = f"""
-❖ Mᴇꜱꜱᴀɢᴇ Iᴅ: {msg.message_id}
-❖ Yᴏᴜʀ Iᴅ: {target_user.id}
-❖ Cʜᴀᴛ Iᴅ: {chat.id}
-"""
+    text = (
+        f"❖ Mᴇꜱꜱᴀɢᴇ Iᴅ: <code>{msg.message_id}</code>\n"
+        f"❖ Uꜱᴇʀ Iᴅ: <code>{target_user.id}</code>\n"
+        f"❖ Cʜᴀᴛ Iᴅ: <code>{chat.id}</code>"
+    )
 
-    await msg.reply_text(text)
+    await msg.reply_text(text, parse_mode="HTML", disable_web_page_preview=True)
 
 # ---------------- AI FUNCTION ----------------
 import httpx
