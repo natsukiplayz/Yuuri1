@@ -2045,6 +2045,9 @@ async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         print("Auto-reply error:", e)
 
 # ================= MAIN =================
+async def error_handler(update, context):
+    print(f"⚠️ Error: {context.error}")
+
 def main():
 
     print("🔥 Yuuri Bot Starting...")
