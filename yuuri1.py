@@ -35,6 +35,8 @@ BOT_NAME = "yuuri"
 OWNER_ID = int(os.getenv("OWNER_ID"))
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 MONGO_URI = os.getenv("MONGO_URI")
+#--
+#======
 
 # ================= MONGODB =================
 client = MongoClient(MONGO_URI)
@@ -47,7 +49,9 @@ heists = db["heists"]
 # ================= LOG =================
 logging.basicConfig(level=logging.INFO)
 
-# ================= USER SYSTEM =================
+#===========Systems========
+#--
+# ===== USER SYSTEM =====
 def get_user(user):
     data = users.find_one({"id": user.id})
 
@@ -72,7 +76,60 @@ def get_user(user):
 def save_user(data):
     users.update_one({"id": data["id"]}, {"$set": data})
 
-# ================= RANK SYSTEM =================
+# ======Broadcast_System======
+import asyncio
+import time
+from telegram import Update
+from telegram.ext import ContextTypes
+
+# Broadcast control dictionary
+broadcast_control = {"running": False, "cancel": False}
+
+# ======= REFERRAL SYSTEM ========
+    if user_data.get("referred_by") is None and args:
+
+        ref = args[0]
+
+        if ref.startswith("ref_"):
+
+            try:
+                referrer_id = int(ref.split("_")[1])
+
+                if referrer_id != user.id:
+
+                    users.update_one(
+                        {"id": user.id},
+                        {"$set": {"referred_by": referrer_id}}
+                    )
+
+                    users.update_one(
+                        {"id": referrer_id},
+                        {"$inc": {"coins": 1000}}
+                    )
+
+                    try:
+                        await context.bot.send_message(
+                            referrer_id,
+                            f"🎉 {first_name} joined using your referral!\n💰 You earned 1000 coins!"
+                        )
+                    except:
+                        pass
+
+            except:
+                pass
+
+# ========== LEVEL SYSTEM ========
+def add_xp(user_data, amount=10):
+    user_data["xp"] += amount
+    need = user_data["level"] * 100
+
+    if user_data["xp"] >= need:
+        user_data["xp"] = 0
+        user_data["level"] += 1
+
+    save_user(user_data)
+
+# ====== RANK SYSTEM =======
 
 RANKS = [
     {"name": "Noob", "xp": 0},
@@ -110,7 +167,25 @@ def create_progress_bar(percent):
     bar = "█" * filled + "░" * empty
     return f"{bar} {percent}%"
 
-# ================= AUTO SAVE CHATS =================
+#=========The_Important_System========
+#--
+# ========= RANK =========
+    current_rank, next_rank = get_rank_data(xp)
+
+    if next_rank:
+
+        progress = xp - current_rank["xp"]
+        needed = next_rank["xp"] - current_rank["xp"]
+
+        percent = int((progress / needed) * 100)
+
+        bar = create_progress_bar(percent)
+
+    else:
+        percent = 100
+        bar = create_progress_bar(percent)
+
+# ======= AUTO SAVE CHATS =======
 async def save_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     if not chat:
@@ -127,7 +202,7 @@ async def save_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         upsert=True
     )
 
-#=======================Upgrade Of Bot Steps=======================
+#====================Upgrade Of Bot Steps====================
 async def referral(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user = update.effective_user
@@ -174,7 +249,7 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(text, parse_mode="Markdown")
 
-#=======================Main StartUp Of Yuuri======================
+#==================Main StartUp Of Yuuri==================
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     msg = update.message
@@ -186,39 +261,6 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     args = context.args
 
     user_data = get_user(user)
-
-    # ================= REFERRAL SYSTEM =================
-    if user_data.get("referred_by") is None and args:
-
-        ref = args[0]
-
-        if ref.startswith("ref_"):
-
-            try:
-                referrer_id = int(ref.split("_")[1])
-
-                if referrer_id != user.id:
-
-                    users.update_one(
-                        {"id": user.id},
-                        {"$set": {"referred_by": referrer_id}}
-                    )
-
-                    users.update_one(
-                        {"id": referrer_id},
-                        {"$inc": {"coins": 1000}}
-                    )
-
-                    try:
-                        await context.bot.send_message(
-                            referrer_id,
-                            f"🎉 {first_name} joined using your referral!\n💰 You earned 1000 coins!"
-                        )
-                    except:
-                        pass
-
-            except:
-                pass
 
     # ================= BUTTONS =================
     bot = await context.bot.get_me()
@@ -253,7 +295,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 💰 Earn 1000 coins per invite
 """
 
-    # ================= SEND MESSAGE =================
+#            === SEND MESSAGE ===
 
     sent_msg = await msg.reply_text(
         caption,
@@ -262,6 +304,49 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     context.chat_data["start_message_id"] = sent_msg.message_id
 
+# =======Daily=======
+from datetime import datetime
+import random
+
+async def daily(update, context):
+    user_id = update.effective_user.id
+    u = users.find_one({"id": user_id})
+
+    # create user if not exist
+    if not u:
+        u = {
+            "id": user_id,
+            "name": update.effective_user.first_name,
+            "coins": 0,
+            "xp": 0,
+            "level": 1,
+            "inventory": []
+        }
+        users.insert_one(u)
+
+    today = datetime.now().date()
+
+    if "last_daily" in u:
+        last_claim = datetime.strptime(u["last_daily"], "%Y-%m-%d").date()
+        if last_claim == today:
+            return await update.message.reply_text(
+                "⛔ Yᴏᴜ ᴀʟʀᴇᴀᴅʏ Cʟᴀɪᴍᴇᴅ Yᴏᴜʀ Dᴀɪʟʏ Rᴇᴡᴀʀᴅ Tᴏᴅᴀʏ."
+            )
+
+    # Give reward
+    reward = random.randint(50, 120)
+    u["coins"] += reward
+    u["last_daily"] = today.strftime("%Y-%m-%d")
+
+    # Save user
+    users.update_one({"id": user_id}, {"$set": u})
+
+    await update.message.reply_text(
+        f"🎁 Dᴀɪʟʏ Rᴇᴡᴀʀᴅ: +{reward} Cᴏɪɴs"
+    )
+
+#====economy commands=======
+#--
 # ======== PROFILE =======
 async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -430,6 +515,93 @@ async def robe(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"💰 Sᴛᴏʟᴇɴ: {steal} Cᴏɪɴs"
     )
 
+#======Give======
+async def givee(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    msg = update.effective_message
+    sender = update.effective_user
+    reply = msg.reply_to_message
+
+    if not reply:
+        return await msg.reply_text("⚠️ Rᴇᴘʟʏ Tᴏ A Pʟᴀʏᴇʀ Tᴏ Gɪᴠᴇ Cᴏɪɴs")
+
+    target = reply.from_user
+
+    if not target:
+        return await msg.reply_text("❌ Pʟᴀʏᴇʀ Nᴏᴛ Fᴏᴜɴᴅ")
+
+    if target.is_bot:
+        return await msg.reply_text("🤖 Yᴏᴜ Cᴀɴ'ᴛ Gɪᴠᴇ Cᴏɪɴs Tᴏ Bᴏᴛs")
+
+    if not context.args:
+        return await msg.reply_text("⚠️ Usᴀɢᴇ: /givee <amount>")
+
+    try:
+        amount = int(context.args[0])
+    except:
+        return await msg.reply_text("❌ Iɴᴠᴀʟɪᴅ Aᴍᴏᴜɴᴛ")
+
+    if amount <= 0:
+        return await msg.reply_text("❌ Aᴍᴏᴜɴᴛ Mᴜsᴛ Bᴇ Pᴏsɪᴛɪᴠᴇ")
+
+    if target.id == sender.id:
+        return await msg.reply_text("⚠️ Yᴏᴜ Cᴀɴ'ᴛ Gɪᴠᴇ Cᴏɪɴs Tᴏ Yᴏᴜʀsᴇʟғ")
+
+    # 🚫 block giving coins to owner
+    if target.id == OWNER_ID:
+        return await msg.reply_text("🧸 Nᴏᴛ Nᴇᴇᴅ Tᴏ Gɪᴠᴇ Mʏ Oᴡɴᴇʀ 🧸✨")
+
+    sender_data = get_user(sender)
+    receiver_data = get_user(target)
+
+    if sender_data.get("coins", 0) < amount:
+        return await msg.reply_text("💰 Yᴏᴜ Dᴏɴ'ᴛ Hᴀᴠᴇ Eɴᴏᴜɢʜ Cᴏɪɴs")
+
+    # ===== TAX =====
+    tax = int(amount * 0.10)
+    received = amount - tax
+
+    # ===== XP DEDUCTION =====
+    xp_loss = max(1, min(amount // 30, 50))
+
+    # ===== ANIMATION =====
+    anim = await msg.reply_text("💸 Tʀᴀɴsғᴇʀ Iɴɪᴛɪᴀᴛᴇᴅ...")
+    await asyncio.sleep(1.2)
+
+    await anim.edit_text("💰 Cᴀʟᴄᴜʟᴀᴛɪɴɢ Tᴀx...")
+    await asyncio.sleep(1.2)
+
+    # deduct sender
+    users.update_one(
+        {"id": sender.id},
+        {"$inc": {"coins": -amount, "xp": -xp_loss}}
+    )
+
+    # give receiver
+    users.update_one(
+        {"id": target.id},
+        {"$inc": {"coins": received}}
+    )
+
+    # tax to owner
+    users.update_one(
+        {"id": OWNER_ID},
+        {"$inc": {"coins": tax}}
+    )
+
+    await anim.edit_text(
+f"""
+✅ Tʀᴀɴsᴀᴄᴛɪᴏɴ Cᴏᴍᴘʟᴇᴛᴇᴅ
+
+👤 Sᴇɴᴅᴇʀ: {sender.first_name}
+🎁 Rᴇᴄᴇɪᴠᴇʀ: {target.first_name}
+
+✅ {target.first_name} Rᴇᴄᴇɪᴠᴇᴅ ${received}
+💸 Tᴀx: ${tax} (10%)
+⚡ Xᴘ Dᴇᴅᴜᴄᴛᴇᴅ: -{xp_loss}
+"""
+    )
+
 #========Kill=======
 import random
 from datetime import datetime
@@ -574,35 +746,283 @@ async def bounty(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"⚔️ Kɪʟʟ ᴛʜᴇᴍ Tᴏ Cʟᴀɪᴍ!"
         )
 
+#========Revive========
+async def revive(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-# ================= LEVEL SYSTEM =================
-def add_xp(user_data, amount=10):
-    user_data["xp"] += amount
-    need = user_data["level"] * 100
+    user = update.effective_user
+    msg = update.effective_message
+    reply = msg.reply_to_message
 
-    if user_data["xp"] >= need:
-        user_data["xp"] = 0
-        user_data["level"] += 1
-
-    save_user(user_data)
-
-# ================= RANK =================
-    current_rank, next_rank = get_rank_data(xp)
-
-    if next_rank:
-
-        progress = xp - current_rank["xp"]
-        needed = next_rank["xp"] - current_rank["xp"]
-
-        percent = int((progress / needed) * 100)
-
-        bar = create_progress_bar(percent)
-
+    # target player
+    if reply:
+        target = reply.from_user
     else:
-        percent = 100
-        bar = create_progress_bar(percent)
+        target = user
 
-# ================= TOP 10 RANKERS =================
+    data = users.find_one({"id": target.id})
+
+    if not data:
+        return await msg.reply_text("❌ Pʟᴀʏᴇʀ Nᴏᴛ Fᴏᴜɴᴅ")
+
+    # check if already alive
+    if not data.get("dead", False):
+        return await msg.reply_text("⚠️ Tʜɪs Pʟᴀʏᴇʀ ɪs Aʟʀᴇᴀᴅʏ Aʟɪᴠᴇ")
+
+    # self revive cost
+    if target.id == user.id:
+
+        coins = data.get("coins", 0)
+
+        if coins < 400:
+            return await msg.reply_text(
+                "💰 Yᴏᴜ Nᴇᴇᴅ 400 Cᴏɪɴs Tᴏ Rᴇᴠɪᴠᴇ Yᴏᴜʀsᴇʟғ"
+            )
+
+        users.update_one(
+            {"id": user.id},
+            {"$inc": {"coins": -400}}
+        )
+
+    # revive player
+    users.update_one(
+        {"id": target.id},
+        {"$set": {"dead": False}}
+    )
+
+    await msg.reply_text(
+f"""
+✨ Rᴇᴠɪᴠᴇ Sᴜᴄᴄᴇssғᴜʟ
+
+👤 Nᴀᴍᴇ : {target.first_name}
+🆔 Iᴅ : {target.id}
+❤️ Sᴛᴀᴛᴜs : Aʟɪᴠᴇ
+
+⚔️ Rᴇᴀᴅʏ Aɢᴀɪɴ
+"""
+    )
+
+# ======= PROTECT SYSTEM =======
+from datetime import datetime, timedelta
+
+async def protect(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    if not context.args:
+        return await update.message.reply_text(
+            "🛡️ Pʀᴏᴛᴇᴄᴛɪᴏɴ Sʏsᴛᴇᴍ\n\n"
+            "💰 Cᴏsᴛs:\n"
+            "1ᴅ → 200$\n"
+            "2ᴅ → 400$\n"
+            "3ᴅ → 600$\n\n"
+            "Uꜱᴀɢᴇ: /protect 1d|2d|3d"
+        )
+
+    arg = context.args[0].lower()
+
+    durations = {
+        "1d": (1, 200),
+        "2d": (2, 400),
+        "3d": (3, 600)
+    }
+
+    if arg not in durations:
+        return await update.message.reply_text(
+            "🛡️ Iɴᴠᴀʟɪᴅ Pʀᴏᴛᴇᴄᴛɪᴏɴ Tɪᴍᴇ.\n\n"
+            "💰 Aᴛ Lᴇᴀꜱᴛ 200$ Nᴇᴇᴅᴇᴅ Fᴏʀ 1ᴅ Pʀᴏᴛᴇᴄᴛɪᴏɴ.\n"
+            "Uꜱᴀɢᴇ: /protect 1d|2d|3d"
+        )
+
+    days, price = durations[arg]
+
+    user = get_user(update.effective_user)
+
+    # 💰 Check coins
+    if user["coins"] < price:
+        return await update.message.reply_text(
+            "💰 Nᴏᴛ Eɴᴏᴜɢʜ Cᴏɪɴs.\n"
+            f"🛡️ {arg} Pʀᴏᴛᴇᴄᴛɪᴏɴ Cᴏsᴛꜱ {price}$."
+        )
+
+    now = datetime.utcnow()
+
+    protect_until = user.get("protect_until")
+    if protect_until:
+        expire = datetime.strptime(protect_until, "%Y-%m-%d %H:%M:%S")
+        if expire > now:
+            remaining = expire - now
+            hours, remainder = divmod(int(remaining.total_seconds()), 3600)
+            minutes, _ = divmod(remainder, 60)
+
+            return await update.message.reply_text(
+                "🛡️ Yᴏᴜ Aʀᴇ Aʟʀᴇᴀᴅʏ Pʀᴏᴛᴇᴄᴛᴇᴅ.\n"
+                f"⏳ Tɪᴍᴇ Lᴇꜰᴛ: {hours}ʜ {minutes}ᴍ\n"
+                f"🔒 Uɴᴛɪʟ: {protect_until}"
+            )
+
+    # 💰 Deduct coins
+    user["coins"] -= price
+
+    expire_time = now + timedelta(days=days)
+    user["protect_until"] = expire_time.strftime("%Y-%m-%d %H:%M:%S")
+
+    save_user(user)
+
+    # ☠️ If dead
+    if user.get("dead", False):
+        return await update.message.reply_text(
+            f"🛡️ Yᴏᴜ Aʀᴇ Nᴏᴡ Pʀᴏᴛᴇᴄᴛᴇᴅ Fᴏʀ {arg}.\n"
+            "🔄 Bᴜᴛ Yᴏᴜʀ Sᴛᴀᴛᴜꜱ Iꜱ Sᴛɪʟʟ Dᴇᴀᴅ Uɴᴛɪʟ Rᴇᴠɪᴠᴇ."
+        )
+
+    # ✅ Normal message
+    await update.message.reply_text(
+        f"🛡️ Yᴏᴜ Aʀᴇ Nᴏᴡ Pʀᴏᴛᴇᴄᴛᴇᴅ Fᴏʀ {arg}."
+    )
+
+#========= REGISTER ========
+from telegram import Update
+from telegram.ext import ContextTypes
+from datetime import datetime
+
+async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Only allow in private chat
+    if update.effective_chat.type != "private":
+        return await update.message.reply_text(
+            "❌ Tʜɪs Cᴏᴍᴍᴀɴᴅ Cᴀɴ Oɴʟʏ Bᴇ Usᴇᴅ Iɴ Dᴍ."
+        )
+
+    user = update.effective_user
+    user_data = users.find_one({"id": user.id})
+
+    # If user doesn't exist, create new
+    if not user_data:
+        user_data = {
+            "id": user.id,
+            "name": user.first_name,
+            "coins": 0,
+            "xp": 0,
+            "level": 1,
+            "inventory": [],
+            "registered": False
+        }
+        users.insert_one(user_data)
+
+    # Already registered?
+    if user_data.get("registered", False):
+        return await update.message.reply_text(
+            "⚠️ Yᴏᴜ Aʟʀᴇᴀᴅʏ Rᴇɢɪsᴛᴇʀᴇᴅ."
+        )
+
+    # Update user: give coins & mark registered
+    users.update_one(
+        {"id": user.id},
+        {"$set": {"registered": True}, "$inc": {"coins": 1000}}
+    )
+
+    await update.message.reply_text(
+        "🎉 Rᴇɢɪsᴛʀᴀᴛɪᴏɴ Sᴜᴄᴄᴇssғᴜʟ!\n"
+        "💰 Rᴇᴄᴇɪᴠᴇᴅ: $1000\n"
+        "✨ Wᴇʟᴄᴏᴍᴇ Tᴏ Yᴜᴜʀɪ!"
+    )
+
+# ======= SHOP ========
+SHOP_ITEMS = {
+    "rose": (500, "🌹"),
+    "chocolate": (800, "🍫"),
+    "ring": (2000, "💍"),
+    "teddy": (1500, "🧸"),
+    "pizza": (600, "🍕"),
+    "box": (2500, "🎁"),
+    "puppy": (3000, "🐶"),
+    "cake": (1000, "🍰"),
+    "letter": (400, "💌"),
+    "cat": (2500, "🐱"),
+    "hepikute": (1500, "💖")
+}
+
+# Pre-styled font helper (optional, you can style directly)
+def font_text(text: str) -> str:
+    # Replace only letters/numbers you want in font style
+    font_map = {
+        "A":"ᴬ","B":"ᴮ","C":"ᶜ","D":"ᴰ","E":"ᴱ","F":"ᶠ","G":"ᴳ","H":"ᴴ","I":"ᴵ","J":"ᴶ",
+        "K":"ᴷ","L":"ᴸ","M":"ᴹ","N":"ᴺ","O":"ᴼ","P":"ᴾ","Q":"ᵠ","R":"ᴿ","S":"ˢ","T":"ᵀ",
+        "U":"ᵁ","V":"ⱽ","W":"ᵂ","X":"ˣ","Y":"ʸ","Z":"ᶻ",
+        "a":"ᵃ","b":"ᵇ","c":"ᶜ","d":"ᵈ","e":"ᵉ","f":"ᶠ","g":"ᵍ","h":"ʰ","i":"ᶦ","j":"ʲ",
+        "k":"ᵏ","l":"ˡ","m":"ᵐ","n":"ⁿ","o":"ᵒ","p":"ᵖ","q":"ᵠ","r":"ʳ","s":"ˢ","t":"ᵗ",
+        "u":"ᵘ","v":"ᵛ","w":"ʷ","x":"ˣ","y":"ʸ","z":"ᶻ",
+        "0":"0","1":"1","2":"2","3":"3","4":"4","5":"5","6":"6","7":"7","8":"8","9":"9",
+        " ":" "
+    }
+    return "".join(font_map.get(c, c) for c in text)
+
+async def shop(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = "🎁 Aᴠᴀɪʟᴀʙʟᴇ Gɪꜰᴛs:\n\n"
+    for k, (v, emoji) in SHOP_ITEMS.items():
+        msg += f"{emoji} {font_text(k.capitalize())} — {font_text(str(v))} ᴄᴏɪɴs\n"
+
+    await update.message.reply_text(msg)
+
+
+# ======= PURCHASE ========
+async def purchase(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        return await update.message.reply_text("Uꜱᴀɢᴇ: /purchase item")
+
+    item = context.args[0].lower()
+
+    if item not in SHOP_ITEMS:
+        return await update.message.reply_text("Iᴛᴇᴍ ɴᴏᴛ ꜰᴏᴜɴᴅ")
+
+    u = get_user(update.effective_user)
+    price, emoji = SHOP_ITEMS[item]
+
+    if u["coins"] < price:
+        return await update.message.reply_text("ɴᴏᴛ ᴇɴᴏᴜɢʜ ᴄᴏɪɴs")
+
+    u["coins"] -= price
+    u["inventory"].append(item)
+    save_user(u)
+
+    await update.message.reply_text(f"✅ {emoji} Yᴏᴜ ʙᴏᴜɢʜᴛ {font_text(item.capitalize())}")
+
+
+#===================top_players_command=================
+#--
+#=====Top_rhichest=====
+async def richest(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Fetch all users except removed ones and the bot itself
+    all_users = list(
+        users.find(  # <-- changed from users_col to users
+            {"removed_from_rank": {"$ne": True}, "id": {"$ne": context.bot.id}}
+        )
+    )
+
+    if not all_users:
+        return await update.message.reply_text("ɴᴏ ᴘʟᴀʏᴇʀꜱ ꜰᴏᴜɴᴅ.")
+
+    # Sort users by coins descending
+    sorted_users = sorted(
+        all_users,
+        key=lambda u: u.get("coins", 0),
+        reverse=True
+    )
+
+    top = sorted_users[:10]  # top 10
+
+    text = "🏆 Tᴏᴘ 10 Rɪᴄʜᴇꜱᴛ Uꜱᴇʀꜱ:\n\n"
+
+    for i, user in enumerate(top, start=1):
+        name = user.get("name", "Unknown")
+        coins = f"${user.get('coins', 0):,}"  # format coins
+        icon = "💓" if user.get("premium") else "👤"
+
+        text += f"{icon} {i}. {name}: {coins}\n"
+
+    text += "\n💓 = Pʀᴇᴍɪᴜᴍ • 👤 = Nᴏʀᴍᴀʟ\n\n"
+    text += "✅ Uᴘɢʀᴀᴅᴇ Tᴏ Pʀᴇᴍɪᴜᴍ : ᴄᴏᴍɪɴɢ ꜱᴏᴏɴ 🔜"
+
+    await update.message.reply_text(text)
+
+#=====rankers====
 async def rankers(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     all_users = list(
@@ -630,6 +1050,168 @@ async def rankers(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text += "\n💓 = Pʀᴇᴍɪᴜᴍ • 👤 = Nᴏʀᴍᴀʟ"
 
     await update.message.reply_text(text)
+
+#=======mini_games_topplayers=======
+#--
+#======rullrank-the Russian rullate rank=====
+async def rullrank(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    top_users = users.find().sort("roulette_won", -1).limit(10)
+
+    text = (
+        "🏆 Rᴜssɪᴀɴ Rᴜʟʟᴇᴛᴇ Lᴇᴀᴅᴇʀʙᴏᴀʀᴅ\n\n"
+    )
+
+    rank = 1
+
+    for user in top_users:
+
+        name = user.get("name", "Pʟᴀʏᴇʀ")
+        amount = user.get("roulette_won", 0)
+
+        medals = {
+            1: "🥇",
+            2: "🥈",
+            3: "🥉"
+        }
+
+        medal = medals.get(rank, "🔹")
+
+        text += f"{medal} {rank}. {name} — `{amount}` ᴄᴏɪɴs\n"
+
+        rank += 1
+
+    if rank == 1:
+        text += "Nᴏ Rᴏᴜʟᴇᴛᴛᴇ Wɪɴɴᴇʀs Yᴇᴛ."
+
+    text += "\n\n🎰 Kᴇᴇᴘ Pʟᴀʏɪɴɢ & Wɪɴ Tʜᴇ Pᴏᴛ 🍯"
+
+    await update.message.reply_text(
+        text,
+        parse_mode="Markdown"
+    )
+
+#=======broadcasting======
+#--
+# ======= PRIVATE BROADCAST ========
+async def broad_c(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != OWNER_ID:
+        return await update.message.reply_text("❌ Uɴᴀᴜᴛʜᴏʀɪᴢᴇᴅ")
+
+    if broadcast_control["running"]:
+        return await update.message.reply_text("⚠️ Aɴᴏᴛʜᴇʀ ʙʀᴏᴀᴅᴄᴀsᴛ ʀᴜɴɴɪɴɢ!")
+
+    # Get message preserving all spaces
+    if update.message.reply_to_message:
+        msg = update.message.reply_to_message.text or update.message.reply_to_message.caption
+    else:
+        if not context.args:
+            return await update.message.reply_text("Rᴇᴘʟʏ ᴏʀ ᴜsᴇ /broad_c message")
+        msg = update.message.text.split(" ", 1)[1]
+
+    all_chats = list(db["chats"].find({"type": "private"}))
+    total = len(all_chats)
+    success = 0
+    failed = 0
+
+    broadcast_control["running"] = True
+    broadcast_control["cancel"] = False
+    start_time = time.time()
+    progress_msg = await update.message.reply_text("🚀 Sᴛᴀʀᴛɪɴɢ Bʀᴏᴀᴅᴄᴀsᴛ...")
+
+    for i, chat in enumerate(all_chats, start=1):
+        if broadcast_control["cancel"]:
+            break
+
+        try:
+            await context.bot.send_message(chat_id=chat["id"], text=msg)
+            success += 1
+        except:
+            failed += 1
+
+        if i % 10 == 0 or i == total:
+            bar_len = 10
+            filled = int((i / total) * bar_len)
+            bar = "█" * filled + "░" * (bar_len - filled)
+            await progress_msg.edit_text(
+                f"📊 Bʀᴏᴀᴅᴄᴀsᴛɪɴɢ...\n\n[{bar}] {i}/{total}\n✅ Sᴜᴄᴄᴇss: {success}\n❌ Fᴀɪʟᴇᴅ: {failed}\n📦 Tᴏᴛᴀʟ: {total}"
+            )
+
+        await asyncio.sleep(0.07)
+
+    broadcast_control["running"] = False
+    status = "🛑 Cᴀɴᴄᴇʟʟᴇᴅ" if broadcast_control["cancel"] else "✅ Cᴏᴍᴘʟᴇᴛᴇᴅ"
+    total_time = round(time.time() - start_time, 2)
+
+    await progress_msg.edit_text(
+        f"📢 Bʀᴏᴀᴅᴄᴀsᴛ {status}\n\n✅ Sᴇɴᴛ: {success}\n❌ Fᴀɪʟᴇᴅ: {failed}\n📦 Tᴏᴛᴀʟ: {total}\n⏱ Tɪᴍᴇ: {total_time}s"
+    )
+
+# ======= GROUP BROADCAST =========
+async def broad_gc(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != OWNER_ID:
+        return await update.message.reply_text("❌ Uɴᴀᴜᴛʜᴏʀɪᴢᴇᴅ")
+
+    if broadcast_control["running"]:
+        return await update.message.reply_text("⚠️ Aɴᴏᴛʜᴇʀ ʙʀᴏᴀᴅᴄᴀsᴛ ʀᴜɴɴɪɴɢ!")
+
+    if update.message.reply_to_message:
+        msg = update.message.reply_to_message.text or update.message.reply_to_message.caption
+    else:
+        if not context.args:
+            return await update.message.reply_text("Rᴇᴘʟʏ ᴏʀ ᴜsᴇ /broad_gc message")
+        msg = update.message.text.split(" ", 1)[1]
+
+    all_groups = list(db["chats"].find({"type": {"$in": ["group", "supergroup"]}}))
+    total = len(all_groups)
+    success = 0
+    failed = 0
+
+    broadcast_control["running"] = True
+    broadcast_control["cancel"] = False
+    start_time = time.time()
+
+    progress_msg = await update.message.reply_text("🚀 Sᴛᴀʀᴛɪɴɢ Gʀᴏᴜᴘ Bʀᴏᴀᴅᴄᴀsᴛ...")
+
+    for i, chat in enumerate(all_groups, start=1):
+        if broadcast_control["cancel"]:
+            break
+
+        try:
+            await context.bot.send_message(chat_id=chat["id"], text=msg)
+            success += 1
+        except:
+            failed += 1
+
+        if i % 10 == 0 or i == total:
+            percent = int((i / total) * 100)
+            filled = int(percent / 10)
+            bar = "█" * filled + "░" * (10 - filled)
+            await progress_msg.edit_text(
+                f"📊 Gʀᴏᴜᴘ Bʀᴏᴀᴅᴄᴀsᴛ...\n\n[{bar}] {percent}%\n✅ Sᴜᴄᴄᴇss: {success}\n❌ Fᴀɪʟᴇᴅ: {failed}\n📦 Tᴏᴛᴀʟ: {total}"
+            )
+
+        await asyncio.sleep(0.07)
+
+    broadcast_control["running"] = False
+    status = "🛑 Cᴀɴᴄᴇʟʟᴇᴅ" if broadcast_control["cancel"] else "✅ Cᴏᴍᴘʟᴇᴛᴇᴅ"
+    total_time = round(time.time() - start_time, 2)
+
+    await progress_msg.edit_text(
+        f"📢 Gʀᴏᴜᴘ Bʀᴏᴀᴅᴄᴀsᴛ {status}\n\n✅ Sᴇɴᴛ: {success}\n❌ Fᴀɪʟᴇᴅ: {failed}\n📦 Tᴏᴛᴀʟ: {total}\n⏱ Tɪᴍᴇ: {total_time}s"
+    )
+
+# ======== CANCEL BROADCAST ========
+async def cancel_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != OWNER_ID:
+        return await update.message.reply_text("❌ Uɴᴀᴜᴛʜᴏʀɪᴢᴇᴅ")
+
+    if not broadcast_control["running"]:
+        return await update.message.reply_text("❌ Nᴏ ʙʀᴏᴀᴅᴄᴀsᴛ ʀᴜɴɴɪɴɢ")
+
+    broadcast_control["cancel"] = True
+    await update.message.reply_text("🛑 Bʀᴏᴀᴅᴄᴀsᴛ Cᴀɴᴄᴇʟʟᴀᴛɪᴏɴ RᴇQᴜᴇsᴛᴇᴅ...")
+
 
 import asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -1364,574 +1946,7 @@ f"""
 
             return
 
-#RullRank leaderboard of rullategame====
-async def rullrank(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    top_users = users.find().sort("roulette_won", -1).limit(10)
-
-    text = (
-        "🏆 Rᴜssɪᴀɴ Rᴜʟʟᴇᴛᴇ Lᴇᴀᴅᴇʀʙᴏᴀʀᴅ\n\n"
-    )
-
-    rank = 1
-
-    for user in top_users:
-
-        name = user.get("name", "Pʟᴀʏᴇʀ")
-        amount = user.get("roulette_won", 0)
-
-        medals = {
-            1: "🥇",
-            2: "🥈",
-            3: "🥉"
-        }
-
-        medal = medals.get(rank, "🔹")
-
-        text += f"{medal} {rank}. {name} — `{amount}` ᴄᴏɪɴs\n"
-
-        rank += 1
-
-    if rank == 1:
-        text += "Nᴏ Rᴏᴜʟᴇᴛᴛᴇ Wɪɴɴᴇʀs Yᴇᴛ."
-
-    text += "\n\n🎰 Kᴇᴇᴘ Pʟᴀʏɪɴɢ & Wɪɴ Tʜᴇ Pᴏᴛ 🍯"
-
-    await update.message.reply_text(
-        text,
-        parse_mode="Markdown"
-    )
-
-
-
-# ================= DAILY (MongoDB Version, TinyDB Style) =================
-from datetime import datetime
-import random
-
-async def daily(update, context):
-    user_id = update.effective_user.id
-    u = users.find_one({"id": user_id})
-
-    # create user if not exist
-    if not u:
-        u = {
-            "id": user_id,
-            "name": update.effective_user.first_name,
-            "coins": 0,
-            "xp": 0,
-            "level": 1,
-            "inventory": []
-        }
-        users.insert_one(u)
-
-    today = datetime.now().date()
-
-    if "last_daily" in u:
-        last_claim = datetime.strptime(u["last_daily"], "%Y-%m-%d").date()
-        if last_claim == today:
-            return await update.message.reply_text(
-                "⛔ Yᴏᴜ ᴀʟʀᴇᴀᴅʏ Cʟᴀɪᴍᴇᴅ Yᴏᴜʀ Dᴀɪʟʏ Rᴇᴡᴀʀᴅ Tᴏᴅᴀʏ."
-            )
-
-    # Give reward
-    reward = random.randint(50, 120)
-    u["coins"] += reward
-    u["last_daily"] = today.strftime("%Y-%m-%d")
-
-    # Save user
-    users.update_one({"id": user_id}, {"$set": u})
-
-    await update.message.reply_text(
-        f"🎁 Dᴀɪʟʏ Rᴇᴡᴀʀᴅ: +{reward} Cᴏɪɴs"
-    )
-
-# ================= PROTECT SYSTEM =================
-from datetime import datetime, timedelta
-
-async def protect(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    if not context.args:
-        return await update.message.reply_text(
-            "🛡️ Pʀᴏᴛᴇᴄᴛɪᴏɴ Sʏsᴛᴇᴍ\n\n"
-            "💰 Cᴏsᴛs:\n"
-            "1ᴅ → 200$\n"
-            "2ᴅ → 400$\n"
-            "3ᴅ → 600$\n\n"
-            "Uꜱᴀɢᴇ: /protect 1d|2d|3d"
-        )
-
-    arg = context.args[0].lower()
-
-    durations = {
-        "1d": (1, 200),
-        "2d": (2, 400),
-        "3d": (3, 600)
-    }
-
-    if arg not in durations:
-        return await update.message.reply_text(
-            "🛡️ Iɴᴠᴀʟɪᴅ Pʀᴏᴛᴇᴄᴛɪᴏɴ Tɪᴍᴇ.\n\n"
-            "💰 Aᴛ Lᴇᴀꜱᴛ 200$ Nᴇᴇᴅᴇᴅ Fᴏʀ 1ᴅ Pʀᴏᴛᴇᴄᴛɪᴏɴ.\n"
-            "Uꜱᴀɢᴇ: /protect 1d|2d|3d"
-        )
-
-    days, price = durations[arg]
-
-    user = get_user(update.effective_user)
-
-    # 💰 Check coins
-    if user["coins"] < price:
-        return await update.message.reply_text(
-            "💰 Nᴏᴛ Eɴᴏᴜɢʜ Cᴏɪɴs.\n"
-            f"🛡️ {arg} Pʀᴏᴛᴇᴄᴛɪᴏɴ Cᴏsᴛꜱ {price}$."
-        )
-
-    now = datetime.utcnow()
-
-    protect_until = user.get("protect_until")
-    if protect_until:
-        expire = datetime.strptime(protect_until, "%Y-%m-%d %H:%M:%S")
-        if expire > now:
-            remaining = expire - now
-            hours, remainder = divmod(int(remaining.total_seconds()), 3600)
-            minutes, _ = divmod(remainder, 60)
-
-            return await update.message.reply_text(
-                "🛡️ Yᴏᴜ Aʀᴇ Aʟʀᴇᴀᴅʏ Pʀᴏᴛᴇᴄᴛᴇᴅ.\n"
-                f"⏳ Tɪᴍᴇ Lᴇꜰᴛ: {hours}ʜ {minutes}ᴍ\n"
-                f"🔒 Uɴᴛɪʟ: {protect_until}"
-            )
-
-    # 💰 Deduct coins
-    user["coins"] -= price
-
-    expire_time = now + timedelta(days=days)
-    user["protect_until"] = expire_time.strftime("%Y-%m-%d %H:%M:%S")
-
-    save_user(user)
-
-    # ☠️ If dead
-    if user.get("dead", False):
-        return await update.message.reply_text(
-            f"🛡️ Yᴏᴜ Aʀᴇ Nᴏᴡ Pʀᴏᴛᴇᴄᴛᴇᴅ Fᴏʀ {arg}.\n"
-            "🔄 Bᴜᴛ Yᴏᴜʀ Sᴛᴀᴛᴜꜱ Iꜱ Sᴛɪʟʟ Dᴇᴀᴅ Uɴᴛɪʟ Rᴇᴠɪᴠᴇ."
-        )
-
-    # ✅ Normal message
-    await update.message.reply_text(
-        f"🛡️ Yᴏᴜ Aʀᴇ Nᴏᴡ Pʀᴏᴛᴇᴄᴛᴇᴅ Fᴏʀ {arg}."
-    )
-
-# ================= REGISTER =================
-from telegram import Update
-from telegram.ext import ContextTypes
-from datetime import datetime
-
-async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Only allow in private chat
-    if update.effective_chat.type != "private":
-        return await update.message.reply_text(
-            "❌ Tʜɪs Cᴏᴍᴍᴀɴᴅ Cᴀɴ Oɴʟʏ Bᴇ Usᴇᴅ Iɴ Dᴍ."
-        )
-
-    user = update.effective_user
-    user_data = users.find_one({"id": user.id})
-
-    # If user doesn't exist, create new
-    if not user_data:
-        user_data = {
-            "id": user.id,
-            "name": user.first_name,
-            "coins": 0,
-            "xp": 0,
-            "level": 1,
-            "inventory": [],
-            "registered": False
-        }
-        users.insert_one(user_data)
-
-    # Already registered?
-    if user_data.get("registered", False):
-        return await update.message.reply_text(
-            "⚠️ Yᴏᴜ Aʟʀᴇᴀᴅʏ Rᴇɢɪsᴛᴇʀᴇᴅ."
-        )
-
-    # Update user: give coins & mark registered
-    users.update_one(
-        {"id": user.id},
-        {"$set": {"registered": True}, "$inc": {"coins": 1000}}
-    )
-
-    await update.message.reply_text(
-        "🎉 Rᴇɢɪsᴛʀᴀᴛɪᴏɴ Sᴜᴄᴄᴇssғᴜʟ!\n"
-        "💰 Rᴇᴄᴇɪᴠᴇᴅ: $1000\n"
-        "✨ Wᴇʟᴄᴏᴍᴇ Tᴏ Yᴜᴜʀɪ!"
-    )
-
-#revive_player 🥳
-async def revive(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    user = update.effective_user
-    msg = update.effective_message
-    reply = msg.reply_to_message
-
-    # target player
-    if reply:
-        target = reply.from_user
-    else:
-        target = user
-
-    data = users.find_one({"id": target.id})
-
-    if not data:
-        return await msg.reply_text("❌ Pʟᴀʏᴇʀ Nᴏᴛ Fᴏᴜɴᴅ")
-
-    # check if already alive
-    if not data.get("dead", False):
-        return await msg.reply_text("⚠️ Tʜɪs Pʟᴀʏᴇʀ ɪs Aʟʀᴇᴀᴅʏ Aʟɪᴠᴇ")
-
-    # self revive cost
-    if target.id == user.id:
-
-        coins = data.get("coins", 0)
-
-        if coins < 400:
-            return await msg.reply_text(
-                "💰 Yᴏᴜ Nᴇᴇᴅ 400 Cᴏɪɴs Tᴏ Rᴇᴠɪᴠᴇ Yᴏᴜʀsᴇʟғ"
-            )
-
-        users.update_one(
-            {"id": user.id},
-            {"$inc": {"coins": -400}}
-        )
-
-    # revive player
-    users.update_one(
-        {"id": target.id},
-        {"$set": {"dead": False}}
-    )
-
-    await msg.reply_text(
-f"""
-✨ Rᴇᴠɪᴠᴇ Sᴜᴄᴄᴇssғᴜʟ
-
-👤 Nᴀᴍᴇ : {target.first_name}
-🆔 Iᴅ : {target.id}
-❤️ Sᴛᴀᴛᴜs : Aʟɪᴠᴇ
-
-⚔️ Rᴇᴀᴅʏ Aɢᴀɪɴ
-"""
-    )
-
-#givee_section - to transfer coins to another one 
-async def givee(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    msg = update.effective_message
-    sender = update.effective_user
-    reply = msg.reply_to_message
-
-    if not reply:
-        return await msg.reply_text("⚠️ Rᴇᴘʟʏ Tᴏ A Pʟᴀʏᴇʀ Tᴏ Gɪᴠᴇ Cᴏɪɴs")
-
-    target = reply.from_user
-
-    if not target:
-        return await msg.reply_text("❌ Pʟᴀʏᴇʀ Nᴏᴛ Fᴏᴜɴᴅ")
-
-    if target.is_bot:
-        return await msg.reply_text("🤖 Yᴏᴜ Cᴀɴ'ᴛ Gɪᴠᴇ Cᴏɪɴs Tᴏ Bᴏᴛs")
-
-    if not context.args:
-        return await msg.reply_text("⚠️ Usᴀɢᴇ: /givee <amount>")
-
-    try:
-        amount = int(context.args[0])
-    except:
-        return await msg.reply_text("❌ Iɴᴠᴀʟɪᴅ Aᴍᴏᴜɴᴛ")
-
-    if amount <= 0:
-        return await msg.reply_text("❌ Aᴍᴏᴜɴᴛ Mᴜsᴛ Bᴇ Pᴏsɪᴛɪᴠᴇ")
-
-    if target.id == sender.id:
-        return await msg.reply_text("⚠️ Yᴏᴜ Cᴀɴ'ᴛ Gɪᴠᴇ Cᴏɪɴs Tᴏ Yᴏᴜʀsᴇʟғ")
-
-    # 🚫 block giving coins to owner
-    if target.id == OWNER_ID:
-        return await msg.reply_text("🧸 Nᴏᴛ Nᴇᴇᴅ Tᴏ Gɪᴠᴇ Mʏ Oᴡɴᴇʀ 🧸✨")
-
-    sender_data = get_user(sender)
-    receiver_data = get_user(target)
-
-    if sender_data.get("coins", 0) < amount:
-        return await msg.reply_text("💰 Yᴏᴜ Dᴏɴ'ᴛ Hᴀᴠᴇ Eɴᴏᴜɢʜ Cᴏɪɴs")
-
-    # ===== TAX =====
-    tax = int(amount * 0.10)
-    received = amount - tax
-
-    # ===== XP DEDUCTION =====
-    xp_loss = max(1, min(amount // 30, 50))
-
-    # ===== ANIMATION =====
-    anim = await msg.reply_text("💸 Tʀᴀɴsғᴇʀ Iɴɪᴛɪᴀᴛᴇᴅ...")
-    await asyncio.sleep(1.2)
-
-    await anim.edit_text("💰 Cᴀʟᴄᴜʟᴀᴛɪɴɢ Tᴀx...")
-    await asyncio.sleep(1.2)
-
-    # deduct sender
-    users.update_one(
-        {"id": sender.id},
-        {"$inc": {"coins": -amount, "xp": -xp_loss}}
-    )
-
-    # give receiver
-    users.update_one(
-        {"id": target.id},
-        {"$inc": {"coins": received}}
-    )
-
-    # tax to owner
-    users.update_one(
-        {"id": OWNER_ID},
-        {"$inc": {"coins": tax}}
-    )
-
-    await anim.edit_text(
-f"""
-✅ Tʀᴀɴsᴀᴄᴛɪᴏɴ Cᴏᴍᴘʟᴇᴛᴇᴅ
-
-👤 Sᴇɴᴅᴇʀ: {sender.first_name}
-🎁 Rᴇᴄᴇɪᴠᴇʀ: {target.first_name}
-
-✅ {target.first_name} Rᴇᴄᴇɪᴠᴇᴅ ${received}
-💸 Tᴀx: ${tax} (10%)
-⚡ Xᴘ Dᴇᴅᴜᴄᴛᴇᴅ: -{xp_loss}
-"""
-    )
-
-# ================= SHOP =================
-SHOP_ITEMS = {
-    "rose": (500, "🌹"),
-    "chocolate": (800, "🍫"),
-    "ring": (2000, "💍"),
-    "teddy": (1500, "🧸"),
-    "pizza": (600, "🍕"),
-    "box": (2500, "🎁"),
-    "puppy": (3000, "🐶"),
-    "cake": (1000, "🍰"),
-    "letter": (400, "💌"),
-    "cat": (2500, "🐱"),
-    "hepikute": (1500, "💖")
-}
-
-# Pre-styled font helper (optional, you can style directly)
-def font_text(text: str) -> str:
-    # Replace only letters/numbers you want in font style
-    font_map = {
-        "A":"ᴬ","B":"ᴮ","C":"ᶜ","D":"ᴰ","E":"ᴱ","F":"ᶠ","G":"ᴳ","H":"ᴴ","I":"ᴵ","J":"ᴶ",
-        "K":"ᴷ","L":"ᴸ","M":"ᴹ","N":"ᴺ","O":"ᴼ","P":"ᴾ","Q":"ᵠ","R":"ᴿ","S":"ˢ","T":"ᵀ",
-        "U":"ᵁ","V":"ⱽ","W":"ᵂ","X":"ˣ","Y":"ʸ","Z":"ᶻ",
-        "a":"ᵃ","b":"ᵇ","c":"ᶜ","d":"ᵈ","e":"ᵉ","f":"ᶠ","g":"ᵍ","h":"ʰ","i":"ᶦ","j":"ʲ",
-        "k":"ᵏ","l":"ˡ","m":"ᵐ","n":"ⁿ","o":"ᵒ","p":"ᵖ","q":"ᵠ","r":"ʳ","s":"ˢ","t":"ᵗ",
-        "u":"ᵘ","v":"ᵛ","w":"ʷ","x":"ˣ","y":"ʸ","z":"ᶻ",
-        "0":"0","1":"1","2":"2","3":"3","4":"4","5":"5","6":"6","7":"7","8":"8","9":"9",
-        " ":" "
-    }
-    return "".join(font_map.get(c, c) for c in text)
-
-async def shop(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = "🎁 Aᴠᴀɪʟᴀʙʟᴇ Gɪꜰᴛs:\n\n"
-    for k, (v, emoji) in SHOP_ITEMS.items():
-        msg += f"{emoji} {font_text(k.capitalize())} — {font_text(str(v))} ᴄᴏɪɴs\n"
-
-    await update.message.reply_text(msg)
-
-
-# ================= PURCHASE =================
-async def purchase(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not context.args:
-        return await update.message.reply_text("Uꜱᴀɢᴇ: /purchase item")
-
-    item = context.args[0].lower()
-
-    if item not in SHOP_ITEMS:
-        return await update.message.reply_text("Iᴛᴇᴍ ɴᴏᴛ ꜰᴏᴜɴᴅ")
-
-    u = get_user(update.effective_user)
-    price, emoji = SHOP_ITEMS[item]
-
-    if u["coins"] < price:
-        return await update.message.reply_text("ɴᴏᴛ ᴇɴᴏᴜɢʜ ᴄᴏɪɴs")
-
-    u["coins"] -= price
-    u["inventory"].append(item)
-    save_user(u)
-
-    await update.message.reply_text(f"✅ {emoji} Yᴏᴜ ʙᴏᴜɢʜᴛ {font_text(item.capitalize())}")
-
-# ================= TOP 10 RICHEST (MongoDB Version, Pre-Fancy Text) =================
-async def richest(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Fetch all users except removed ones and the bot itself
-    all_users = list(
-        users.find(  # <-- changed from users_col to users
-            {"removed_from_rank": {"$ne": True}, "id": {"$ne": context.bot.id}}
-        )
-    )
-
-    if not all_users:
-        return await update.message.reply_text("ɴᴏ ᴘʟᴀʏᴇʀꜱ ꜰᴏᴜɴᴅ.")
-
-    # Sort users by coins descending
-    sorted_users = sorted(
-        all_users,
-        key=lambda u: u.get("coins", 0),
-        reverse=True
-    )
-
-    top = sorted_users[:10]  # top 10
-
-    text = "🏆 Tᴏᴘ 10 Rɪᴄʜᴇꜱᴛ Uꜱᴇʀꜱ:\n\n"
-
-    for i, user in enumerate(top, start=1):
-        name = user.get("name", "Unknown")
-        coins = f"${user.get('coins', 0):,}"  # format coins
-        icon = "💓" if user.get("premium") else "👤"
-
-        text += f"{icon} {i}. {name}: {coins}\n"
-
-    text += "\n💓 = Pʀᴇᴍɪᴜᴍ • 👤 = Nᴏʀᴍᴀʟ\n\n"
-    text += "✅ Uᴘɢʀᴀᴅᴇ Tᴏ Pʀᴇᴍɪᴜᴍ : ᴄᴏᴍɪɴɢ ꜱᴏᴏɴ 🔜"
-
-    await update.message.reply_text(text)
-
-# ================= BROADCAST SYSTEM (MONGO DB VERSION) =================
-import asyncio
-import time
-from telegram import Update
-from telegram.ext import ContextTypes
-
-# Broadcast control dictionary
-broadcast_control = {"running": False, "cancel": False}
-
-# ================= CANCEL BROADCAST =================
-async def cancel_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != OWNER_ID:
-        return await update.message.reply_text("❌ Uɴᴀᴜᴛʜᴏʀɪᴢᴇᴅ")
-
-    if not broadcast_control["running"]:
-        return await update.message.reply_text("❌ Nᴏ ʙʀᴏᴀᴅᴄᴀsᴛ ʀᴜɴɴɪɴɢ")
-
-    broadcast_control["cancel"] = True
-    await update.message.reply_text("🛑 Bʀᴏᴀᴅᴄᴀsᴛ Cᴀɴᴄᴇʟʟᴀᴛɪᴏɴ RᴇQᴜᴇsᴛᴇᴅ...")
-
-# ================= PRIVATE BROADCAST =================
-async def broad_c(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != OWNER_ID:
-        return await update.message.reply_text("❌ Uɴᴀᴜᴛʜᴏʀɪᴢᴇᴅ")
-
-    if broadcast_control["running"]:
-        return await update.message.reply_text("⚠️ Aɴᴏᴛʜᴇʀ ʙʀᴏᴀᴅᴄᴀsᴛ ʀᴜɴɴɪɴɢ!")
-
-    # Get message preserving all spaces
-    if update.message.reply_to_message:
-        msg = update.message.reply_to_message.text or update.message.reply_to_message.caption
-    else:
-        if not context.args:
-            return await update.message.reply_text("Rᴇᴘʟʏ ᴏʀ ᴜsᴇ /broad_c message")
-        msg = update.message.text.split(" ", 1)[1]
-
-    all_chats = list(db["chats"].find({"type": "private"}))
-    total = len(all_chats)
-    success = 0
-    failed = 0
-
-    broadcast_control["running"] = True
-    broadcast_control["cancel"] = False
-    start_time = time.time()
-    progress_msg = await update.message.reply_text("🚀 Sᴛᴀʀᴛɪɴɢ Bʀᴏᴀᴅᴄᴀsᴛ...")
-
-    for i, chat in enumerate(all_chats, start=1):
-        if broadcast_control["cancel"]:
-            break
-
-        try:
-            await context.bot.send_message(chat_id=chat["id"], text=msg)
-            success += 1
-        except:
-            failed += 1
-
-        if i % 10 == 0 or i == total:
-            bar_len = 10
-            filled = int((i / total) * bar_len)
-            bar = "█" * filled + "░" * (bar_len - filled)
-            await progress_msg.edit_text(
-                f"📊 Bʀᴏᴀᴅᴄᴀsᴛɪɴɢ...\n\n[{bar}] {i}/{total}\n✅ Sᴜᴄᴄᴇss: {success}\n❌ Fᴀɪʟᴇᴅ: {failed}\n📦 Tᴏᴛᴀʟ: {total}"
-            )
-
-        await asyncio.sleep(0.07)
-
-    broadcast_control["running"] = False
-    status = "🛑 Cᴀɴᴄᴇʟʟᴇᴅ" if broadcast_control["cancel"] else "✅ Cᴏᴍᴘʟᴇᴛᴇᴅ"
-    total_time = round(time.time() - start_time, 2)
-
-    await progress_msg.edit_text(
-        f"📢 Bʀᴏᴀᴅᴄᴀsᴛ {status}\n\n✅ Sᴇɴᴛ: {success}\n❌ Fᴀɪʟᴇᴅ: {failed}\n📦 Tᴏᴛᴀʟ: {total}\n⏱ Tɪᴍᴇ: {total_time}s"
-    )
-
-# ================= GROUP BROADCAST =================
-async def broad_gc(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != OWNER_ID:
-        return await update.message.reply_text("❌ Uɴᴀᴜᴛʜᴏʀɪᴢᴇᴅ")
-
-    if broadcast_control["running"]:
-        return await update.message.reply_text("⚠️ Aɴᴏᴛʜᴇʀ ʙʀᴏᴀᴅᴄᴀsᴛ ʀᴜɴɴɪɴɢ!")
-
-    if update.message.reply_to_message:
-        msg = update.message.reply_to_message.text or update.message.reply_to_message.caption
-    else:
-        if not context.args:
-            return await update.message.reply_text("Rᴇᴘʟʏ ᴏʀ ᴜsᴇ /broad_gc message")
-        msg = update.message.text.split(" ", 1)[1]
-
-    all_groups = list(db["chats"].find({"type": {"$in": ["group", "supergroup"]}}))
-    total = len(all_groups)
-    success = 0
-    failed = 0
-
-    broadcast_control["running"] = True
-    broadcast_control["cancel"] = False
-    start_time = time.time()
-
-    progress_msg = await update.message.reply_text("🚀 Sᴛᴀʀᴛɪɴɢ Gʀᴏᴜᴘ Bʀᴏᴀᴅᴄᴀsᴛ...")
-
-    for i, chat in enumerate(all_groups, start=1):
-        if broadcast_control["cancel"]:
-            break
-
-        try:
-            await context.bot.send_message(chat_id=chat["id"], text=msg)
-            success += 1
-        except:
-            failed += 1
-
-        if i % 10 == 0 or i == total:
-            percent = int((i / total) * 100)
-            filled = int(percent / 10)
-            bar = "█" * filled + "░" * (10 - filled)
-            await progress_msg.edit_text(
-                f"📊 Gʀᴏᴜᴘ Bʀᴏᴀᴅᴄᴀsᴛ...\n\n[{bar}] {percent}%\n✅ Sᴜᴄᴄᴇss: {success}\n❌ Fᴀɪʟᴇᴅ: {failed}\n📦 Tᴏᴛᴀʟ: {total}"
-            )
-
-        await asyncio.sleep(0.07)
-
-    broadcast_control["running"] = False
-    status = "🛑 Cᴀɴᴄᴇʟʟᴇᴅ" if broadcast_control["cancel"] else "✅ Cᴏᴍᴘʟᴇᴛᴇᴅ"
-    total_time = round(time.time() - start_time, 2)
-
-    await progress_msg.edit_text(
-        f"📢 Gʀᴏᴜᴘ Bʀᴏᴀᴅᴄᴀsᴛ {status}\n\n✅ Sᴇɴᴛ: {success}\n❌ Fᴀɪʟᴇᴅ: {failed}\n📦 Tᴏᴛᴀʟ: {total}\n⏱ Tɪᴍᴇ: {total_time}s"
-    )
 
 #AniWorld================================================
 
