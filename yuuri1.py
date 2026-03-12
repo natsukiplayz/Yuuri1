@@ -236,6 +236,7 @@ async def quote(update: Update, context: ContextTypes.DEFAULT_TYPE):
 #========== Sticker Create ========
 #--
 # === Own Sticker Pack Creator ===
+
 BOT_USERNAME = "im_yuuribot"
 
 async def save_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -251,7 +252,7 @@ async def save_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     sticker = message.reply_to_message.sticker
 
-    # Detect format
+    # Detect sticker format
     if sticker.is_animated:
         sticker_format = "animated"
     elif sticker.is_video:
@@ -269,15 +270,14 @@ async def save_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
 
-        # Correct InputSticker format
+        # Correct InputSticker (NO format argument)
         input_sticker = InputSticker(
             sticker=sticker.file_id,
-            emoji_list=[sticker.emoji or "🙂"],
-            format=sticker_format
+            emoji_list=[sticker.emoji or "🙂"]
         )
 
         try:
-            # Try adding sticker
+            # Try adding sticker to existing pack
             await context.bot.add_sticker_to_set(
                 user_id=user_id,
                 name=pack_name,
@@ -288,7 +288,7 @@ async def save_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             err = str(e).lower()
 
-            # If pack doesn't exist → create pack
+            # Pack doesn't exist → create it
             if "stickerset_invalid" in err or "not found" in err:
 
                 await context.bot.create_new_sticker_set(
