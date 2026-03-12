@@ -2154,6 +2154,8 @@ async def user_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await msg.reply_text(text, parse_mode="Markdown")
 
+# ===== ADMIN STORAGE =====
+ADMINS = {}
 #=========promote users========
 async def promote(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
