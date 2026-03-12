@@ -329,6 +329,35 @@ async def save_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await saving_msg.edit_text("❌ Cᴀɴ'ᴛ Sᴀᴠᴇ Tʜɪs Sᴛɪᴄᴋᴇʀ.")
 
+#==========welcome_message======
+import random
+from telegram import Update
+from telegram.ext import ContextTypes
+
+WELCOME_STYLES = [
+
+"🤗 𝗪𝗲𝗹𝗰𝗼𝗺𝗲 {user} 🧸✨",
+"🤗 𝙒𝙚𝙡𝙘𝙤𝙢𝙚 {user} 🧸✨",
+"🤗 𝑾𝒆𝒍𝒄𝒐𝒎𝒆 {user} 🧸✨",
+"🤗 𝒲𝑒𝓁𝒸𝑜𝓂𝑒 {user} 🧸✨",
+"🤗 𝐖𝐞𝐥𝐜𝐨𝐦𝐞 {user} 🧸✨",
+"🤗 𝘞𝘦𝘭𝘤𝘰𝘮𝘦 {user} 🧸✨",
+"🤗 𝚆𝚎𝚕𝚌𝚘𝚖𝚎 {user} 🧸✨",
+"🤗 𝕎𝕖𝕝𝕔𝕠𝕞𝕖 {user} 🧸✨",
+"🤗 𝓦𝓮𝓵𝓬𝓸𝓶𝓮 {user} 🧸✨"
+
+]
+
+async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    for member in update.message.new_chat_members:
+
+        user = member.mention_html()
+
+        text = random.choice(WELCOME_STYLES).format(user=user)
+
+        await update.message.reply_html(text)
+
 # ================= BOT STATS =================
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -2438,6 +2467,9 @@ def main():
 
     # ===== CALLBACK HANDLERS =====
     app.add_handler(CallbackQueryHandler(heist_choice, pattern="^heist_"))
+ 
+    #===== Welcome System =====
+    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
 
     # ===== CALLBACK BUTTON HANDLER =====
     app.add_handler(CallbackQueryHandler(callback_handler))
