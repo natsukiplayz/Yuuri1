@@ -2154,6 +2154,112 @@ async def user_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await msg.reply_text(text, parse_mode="Markdown")
 
+#=========promote users========
+async def promote(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    msg = update.message
+    chat_id = update.effective_chat.id
+    sender = update.effective_user
+
+    if chat_id not in ADMINS:
+        ADMINS[chat_id] = {}
+
+    sender_data = ADMINS[chat_id].get(sender.id)
+    sender_level = sender_data["level"] if sender_data else 0
+
+    if sender_level < 3:
+        await msg.reply_text("❌ Yᴏᴜ Nᴇᴇᴅ Aᴅᴍɪɴ Tᴏ Pʀᴏᴍᴏᴛᴇ Oᴛʜᴇʀꜱ")
+        return
+
+    args = msg.text.split()
+
+    if msg.reply_to_message:
+        target = msg.reply_to_message.from_user
+        level = int(args[1]) if len(args) > 1 else 1
+    else:
+        if len(args) < 3:
+            await msg.reply_text("Usage: .promote @username 1|2|3")
+            return
+
+        username = args[1].replace("@","")
+        level = int(args[2])
+
+        try:
+            member = await context.bot.get_chat_member(chat_id, username)
+            target = member.user
+        except:
+            await msg.reply_text("❌ User not found")
+            return
+
+    if target.id in ADMINS[chat_id]:
+        await msg.reply_text(f"✅ {target.first_name} Iꜱ Aʟʀᴇᴀᴅʏ Pʀᴏᴍᴏᴛᴇᴅ 🎖")
+        return
+
+    ADMINS[chat_id][target.id] = {
+        "level": level,
+        "promoted_by": sender.id
+    }
+
+    if level == 1:
+        text = "🥇 Pʀᴏᴍᴏᴛᴇᴅ Tᴏ Bᴀꜱɪᴄ Lᴇᴠᴇʟ 1 Aᴅᴍɪɴ Nᴏ Bᴀɴ\\ᴍᴜᴛᴇ\\ᴍᴀᴋᴇ Aᴅᴍɪɴꜱ Rɪɢʜᴛꜱ 🎖"
+
+    elif level == 2:
+        text = "🥈 Pʀᴏᴍᴏᴛᴇᴅ Tᴏ Lᴇᴠᴇʟ 2 Aᴅᴍɪɴ Hᴀᴠᴇ Bᴀɴ/ᴍᴜᴛᴇ Rɪɢʜᴛꜱ 🎖"
+
+    else:
+        text = "🥉 Pʀᴏᴍᴏᴛᴇᴅ Tᴏ Lᴇᴠᴇʟ 3 Aᴅᴍɪɴ Hᴀᴠᴇ Aʟʟ Rɪɢʜᴛꜱ 🎖"
+
+    await msg.reply_text(text)
+
+#========demote users======
+async def demote(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    msg = update.message
+    chat_id = update.effective_chat.id
+    sender = update.effective_user
+
+    if chat_id not in ADMINS:
+        ADMINS[chat_id] = {}
+
+    sender_data = ADMINS[chat_id].get(sender.id)
+    sender_level = sender_data["level"] if sender_data else 0
+
+    if sender_level < 3:
+        await msg.reply_text("❌ Yᴏᴜ Nᴇᴇᴅ Aᴅᴍɪɴ Tᴏ Dᴇᴍᴏᴛᴇ Oᴛʜᴇʀꜱ")
+        return
+
+    if msg.reply_to_message:
+        target = msg.reply_to_message.from_user
+    else:
+        args = msg.text.split()
+
+        if len(args) < 2:
+            await msg.reply_text("Usage: .demote @username")
+            return
+
+        username = args[1].replace("@","")
+
+        try:
+            member = await context.bot.get_chat_member(chat_id, username)
+            target = member.user
+        except:
+            await msg.reply_text("❌ User not found")
+            return
+
+    if target.id not in ADMINS[chat_id]:
+        await msg.reply_text("❌ User is not promoted")
+        return
+
+    promoter = ADMINS[chat_id][target.id]["promoted_by"]
+
+    if promoter != sender.id:
+        await msg.reply_text(f"❌ {target.first_name} Iꜱ Pʀᴏᴍᴏᴛᴇᴅ Bʏ Oᴛʜᴇʀ Tʜᴀɴ Mᴇ 🎭")
+        return
+
+    del ADMINS[chat_id][target.id]
+
+    await msg.reply_text(f"⁉️ {target.first_name} Dᴇᴍᴏᴛᴇᴅ!")
+
 # ---------------- MEMORY STORAGE ----------------
 
 chat_memory = {}
@@ -2321,7 +2427,9 @@ def main():
 
     #===== Group Management =====
     app.add_handler(CommandHandler("user", user_command))
-
+    app.add_handler(MessageHandler(filters.Regex(r"^\.promote"), promote))
+    app.add_handler(MessageHandler(filters.Regex(r"^\.demote"), demote))
+    
     #==== Side Features =========
     app.add_handler(CommandHandler("q", quote))
     app.add_handler(CommandHandler("obt", save_sticker))
