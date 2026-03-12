@@ -2154,18 +2154,40 @@ async def user_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await msg.reply_text(text, parse_mode="Markdown")
 
+# ---------------- MEMORY STORAGE ----------------
+
+chat_memory = {}
+MAX_MEMORY = 12
+
 # ---------------- AI FUNCTION ----------------
 import httpx
 
-async def ask_ai_async(text: str):
+async def ask_ai_async(chat_id: int, text: str):
+
     if not GROQ_API_KEY:
         return "🤖 AI not configured."
+
     try:
+
+        if chat_id not in chat_memory:
+            chat_memory[chat_id] = []
+
+        # Add user message to memory
+        chat_memory[chat_id].append({
+            "role": "user",
+            "content": text
+        })
+
+        # Limit memory size
+        chat_memory[chat_id] = chat_memory[chat_id][-MAX_MEMORY:]
+
         url = "https://api.groq.com/openai/v1/chat/completions"
+
         headers = {
             "Authorization": f"Bearer {GROQ_API_KEY}",
             "Content-Type": "application/json"
         }
+
         data = {
             "model": "moonshotai/kimi-k2-instruct-0905",
             "messages": [
@@ -2184,16 +2206,27 @@ async def ask_ai_async(text: str):
                          "always talks in hinglish and never show the reaction like for example: *happy*, yuuri: text."
                          "and talk only under 10-15 words more words are strictly prohibited."
                          "you can only chat and not show any action in text like *blushes*,*pushing away*."
-                 )},
-                {"role": "user", "content": text}
-            ]
+                 )}
+            ] + chat_memory[chat_id]
         }
+
         async with httpx.AsyncClient(timeout=20) as client:
             response = await client.post(url, headers=headers, json=data)
+
         if response.status_code != 200:
             print("Yuuri Status:", response.status_code, response.text)
             return "⚠️ Yuuri Server error"
-        return response.json()["choices"][0]["message"]["content"]
+
+        reply = response.json()["choices"][0]["message"]["content"]
+
+        # Save AI reply to memory
+        chat_memory[chat_id].append({
+            "role": "assistant",
+            "content": reply
+        })
+
+        return reply
+
     except Exception as e:
         print("AI ERROR:", e)
         return "⚠️ Error Talking To Yuuri"
@@ -2232,7 +2265,7 @@ async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
 
             # Get AI reply
-            reply = await ask_ai_async(text)
+            reply = await ask_ai_async(update.effective_chat.id, text)
             print("Yuuri Reply:", reply)
 
             # Send reply
