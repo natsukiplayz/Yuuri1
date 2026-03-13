@@ -2660,7 +2660,9 @@ def main():
     app.add_handler(CommandHandler("hug", hug))
     app.add_handler(CommandHandler("bite", bite))
     app.add_handler(CommandHandler("slap", slap))
-    app.add_handler(CommandHandler("fuck", fuck))
+    app.add_handler(CommandHandler("kick", kick))
+    app.add_handler(CommandHandler("punch", punch))
+    app.add_handler(CommandHandler("murder", murder))
 
     # ===== CALLBACK HANDLERS =====
     app.add_handler(CallbackQueryHandler(heist_choice, pattern="^heist_"))
