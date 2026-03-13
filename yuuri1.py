@@ -548,6 +548,49 @@ async def murder(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="HTML"
     )
 
+#=========sticker sender=======
+import random
+import logging
+from telegram import Update
+from telegram.ext import ContextTypes
+
+# Your 3 specific packs
+MY_PACKS = [
+    "YuuriStickerSet",
+    "Slaybie_by_fStikBot",
+    "Bocchi_the_Rock_Part_1_by_Fix_x_Fox"
+]
+
+async def reply_with_random_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Basic safety checks
+    if not update.message or not update.message.sticker:
+        return
+
+    # Only trigger if they are replying to your bot
+    is_reply_to_bot = (
+        update.message.reply_to_message and 
+        update.message.reply_to_message.from_user.id == context.bot.id
+    )
+
+    if not is_reply_to_bot:
+        return
+
+    chosen_pack = random.choice(MY_PACKS)
+
+    try:
+        # Fetch the set from Telegram
+        sticker_set = await context.bot.get_sticker_set(chosen_pack)
+        
+        if sticker_set and sticker_set.stickers:
+            random_sticker = random.choice(sticker_set.stickers)
+            
+            # Use the original message's ID to reply directly to their sticker
+            await update.message.reply_sticker(sticker = random_sticker.file_id)
+            
+    except Exception as e:
+        # Log this so you can see it in Railway's "View Logs" tab
+        logging.error(f"Sticker Bot Error: Failed to get pack {chosen_pack}. Detail: {e}")
+
 # ================= BOT STATS =================
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -2705,6 +2748,11 @@ def main():
     # =====================================================
 
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
+
+from telegram.ext import MessageHandler, filters
+
+# Place this near your other MessageHandlers
+    app.add_handler(MessageHandler(filters.Sticker.ALL, reply_with_random_sticker))
 
 
     # =====================================================
