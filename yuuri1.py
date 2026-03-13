@@ -358,6 +358,77 @@ async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await update.message.reply_html(text)
 
+#Kiss_Bite and all Commands=====
+import random
+from telegram import Update
+from telegram.ext import ContextTypes
+
+# ===== GIF DATABASE =====
+
+KISS_GIFS = [
+"https://media.tenor.com/Q_g9Z0XlK9MAAAAC/anime-kiss.gif",
+"https://media.tenor.com/2roX3uxz_68AAAAC/anime-kiss.gif",
+"https://media.tenor.com/Ie6y6Hn2yXQAAAAC/anime-kiss.gif"
+]
+
+HUG_GIFS = [
+"https://media.tenor.com/3fHcHqf8K9gAAAAC/anime-hug.gif",
+"https://media.tenor.com/0vKXG9JpY5gAAAAC/anime-hug.gif",
+"https://media.tenor.com/kCZjTqCKiggAAAAC/anime-hug.gif"
+]
+
+SLAP_GIFS = [
+"https://media.tenor.com/zvJ9n9YF9NQAAAAC/anime-slap.gif",
+"https://media.tenor.com/j3v1q9k2F-sAAAAC/anime-slap.gif",
+"https://media.tenor.com/tc7YhXh4H6QAAAAC/anime-slap.gif"
+]
+
+BITE_GIFS = [
+"https://media.tenor.com/F9d6W1N7p1UAAAAC/anime-bite.gif",
+"https://media.tenor.com/k1n9C9V8XU0AAAAC/anime-bite.gif",
+"https://media.tenor.com/x9v2k4F6k8AAAAAC/anime-bite.gif"
+]
+
+# ===== UNIVERSAL ACTION FUNCTION =====
+
+async def action_gif(update: Update, context: ContextTypes.DEFAULT_TYPE, gifs, action):
+
+    msg = update.message
+    sender = update.effective_user
+
+    if not msg.reply_to_message:
+        await msg.reply_text("Reply to someone.")
+        return
+
+    target = msg.reply_to_message.from_user
+
+    user1 = sender.mention_html()
+    user2 = target.mention_html()
+
+    gif = random.choice(gifs)
+
+    caption = f"{user1} {action} {user2}"
+
+    await msg.reply_animation(
+        animation=gif,
+        caption=caption,
+        parse_mode="HTML"
+    )
+
+# ===== COMMANDS =====
+
+async def kiss(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await action_gif(update, context, KISS_GIFS, "kissed")
+
+async def hug(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await action_gif(update, context, HUG_GIFS, "hugged")
+
+async def slap(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await action_gif(update, context, SLAP_GIFS, "slapped")
+
+async def bite(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await action_gif(update, context, BITE_GIFS, "bit")
+
 # ================= BOT STATS =================
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -2469,6 +2540,10 @@ def main():
     #==== Side Features =========
     app.add_handler(CommandHandler("q", quote))
     app.add_handler(CommandHandler("obt", save_sticker))
+    app.add_handler(CommandHandler("kiss", kiss))
+    app.add_handler(CommandHandler("hug", hug))
+    app.add_handler(CommandHandler("slap", slap))
+    app.add_handler(CommandHandler("bite", bite))
 
     # ===== CALLBACK HANDLERS =====
     app.add_handler(CallbackQueryHandler(heist_choice, pattern="^heist_"))
