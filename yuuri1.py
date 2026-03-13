@@ -554,7 +554,6 @@ import logging
 from telegram import Update
 from telegram.ext import ContextTypes
 
-# Your 3 specific packs
 MY_PACKS = [
     "YuuriStickerSet",
     "Slaybie_by_fStikBot",
@@ -562,33 +561,27 @@ MY_PACKS = [
 ]
 
 async def reply_with_random_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # 1. Safety check for the message
     if not update.message or not update.message.sticker:
         return
 
-    # 2. Only trigger if they are replying to your bot
+    # Check if replying to bot
     if not update.message.reply_to_message or update.message.reply_to_message.from_user.id != context.bot.id:
         return
 
     chosen_pack = random.choice(MY_PACKS)
 
     try:
-        # Fetch the set
-        sticker_set = await context.bot.get_sticker_set(chosen_pack)
+        # Use keyword name= to avoid positional argument issues
+        sticker_set = await context.bot.get_sticker_set(name=chosen_pack)
         
         if sticker_set and sticker_set.stickers:
             random_sticker = random.choice(sticker_set.stickers)
             
-            # Use a try block for the actual send to catch "Message not found" errors
-            try:
-                await update.message.reply_sticker(sticker=random_sticker.file_id)
-            except Exception as send_error:
-                # If reply fails (e.g. message deleted), just send it to the chat normally
-                await context.bot.send_sticker(chat_id=update.effective_chat.id, sticker=random_sticker.file_id)
+            # Use file_id directly to avoid creating new Sticker objects that might crash
+            await update.message.reply_sticker(sticker=random_sticker.file_id)
             
     except Exception as e:
-        # This fixes the "missing positional arguments" log spam
-        logging.error(f"Sticker Pack {chosen_pack} error: {str(e)}")
+        logging.error(f"Sticker Pack {chosen_pack} error: {e}")
 
 # ================= BOT STATS =================
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
