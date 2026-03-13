@@ -2620,6 +2620,8 @@ async def ask_ai_async(chat_id: int, text: str):
         print("AI ERROR:", e)
         return "⚠️ Error Talking To Yuuri"
 
+import re  # Ensure this is at the top of your file
+
 # ---------------- AUTO-REPLY ----------------
 async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
@@ -2655,10 +2657,25 @@ async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             # Get AI reply
             reply = await ask_ai_async(update.effective_chat.id, text)
-            print("Yuuri Reply:", reply)
 
-            # Send reply
-            await msg.reply_text(reply)
+            # === CLEANING LOGIC START ===
+            # 1. Remove "Yuuri:" or "Yuuri :" from the start
+            reply = re.sub(r'^yuuri\s*:\s*', '', reply, flags=re.IGNORECASE)
+
+            # 2. Remove roleplay text like *eyes narrow* or (smiles)
+            # This removes anything between * * or ( )
+            reply = re.sub(r'\*.*?\*', '', reply)
+            reply = re.sub(r'\(.*?\)', '', reply)
+
+            # 3. Clean up extra spaces
+            reply = reply.strip()
+            # === CLEANING LOGIC END ===
+
+            print("Yuuri (Clean) Reply:", reply)
+
+            # Only send if there is still text left after cleaning
+            if reply:
+                await msg.reply_text(reply)
 
     except Exception as e:
         print("Auto-reply error:", e)
