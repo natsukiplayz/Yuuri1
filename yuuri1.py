@@ -555,7 +555,7 @@ from telegram import Update, Sticker
 from telegram.constants import ChatAction
 from telegram.ext import ContextTypes
 
-# Only your packs
+# Your sticker packs
 STICKER_PACKS = [
     "AnyaVid",
     "Slaybie_by_fStikBot",
@@ -567,24 +567,29 @@ async def yuuri_sticker_reply(update: Update, context: ContextTypes.DEFAULT_TYPE
     if not msg or not msg.sticker:
         return
 
-    # Must reply to bot
+    # Must reply to the bot
     if not msg.reply_to_message or msg.reply_to_message.from_user.id != context.bot.id:
         return
 
-    # Pick a random allowed pack
+    # Match the type: video stickers reply with video, static with static
+    desired_type = "video" if msg.sticker.is_video else "regular"
+
+    # Pick a random pack
     pack_name = random.choice(STICKER_PACKS)
 
     try:
         sticker_set = await context.bot.get_sticker_set(pack_name)
 
-        # Filter stickers to include only ones with a valid file_id
-        stickers = []
-        for s in sticker_set.stickers:
-            if hasattr(s, "file_id") and s.file_id:
-                stickers.append(s)
+        # Filter stickers by type and valid file_id
+        stickers = [
+            s for s in sticker_set.stickers
+            if getattr(s, "file_id", None)
+            and ((desired_type == "video" and getattr(s, "is_video", False))
+                 or (desired_type == "regular" and not getattr(s, "is_video", False)))
+        ]
 
         if not stickers:
-            print(f"[Sticker WARNING] Pack '{pack_name}' has no usable stickers")
+            print(f"[Sticker WARNING] Pack '{pack_name}' has no usable stickers of type '{desired_type}'")
             return
 
         sticker = random.choice(stickers)
@@ -596,7 +601,7 @@ async def yuuri_sticker_reply(update: Update, context: ContextTypes.DEFAULT_TYPE
         await asyncio.sleep(random.uniform(0.5, 1.2))
 
         await msg.reply_sticker(sticker.file_id)
-        print(f"[Sticker SENT] From pack '{pack_name}'")
+        print(f"[Sticker SENT] From pack '{pack_name}' ({desired_type})")
 
     except Exception as e:
         print(f"[Sticker ERROR] Could not send sticker from pack '{pack_name}': {e}")
