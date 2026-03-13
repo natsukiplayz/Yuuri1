@@ -358,10 +358,11 @@ async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await update.message.reply_html(text)
 
-#Kiss_Bite and all Commands=====
+# ===== Fun Interaction Commands =====
+
 import random
 from telegram import Update
-from telegram.ext import ContextTypes, CommandHandler
+from telegram.ext import ContextTypes
 
 # ===============================
 # GIF DATABASE
@@ -391,113 +392,156 @@ SLAP_GIFS = [
 "CgACAgQAAxkBAAFEqaRps9JRPuXBNf7aa9v_whuwU2nLEgACPQMAAhreBFPkfVHAxMcKpjoE"
 ]
 
-FUCK_GIFS = [
-"CgACAgQAAxkBAAFEqhhps9eWJkkgJuCrBIOh_HCT2rvWdQACZgMAAuQeBFMT2KsF-Ea6GDoE",
-"CgACAgQAAxkBAAFEqeBps9Zcun4m23fzaW0mLC99kFpegAAC6AIAAn1wHVNreT7VbNXZcDoE"
+KICK_GIFS = [
+"CgACAgQAAxkBAAFEq3Vps-hF0AJg7zywn9El8BJUA3DzEwAC8wIAAnvgBFMZAV2MHSAZlzoE",
+"CgACAgQAAxkBAAFEq3Zps-hFW0CEBmL6u7njUYLGr22q3AAC0gYAAog2jFBmFZXucvqURjoE",
+"CgACAgQAAxkBAAFEq3dps-hFNX4ZQ4rdT5s32Wnn3NhVAAPIBwACgbe1UVl5Z4WkKnrHOgQ"
 ]
 
+PUNCH_GIFS = [
+"CgACAgQAAxkBAAFEq4pps-jh2SYq4RCb0d3QXA1ano0ihgACmQYAAmNlfVBPu8eB0yXiOzoE",
+"CgACAgQAAxkBAAFEq4tps-jh9BFfmDjK6XNDKL15Pjzn9wAC8wIAAoSnLVNyqAKuMP98wjoE",
+"CgACAgQAAxkBAAFEq4xps-jh_GtyKDOrEQABr0ParkF7kpEAAsMCAAInZQ1THZgTJK0G2bA6BA"
+]
+
+MURDER_GIFS = [
+"CgACAgQAAxkBAAFEq5tps-nhOiSq-vuyjmk13zm30l7R5gAC8AIAAvmANVPbgt6AF05WbzoE",
+"CgACAgQAAxkBAAFEq5xps-nhBH8Ml1UEBCjctbNpBmH1jwACLQMAAuLJDFMgyege_IFM2ToE",
+"CgACAgQAAxkBAAFEq51ps-nhCb0TEIbTPAIBrY2fjxF4cgACQQMAAhQTJVOQ4cLMXsbquToE"
+]
+
+WARNING_TEXT = "Cʜᴜᴘ!! Wᴀʀɴᴀ Yᴜᴜᴋɪ K Bᴛᴀ Dᴜɴɢɪ 😒"
+
 # ===============================
-# KISS
+# CHECK FUNCTION
 # ===============================
 
-async def kiss(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def check_target(update: Update):
 
     if not update.message.reply_to_message:
-        await update.message.reply_text("Reply to someone to kiss 💋")
-        return
+        await update.message.reply_text("Rᴇᴘʟʏ Tᴏ Sᴏᴍᴇᴏɴᴇ Fɪʀsᴛ 😶")
+        return None
 
     sender = update.effective_user
     target = update.message.reply_to_message.from_user
+    bot = update.get_bot()
+
+    if target.id == sender.id:
+        await update.message.reply_text(WARNING_TEXT)
+        return None
+
+    if target.id == bot.id:
+        await update.message.reply_text(WARNING_TEXT)
+        return None
+
+    return sender, target
+
+
+# ===============================
+# COMMAND TEMPLATE
+# ===============================
+
+async def kiss(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    data = await check_target(update)
+    if not data:
+        return
+    sender, target = data
 
     gif = random.choice(KISS_GIFS)
 
     await update.message.reply_animation(
         gif,
-        caption=f"{sender.mention_html()} 💋 kissed {target.mention_html()}",
+        caption=f"{sender.mention_html()} 💋 Kɪssᴇᴅ {target.mention_html()}",
         parse_mode="HTML"
     )
 
-# ===============================
-# HUG
-# ===============================
 
 async def hug(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    if not update.message.reply_to_message:
-        await update.message.reply_text("Reply to someone to hug 🤗")
+    data = await check_target(update)
+    if not data:
         return
-
-    sender = update.effective_user
-    target = update.message.reply_to_message.from_user
+    sender, target = data
 
     gif = random.choice(HUG_GIFS)
 
     await update.message.reply_animation(
         gif,
-        caption=f"{sender.mention_html()} 🤗 hugged {target.mention_html()}",
+        caption=f"{sender.mention_html()} 🤗 Hᴜɢɢᴇᴅ {target.mention_html()}",
         parse_mode="HTML"
     )
 
-# ===============================
-# BITE
-# ===============================
 
 async def bite(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    if not update.message.reply_to_message:
-        await update.message.reply_text("Reply to someone to bite 😈")
+    data = await check_target(update)
+    if not data:
         return
-
-    sender = update.effective_user
-    target = update.message.reply_to_message.from_user
+    sender, target = data
 
     gif = random.choice(BITE_GIFS)
 
     await update.message.reply_animation(
         gif,
-        caption=f"{sender.mention_html()} 😈 bit {target.mention_html()}",
+        caption=f"{sender.mention_html()} 😈 Bɪᴛ {target.mention_html()}",
         parse_mode="HTML"
     )
 
-# ===============================
-# SLAP
-# ===============================
 
 async def slap(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    if not update.message.reply_to_message:
-        await update.message.reply_text("Reply to someone to slap 👋")
+    data = await check_target(update)
+    if not data:
         return
-
-    sender = update.effective_user
-    target = update.message.reply_to_message.from_user
+    sender, target = data
 
     gif = random.choice(SLAP_GIFS)
 
     await update.message.reply_animation(
         gif,
-        caption=f"{sender.mention_html()} 👋 slapped {target.mention_html()}",
+        caption=f"{sender.mention_html()} 👋 Sʟᴀᴘᴘᴇᴅ {target.mention_html()}",
         parse_mode="HTML"
     )
 
-# ===============================
-# FUCK COMMAND
-# ===============================
 
-async def fuck(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    if not update.message.reply_to_message:
-        await update.message.reply_text("Reply to someone first 😏")
+async def kick(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    data = await check_target(update)
+    if not data:
         return
+    sender, target = data
 
-    sender = update.effective_user
-    target = update.message.reply_to_message.from_user
-
-    gif = random.choice(FUCK_GIFS)
+    gif = random.choice(KICK_GIFS)
 
     await update.message.reply_animation(
         gif,
-        caption=f"{sender.mention_html()} 😏 Fucked 💀 {target.mention_html()}",
+        caption=f"{sender.mention_html()} 🦶 Kɪᴄᴋᴇᴅ {target.mention_html()}",
+        parse_mode="HTML"
+    )
+
+
+async def punch(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    data = await check_target(update)
+    if not data:
+        return
+    sender, target = data
+
+    gif = random.choice(PUNCH_GIFS)
+
+    await update.message.reply_animation(
+        gif,
+        caption=f"{sender.mention_html()} 👊 Pᴜɴᴄʜᴇᴅ {target.mention_html()}",
+        parse_mode="HTML"
+    )
+
+
+async def murder(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    data = await check_target(update)
+    if not data:
+        return
+    sender, target = data
+
+    gif = random.choice(MURDER_GIFS)
+
+    await update.message.reply_animation(
+        gif,
+        caption=f"{sender.mention_html()} 🔪 Mᴜʀᴅᴇʀᴇᴅ {target.mention_html()}",
         parse_mode="HTML"
     )
 
