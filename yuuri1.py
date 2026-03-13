@@ -412,11 +412,12 @@ MURDER_GIFS = [
 
 WARNING_TEXT = "Cʜᴜᴘ!! Wᴀʀɴᴀ Yᴜᴜᴋɪ K Bᴛᴀ Dᴜɴɢɪ 😒"
 
+
 # ===============================
 # CHECK FUNCTION
 # ===============================
 
-async def check_target(update: Update):
+async def check_target(update: Update, action):
 
     if not update.message.reply_to_message:
         await update.message.reply_text("Rᴇᴘʟʏ Tᴏ Sᴏᴍᴇᴏɴᴇ Fɪʀsᴛ 😶")
@@ -426,10 +427,12 @@ async def check_target(update: Update):
     target = update.message.reply_to_message.from_user
     bot = update.get_bot()
 
-    if target.id == sender.id:
-        await update.message.reply_text(WARNING_TEXT)
+    # user tries command on themselves
+    if sender.id == target.id:
+        await update.message.reply_text(f"Yᴏᴜ Cᴀɴ'ᴛ {action} Yᴏᴜʀsᴇʟғ 😑")
         return None
 
+    # user tries command on bot
     if target.id == bot.id:
         await update.message.reply_text(WARNING_TEXT)
         return None
@@ -438,11 +441,11 @@ async def check_target(update: Update):
 
 
 # ===============================
-# COMMAND TEMPLATE
+# COMMANDS
 # ===============================
 
 async def kiss(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    data = await check_target(update)
+    data = await check_target(update, "Kɪss")
     if not data:
         return
     sender, target = data
@@ -457,7 +460,7 @@ async def kiss(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def hug(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    data = await check_target(update)
+    data = await check_target(update, "Hᴜɢ")
     if not data:
         return
     sender, target = data
@@ -472,7 +475,7 @@ async def hug(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def bite(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    data = await check_target(update)
+    data = await check_target(update, "Bɪᴛᴇ")
     if not data:
         return
     sender, target = data
@@ -487,7 +490,7 @@ async def bite(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def slap(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    data = await check_target(update)
+    data = await check_target(update, "Sʟᴀᴘ")
     if not data:
         return
     sender, target = data
@@ -502,7 +505,7 @@ async def slap(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def kick(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    data = await check_target(update)
+    data = await check_target(update, "Kɪᴄᴋ")
     if not data:
         return
     sender, target = data
@@ -517,7 +520,7 @@ async def kick(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def punch(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    data = await check_target(update)
+    data = await check_target(update, "Pᴜɴᴄʜ")
     if not data:
         return
     sender, target = data
@@ -532,7 +535,7 @@ async def punch(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def murder(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    data = await check_target(update)
+    data = await check_target(update, "Mᴜʀᴅᴇʀ")
     if not data:
         return
     sender, target = data
