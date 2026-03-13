@@ -367,27 +367,24 @@ from telegram.ext import ContextTypes
 
 KISS_GIFS = [
 "https://media.tenor.com/Q_g9Z0XlK9MAAAAC/anime-kiss.gif",
-"https://media.tenor.com/2roX3uxz_68AAAAC/anime-kiss.gif",
 "https://media.tenor.com/Ie6y6Hn2yXQAAAAC/anime-kiss.gif"
 ]
 
 HUG_GIFS = [
-"https://media.tenor.com/3fHcHqf8K9gAAAAC/anime-hug.gif",
-"https://media.tenor.com/0vKXG9JpY5gAAAAC/anime-hug.gif",
-"https://media.tenor.com/kCZjTqCKiggAAAAC/anime-hug.gif"
+"https://media.tenor.com/kCZjTqCKiggAAAAC/anime-hug.gif",
+"https://media.tenor.com/3fHcHqf8K9gAAAAC/anime-hug.gif"
 ]
 
 SLAP_GIFS = [
 "https://media.tenor.com/zvJ9n9YF9NQAAAAC/anime-slap.gif",
-"https://media.tenor.com/j3v1q9k2F-sAAAAC/anime-slap.gif",
 "https://media.tenor.com/tc7YhXh4H6QAAAAC/anime-slap.gif"
 ]
 
 BITE_GIFS = [
 "https://media.tenor.com/F9d6W1N7p1UAAAAC/anime-bite.gif",
-"https://media.tenor.com/k1n9C9V8XU0AAAAC/anime-bite.gif",
 "https://media.tenor.com/x9v2k4F6k8AAAAAC/anime-bite.gif"
 ]
+
 
 # ===== UNIVERSAL ACTION FUNCTION =====
 
@@ -409,11 +406,16 @@ async def action_gif(update: Update, context: ContextTypes.DEFAULT_TYPE, gifs, a
 
     caption = f"{user1} {action} {user2}"
 
-    await msg.reply_animation(
-        animation=gif,
-        caption=caption,
-        parse_mode="HTML"
-    )
+    try:
+        await msg.reply_animation(
+            animation=gif,
+            caption=caption,
+            parse_mode="HTML"
+        )
+    except Exception as e:
+        print("GIF ERROR:", e)
+        await msg.reply_text("⚠️ GIF failed to load.")
+
 
 # ===== COMMANDS =====
 
