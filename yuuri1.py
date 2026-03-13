@@ -2752,7 +2752,7 @@ def main():
 from telegram.ext import MessageHandler, filters
 
 # Place this near your other MessageHandlers
-    app.add_handler(MessageHandler(filters.Sticker.ALL, reply_with_random_sticker))
+app.add_handler(MessageHandler(filters.Sticker.ALL, reply_with_random_sticker))
 
 
     # =====================================================
