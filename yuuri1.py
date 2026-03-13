@@ -392,7 +392,7 @@ SLAP_GIFS = [
 ]
 
 FUCK_GIF = [ 
-"CgACAgQAAxkBAAFEqeBps9Zcun4m23fzaW0mLC99kFpegAAC6AIAAn1wHVNreT7VbNXZcDoE"
+"CgACAgQAAxkBAAFEqeBps9Zcun4m23fzaW0mLC99kFpegAAC6AIAAn1wHVNreT7VbNXZcDoE",
 "CgACAgQAAxkBAAFEqbBps9MgM47P-hz6EvoVDMM02xItlAAC8AcAAp7ZbVI8nOlOymzBIjoE"
 ]
 # ===============================
