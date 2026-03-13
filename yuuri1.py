@@ -2686,6 +2686,7 @@ async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         print("Auto-reply error:", e)
 
+
 # ================= MAIN =================
 async def error_handler(update, context):
     print(f"⚠️ Error: {context.error}")
