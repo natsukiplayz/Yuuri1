@@ -2482,48 +2482,63 @@ async def demote(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await msg.reply_text(f"⁉️ {target.first_name} Dᴇᴍᴏᴛᴇᴅ!")
 
 #===========Random_Sticker_Sendef=======
+# ===== Random Sticker Sender with realistic choosing =====
 import random
 import asyncio
-from telegram import Update
+from telegram import Update, ChatAction
 from telegram.ext import ContextTypes
 
-# Sticker pack names
+# ===== Sticker Packs =====
 STICKER_PACKS = [
     "AnyaVid",
     "Slaybie_by_fStikBot",
     "Ministerial_Gray_Buzzard_by_fStikBot"
 ]
 
+# ===== Backup Sticker IDs =====
+BACKUP_STICKERS = [
+    "CAACAgQAAxkBAAFErB5ps_HS9VaB369-Dbtw_0wXTZi-SgACaQwAAvWU4FLampxudkKH_joE",
+    "CAACAgUAAxkBAAFErCBps_HUCqpleGNG8sh6T6D4VnTy3AACshIAAj-4WVbd72QQN6FJ2ToE",
+    "CAACAgUAAxkBAAFErCJps_HXJA3SoTqIwrLTLTK4Q_9e_wACERoAAr1QeVbFlbbjEywZKjoE"
+]
+
 async def yuuri_sticker_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
     msg = update.message
-
-    if not msg.reply_to_message:
+    if not msg or not msg.sticker:
         return
 
-    if msg.reply_to_message.from_user.id != context.bot.id:
+    # Must be replying to the bot
+    if not msg.reply_to_message or msg.reply_to_message.from_user.id != context.bot.id:
         return
 
-    # Show typing simulation
-    await context.bot.send_chat_action(
-        chat_id=msg.chat_id,
-        action="typing"
-    )
+    # ===== 90% chance to respond (natural) =====
+    if random.random() > 0.9:
+        return
 
-    # Delay
-    await asyncio.sleep(1)
+    # ===== Simulate choosing sticker realistically =====
+    await context.bot.send_chat_action(chat_id=msg.chat_id, action=ChatAction.TYPING)
+    await asyncio.sleep(random.uniform(0.5, 1.0))
 
-    # Pick random sticker pack
-    pack_name = random.choice(STICKER_PACKS)
+    # Simulate “choose sticker” action
+    await context.bot.send_chat_action(chat_id=msg.chat_id, action=ChatAction.UPLOAD_DOCUMENT)
+    await asyncio.sleep(random.uniform(0.7, 1.2))
 
-    # Get stickers from pack
-    sticker_pack = await context.bot.get_sticker_set(pack_name)
+    try:
+        # ===== Pick random sticker pack =====
+        pack_name = random.choice(STICKER_PACKS)
+        sticker_pack = await context.bot.get_sticker_set(pack_name)
 
-    # Pick random sticker
-    sticker = random.choice(sticker_pack.stickers)
+        # ===== Pick random sticker from pack =====
+        sticker = random.choice(sticker_pack.stickers)
 
-    # Send sticker
-    await msg.reply_sticker(sticker.file_id)
+        # ===== Send sticker =====
+        await msg.reply_sticker(sticker.file_id)
+
+    except Exception as e:
+        print(f"[Sticker ERROR] Pack failed, sending backup: {e}")
+        # ===== Send backup sticker =====
+        sticker = random.choice(BACKUP_STICKERS)
+        await msg.reply_sticker(sticker)
 
 # ---------------- MEMORY STORAGE ----------------
 
