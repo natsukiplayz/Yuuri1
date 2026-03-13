@@ -495,9 +495,11 @@ async def fuck(update: Update, context: ContextTypes.DEFAULT_TYPE):
     sender = update.effective_user
     target = update.message.reply_to_message.from_user
 
+    gif = random.choice(FUCK_GIFS)
+
     await update.message.reply_animation(
-        FUCK_GIF,
-        caption=f"{sender.mention_html()} 😏 fucked 💀 {target.mention_html()}",
+        gif,
+        caption=f"{sender.mention_html()} 😏 Fucked 💀 {target.mention_html()}",
         parse_mode="HTML"
     )
 
