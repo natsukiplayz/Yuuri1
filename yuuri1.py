@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+import re
 import logging
 import random
 import base64
