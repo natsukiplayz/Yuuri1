@@ -2653,9 +2653,7 @@ async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def error_handler(update, context):
     print(f"⚠️ Error: {context.error}")
 
-
 def main():
-
     print("🔥 Yuuri Bot Starting...")
 
     app = ApplicationBuilder().token(BOT_TOKEN).build()
@@ -2663,7 +2661,6 @@ def main():
     # =====================================================
     # COMMAND HANDLERS
     # =====================================================
-
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CommandHandler("referral", referral))
     app.add_handler(CommandHandler("stats", stats))
@@ -2679,21 +2676,17 @@ def main():
     app.add_handler(CommandHandler("stop_b", cancel_broadcast))
     app.add_handler(CommandHandler("richest", richest))
 
-
     # =====================================================
     # HEIST COMMANDS
     # =====================================================
-
     app.add_handler(CommandHandler("heist", heist))
     app.add_handler(CommandHandler("joinheist", joinheist))
     app.add_handler(CommandHandler("stfast", stfast))
     app.add_handler(CommandHandler("stopheist", stopheist))
 
-
     # =====================================================
     # RUSSIAN ROULETTE
     # =====================================================
-
     app.add_handler(CommandHandler("rullate", rullate))
     app.add_handler(CommandHandler("join", join))
     app.add_handler(CommandHandler("shot", shot))
@@ -2701,32 +2694,25 @@ def main():
     app.add_handler(CommandHandler("out", out))
     app.add_handler(CommandHandler("rullrank", rullrank))
 
-
     # =====================================================
     # GAME COMMANDS
     # =====================================================
-
     app.add_handler(CommandHandler("kill", kill))
     app.add_handler(CommandHandler("rob", robe))
     app.add_handler(CommandHandler("bounty", bounty))
 
-
     # =====================================================
     # GROUP MANAGEMENT
     # =====================================================
-
     app.add_handler(CommandHandler("user", user_command))
     app.add_handler(MessageHandler(filters.Regex(r"^\.promote"), promote))
     app.add_handler(MessageHandler(filters.Regex(r"^\.demote"), demote))
 
-
     # =====================================================
     # FUN / SIDE FEATURES
     # =====================================================
-
     app.add_handler(CommandHandler("q", quote))
     app.add_handler(CommandHandler("obt", save_sticker))
-
     app.add_handler(CommandHandler("kiss", kiss))
     app.add_handler(CommandHandler("hug", hug))
     app.add_handler(CommandHandler("bite", bite))
@@ -2735,45 +2721,36 @@ def main():
     app.add_handler(CommandHandler("punch", punch))
     app.add_handler(CommandHandler("murder", murder))
 
-
     # =====================================================
     # CALLBACK HANDLERS
     # =====================================================
-
     app.add_handler(CallbackQueryHandler(heist_choice, pattern="^heist_"))
     app.add_handler(CallbackQueryHandler(callback_handler))
 
     # =====================================================
     # WELCOME SYSTEM
     # =====================================================
-
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
 
-from telegram.ext import MessageHandler, filters
-
-# Place this near your other MessageHandlers
-app.add_handler(MessageHandler(filters.Sticker.ALL, reply_with_random_sticker))
-
+    # ====================================================
+    # RANDOM STICKER REPLY (NEW FEATURE)
+    # ====================================================
+    # We place this above the generic MessageHandlers to ensure it catches stickers first
+    app.add_handler(MessageHandler(filters.Sticker.ALL, reply_with_random_sticker))
 
     # =====================================================
     # MESSAGE HANDLERS
     # =====================================================
-
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, auto_reply))
     app.add_handler(MessageHandler(filters.ALL, save_chat))
-
 
     # =====================================================
     # ERROR HANDLER
     # =====================================================
-
     app.add_error_handler(error_handler)
 
-
     print("🚀 Yuuri Bot Running...")
-
     app.run_polling()
-
 
 if __name__ == "__main__":
     main()
