@@ -548,49 +548,6 @@ async def murder(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="HTML"
     )
 
-#============sticker sending=========
-import random
-import asyncio
-from telegram import Update
-from telegram.ext import ContextTypes
-
-# Your loaded sticker packs with file_ids
-STICKER_PACKS = {
-    "AnyaVid": [
-        "CAACAgUAAxkBAAEBFShgC2fQnH_X1hXJ4kY1wQ6v4XYV3gACRQADwDZPE7o0fJgJgXw7HgQ",
-        "CAACAgUAAxkBAAEBFShgC2fQnH_X1hXJ4kY1wQ6v4XYV3gACRAADwDZPE7o0fJgJgXw7HgQ"
-    ],
-    "Slaybie_by_fStikBot": [
-        "CAACAgUAAxkBAAEBFShgC2fQnH_X1hXJ4kY1wQ6v4XYV3gACRwADwDZPE7o0fJgJgXw7HgQ"
-    ],
-    "Ministerial_Gray_Buzzard_by_fStikBot": [
-        "CAACAgUAAxkBAAEBFShgC2fQnH_X1hXJ4kY1wQ6v4XYV3gACR0ADwDZPE7o0fJgJgXw7HgQ"
-    ]
-}
-
-async def yuuri_reply_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = update.message
-    if not msg or not msg.sticker:
-        return  # Ignore non-sticker messages
-
-    # Only respond if message is replying to the bot
-    if not msg.reply_to_message or msg.reply_to_message.from_user.id != context.bot.id:
-        return
-
-    # Pick a random sticker pack
-    pack_name = random.choice(list(STICKER_PACKS.keys()))
-    stickers = STICKER_PACKS[pack_name]
-
-    # Simulate "choosing sticker 👀" delay without showing typing
-    await asyncio.sleep(random.uniform(0.5, 1.2))  # feels like bot is picking
-
-    # Pick a random sticker from the chosen pack
-    sticker_file_id = random.choice(stickers)
-
-    # Send the sticker as a reply
-    await msg.reply_sticker(sticker_file_id)
-    print(f"[Sticker SENT] From pack '{pack_name}'")
-
 # ================= BOT STATS =================
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -2742,14 +2699,6 @@ def main():
 
     app.add_handler(CallbackQueryHandler(heist_choice, pattern="^heist_"))
     app.add_handler(CallbackQueryHandler(callback_handler))
-
-
-    # =====================================================
-    # STICKER SYSTEM
-    # =====================================================
-
-    app.add_handler(MessageHandler(filters.Sticker.ALL, yuuri_sticker_reply))
-
 
     # =====================================================
     # WELCOME SYSTEM
