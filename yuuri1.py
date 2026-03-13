@@ -550,43 +550,40 @@ async def murder(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 #============sticker sending=========
 import random
-import asyncio
 from telegram import Update
-from telegram.constants import ChatAction
 from telegram.ext import ContextTypes
 
-# Stickers you provided earlier
-STICKERS = {
+# Your loaded sticker packs with file_ids
+STICKER_PACKS = {
     "AnyaVid": [
-        "CAACAgQAAxkBAAFErB5ps_HS9VaB369-Dbtw_0wXTZi-SgACaQwAAvWU4FLampxudkKH_joE"
+        "CAACAgUAAxkBAAEBFShgC2fQnH_X1hXJ4kY1wQ6v4XYV3gACRQADwDZPE7o0fJgJgXw7HgQ",
+        "CAACAgUAAxkBAAEBFShgC2fQnH_X1hXJ4kY1wQ6v4XYV3gACRAADwDZPE7o0fJgJgXw7HgQ"
     ],
     "Slaybie_by_fStikBot": [
-        "CAACAgUAAxkBAAFErCBps_HUCqpleGNG8sh6T6D4VnTy3AACshIAAj-4WVbd72QQN6FJ2ToE"
+        "CAACAgUAAxkBAAEBFShgC2fQnH_X1hXJ4kY1wQ6v4XYV3gACRwADwDZPE7o0fJgJgXw7HgQ"
     ],
     "Ministerial_Gray_Buzzard_by_fStikBot": [
-        "CAACAgUAAxkBAAFErCJps_HXJA3SoTqIwrLTLTK4Q_9e_wACERoAAr1QeVbFlbbjEywZKjoE"
+        "CAACAgUAAxkBAAEBFShgC2fQnH_X1hXJ4kY1wQ6v4XYV3gACR0ADwDZPE7o0fJgJgXw7HgQ"
     ]
 }
 
-async def yuuri_sticker_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def yuuri_reply_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
     if not msg or not msg.sticker:
-        return
+        return  # Ignore non-sticker messages
 
-    # Must reply to the bot
+    # Only respond if message is replying to the bot
     if not msg.reply_to_message or msg.reply_to_message.from_user.id != context.bot.id:
         return
 
-    # Pick a random pack
-    pack_name = random.choice(list(STICKERS.keys()))
-    sticker_file_id = random.choice(STICKERS[pack_name])
+    # Pick a random sticker pack
+    pack_name = random.choice(list(STICKER_PACKS.keys()))
+    stickers = STICKER_PACKS[pack_name]
 
-    # Simulate "choosing sticker 👀"
-    await context.bot.send_chat_action(chat_id=msg.chat_id, action=ChatAction.TYPING)
-    await asyncio.sleep(random.uniform(0.5, 1.0))
-    await context.bot.send_chat_action(chat_id=msg.chat_id, action=ChatAction.UPLOAD_DOCUMENT)
-    await asyncio.sleep(random.uniform(0.5, 1.2))
+    # Pick a random sticker from the chosen pack
+    sticker_file_id = random.choice(stickers)
 
+    # Send the sticker as a reply
     await msg.reply_sticker(sticker_file_id)
     print(f"[Sticker SENT] From pack '{pack_name}'")
 
