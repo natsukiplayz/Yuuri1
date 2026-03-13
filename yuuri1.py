@@ -2640,13 +2640,17 @@ async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def error_handler(update, context):
     print(f"⚠️ Error: {context.error}")
 
+
 def main():
 
     print("🔥 Yuuri Bot Starting...")
 
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    # ===== COMMAND HANDLERS =====
+    # =====================================================
+    # COMMAND HANDLERS
+    # =====================================================
+
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CommandHandler("referral", referral))
     app.add_handler(CommandHandler("stats", stats))
@@ -2662,13 +2666,21 @@ def main():
     app.add_handler(CommandHandler("stop_b", cancel_broadcast))
     app.add_handler(CommandHandler("richest", richest))
 
-    # ===== HEIST =====
+
+    # =====================================================
+    # HEIST COMMANDS
+    # =====================================================
+
     app.add_handler(CommandHandler("heist", heist))
     app.add_handler(CommandHandler("joinheist", joinheist))
     app.add_handler(CommandHandler("stfast", stfast))
     app.add_handler(CommandHandler("stopheist", stopheist))
 
-    # ===== RUSSIAN ROULETTE =====
+
+    # =====================================================
+    # RUSSIAN ROULETTE
+    # =====================================================
+
     app.add_handler(CommandHandler("rullate", rullate))
     app.add_handler(CommandHandler("join", join))
     app.add_handler(CommandHandler("shot", shot))
@@ -2676,19 +2688,32 @@ def main():
     app.add_handler(CommandHandler("out", out))
     app.add_handler(CommandHandler("rullrank", rullrank))
 
-    # ===== GAME COMMANDS =====
+
+    # =====================================================
+    # GAME COMMANDS
+    # =====================================================
+
     app.add_handler(CommandHandler("kill", kill))
     app.add_handler(CommandHandler("rob", robe))
     app.add_handler(CommandHandler("bounty", bounty))
 
-    #===== Group Management =====
+
+    # =====================================================
+    # GROUP MANAGEMENT
+    # =====================================================
+
     app.add_handler(CommandHandler("user", user_command))
     app.add_handler(MessageHandler(filters.Regex(r"^\.promote"), promote))
     app.add_handler(MessageHandler(filters.Regex(r"^\.demote"), demote))
-    
-    #==== Side Features =========
+
+
+    # =====================================================
+    # FUN / SIDE FEATURES
+    # =====================================================
+
     app.add_handler(CommandHandler("q", quote))
     app.add_handler(CommandHandler("obt", save_sticker))
+
     app.add_handler(CommandHandler("kiss", kiss))
     app.add_handler(CommandHandler("hug", hug))
     app.add_handler(CommandHandler("bite", bite))
@@ -2697,24 +2722,43 @@ def main():
     app.add_handler(CommandHandler("punch", punch))
     app.add_handler(CommandHandler("murder", murder))
 
-    # ===== CALLBACK HANDLERS =====
+
+    # =====================================================
+    # CALLBACK HANDLERS
+    # =====================================================
+
     app.add_handler(CallbackQueryHandler(heist_choice, pattern="^heist_"))
-
-    #===== sticker =====
-app.add_handler(MessageHandler(filters.Sticker.ALL, yuuri_sticker_reply))
-
-    #===== Welcome System =====
-    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
-
-    # ===== CALLBACK BUTTON HANDLER =====
     app.add_handler(CallbackQueryHandler(callback_handler))
 
-    # ===== MESSAGE HANDLERS =====
+
+    # =====================================================
+    # STICKER SYSTEM
+    # =====================================================
+
+    app.add_handler(MessageHandler(filters.Sticker.ALL, yuuri_sticker_reply))
+
+
+    # =====================================================
+    # WELCOME SYSTEM
+    # =====================================================
+
+    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
+
+
+    # =====================================================
+    # MESSAGE HANDLERS
+    # =====================================================
+
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, auto_reply))
     app.add_handler(MessageHandler(filters.ALL, save_chat))
 
-    # ===== ERROR HANDLER =====
+
+    # =====================================================
+    # ERROR HANDLER
+    # =====================================================
+
     app.add_error_handler(error_handler)
+
 
     print("🚀 Yuuri Bot Running...")
 
