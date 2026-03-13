@@ -551,16 +551,22 @@ async def murder(update: Update, context: ContextTypes.DEFAULT_TYPE):
 #============sticker sending=========
 import random
 import asyncio
-from telegram import Update, Sticker
+from telegram import Update
 from telegram.constants import ChatAction
 from telegram.ext import ContextTypes
 
-# Your sticker packs
-STICKER_PACKS = [
-    "AnyaVid",
-    "Slaybie_by_fStikBot",
-    "Ministerial_Gray_Buzzard_by_fStikBot"
-]
+# Stickers you provided earlier
+STICKERS = {
+    "AnyaVid": [
+        "CAACAgQAAxkBAAFErB5ps_HS9VaB369-Dbtw_0wXTZi-SgACaQwAAvWU4FLampxudkKH_joE"
+    ],
+    "Slaybie_by_fStikBot": [
+        "CAACAgUAAxkBAAFErCBps_HUCqpleGNG8sh6T6D4VnTy3AACshIAAj-4WVbd72QQN6FJ2ToE"
+    ],
+    "Ministerial_Gray_Buzzard_by_fStikBot": [
+        "CAACAgUAAxkBAAFErCJps_HXJA3SoTqIwrLTLTK4Q_9e_wACERoAAr1QeVbFlbbjEywZKjoE"
+    ]
+}
 
 async def yuuri_sticker_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
@@ -571,40 +577,18 @@ async def yuuri_sticker_reply(update: Update, context: ContextTypes.DEFAULT_TYPE
     if not msg.reply_to_message or msg.reply_to_message.from_user.id != context.bot.id:
         return
 
-    # Match the type: video stickers reply with video, static with static
-    desired_type = "video" if msg.sticker.is_video else "regular"
-
     # Pick a random pack
-    pack_name = random.choice(STICKER_PACKS)
+    pack_name = random.choice(list(STICKERS.keys()))
+    sticker_file_id = random.choice(STICKERS[pack_name])
 
-    try:
-        sticker_set = await context.bot.get_sticker_set(pack_name)
+    # Simulate "choosing sticker 👀"
+    await context.bot.send_chat_action(chat_id=msg.chat_id, action=ChatAction.TYPING)
+    await asyncio.sleep(random.uniform(0.5, 1.0))
+    await context.bot.send_chat_action(chat_id=msg.chat_id, action=ChatAction.UPLOAD_DOCUMENT)
+    await asyncio.sleep(random.uniform(0.5, 1.2))
 
-        # Filter stickers by type and valid file_id
-        stickers = [
-            s for s in sticker_set.stickers
-            if getattr(s, "file_id", None)
-            and ((desired_type == "video" and getattr(s, "is_video", False))
-                 or (desired_type == "regular" and not getattr(s, "is_video", False)))
-        ]
-
-        if not stickers:
-            print(f"[Sticker WARNING] Pack '{pack_name}' has no usable stickers of type '{desired_type}'")
-            return
-
-        sticker = random.choice(stickers)
-
-        # Simulate "choosing sticker 👀"
-        await context.bot.send_chat_action(chat_id=msg.chat_id, action=ChatAction.TYPING)
-        await asyncio.sleep(random.uniform(0.5, 1.0))
-        await context.bot.send_chat_action(chat_id=msg.chat_id, action=ChatAction.UPLOAD_DOCUMENT)
-        await asyncio.sleep(random.uniform(0.5, 1.2))
-
-        await msg.reply_sticker(sticker.file_id)
-        print(f"[Sticker SENT] From pack '{pack_name}' ({desired_type})")
-
-    except Exception as e:
-        print(f"[Sticker ERROR] Could not send sticker from pack '{pack_name}': {e}")
+    await msg.reply_sticker(sticker_file_id)
+    print(f"[Sticker SENT] From pack '{pack_name}'")
 
 # ================= BOT STATS =================
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
