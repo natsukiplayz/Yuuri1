@@ -555,50 +555,44 @@ from telegram import Update
 from telegram.constants import ChatAction
 from telegram.ext import ContextTypes
 
-# ===== Sticker Packs =====
-STICKER_PACKS = [
-    "AnyaVid",
-    "Slaybie_by_fStikBot",
-    "Ministerial_Gray_Buzzard_by_fStikBot"
-]
-
-# ===== Backup Sticker IDs =====
-BACKUP_STICKERS = [
-    "CAACAgQAAxkBAAFErB5ps_HS9VaB369-Dbtw_0wXTZi-SgACaQwAAvWU4FLampxudkKH_joE",
-    "CAACAgUAAxkBAAFErCBps_HUCqpleGNG8sh6T6D4VnTy3AACshIAAj-4WVbd72QQN6FJ2ToE",
-    "CAACAgUAAxkBAAFErCJps_HXJA3SoTqIwrLTLTK4Q_9e_wACERoAAr1QeVbFlbbjEywZKjoE"
-]
-
 async def yuuri_sticker_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
     if not msg or not msg.sticker:
         return
 
-    # Must reply to bot
+    # Only reply if the message is replying to the bot
     if not msg.reply_to_message or msg.reply_to_message.from_user.id != context.bot.id:
         return
 
-    # ===== Simulate "choosing sticker" realistically =====
-    await context.bot.send_chat_action(chat_id=msg.chat_id, action=ChatAction.TYPING)
-    await asyncio.sleep(random.uniform(0.5, 1.0))
-    await context.bot.send_chat_action(chat_id=msg.chat_id, action=ChatAction.UPLOAD_DOCUMENT)
-    await asyncio.sleep(random.uniform(0.5, 1.2))
+    # Get the sticker pack name from the incoming sticker
+    pack_name = msg.sticker.set_name
+    if not pack_name:
+        print("[Sticker WARNING] Sticker has no set_name, skipping...")
+        return
 
     try:
-        # ===== Pick random sticker pack =====
-        pack_name = random.choice(STICKER_PACKS)
-        sticker_pack = await context.bot.get_sticker_set(pack_name)
+        # Fetch the sticker set
+        sticker_set = await context.bot.get_sticker_set(pack_name)
 
-        # ===== Pick random sticker from the pack =====
-        sticker = random.choice(sticker_pack.stickers)
+        if not sticker_set.stickers:
+            print(f"[Sticker WARNING] Pack '{pack_name}' is empty, skipping...")
+            return
 
-        # ===== Send the sticker =====
+        # Pick a random sticker from the same pack
+        sticker = random.choice(sticker_set.stickers)
+
+        # ===== Simulate "choosing sticker 👀" =====
+        await context.bot.send_chat_action(chat_id=msg.chat_id, action=ChatAction.TYPING)
+        await asyncio.sleep(random.uniform(0.5, 1.0))  # thinking delay
+        await context.bot.send_chat_action(chat_id=msg.chat_id, action=ChatAction.UPLOAD_DOCUMENT)
+        await asyncio.sleep(random.uniform(0.5, 1.0))  # choosing delay
+
+        # Send the sticker
         await msg.reply_sticker(sticker.file_id)
+        print(f"[Sticker SENT] From pack '{pack_name}'")
 
     except Exception as e:
-        print(f"[Sticker ERROR] Sending backup: {e}")
-        sticker = random.choice(BACKUP_STICKERS)
-        await msg.reply_sticker(sticker)
+        print(f"[Sticker ERROR] Could not send sticker from pack '{pack_name}': {e}")
 
 # ================= BOT STATS =================
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
