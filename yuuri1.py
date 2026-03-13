@@ -2481,6 +2481,36 @@ async def demote(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await msg.reply_text(f"⁉️ {target.first_name} Dᴇᴍᴏᴛᴇᴅ!")
 
+#===========Random_Sticker_Sendef=======
+import random
+from telegram import Update
+from telegram.ext import ContextTypes, MessageHandler, filters
+
+# Yuuri stickers
+YUURI_STICKERS = [
+"CAACAgQAAxkBAAFErB5ps_HS9VaB369-Dbtw_0wXTZi-SgACaQwAAvWU4FLampxudkKH_joE",
+"CAACAgUAAxkBAAFErCBps_HUCqpleGNG8sh6T6D4VnTy3AACshIAAj-4WVbd72QQN6FJ2ToE",
+"CAACAgUAAxkBAAFErCJps_HXJA3SoTqIwrLTLTK4Q_9e_wACERoAAr1QeVbFlbbjEywZKjoE"
+]
+
+
+async def yuuri_sticker_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    msg = update.message
+
+    # check if message is replying to something
+    if not msg.reply_to_message:
+        return
+
+    # check if the reply is to the bot
+    if msg.reply_to_message.from_user.id != context.bot.id:
+        return
+
+    # choose random sticker
+    sticker = random.choice(YUURI_STICKERS)
+
+    await msg.reply_sticker(sticker)
+
 # ---------------- MEMORY STORAGE ----------------
 
 chat_memory = {}
@@ -2669,7 +2699,10 @@ def main():
 
     # ===== CALLBACK HANDLERS =====
     app.add_handler(CallbackQueryHandler(heist_choice, pattern="^heist_"))
- 
+
+    #===== sticker =====
+app.add_handler(MessageHandler(filters.Sticker.ALL, yuuri_sticker_reply))
+
     #===== Welcome System =====
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
 
