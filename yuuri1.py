@@ -2620,7 +2620,7 @@ async def ask_ai_async(chat_id: int, text: str):
         print("AI ERROR:", e)
         return "⚠️ Error Talking To Yuuri"
 
-import re  # Ensure this is at the top of your file
+import re  # Ensure this is at the very top of your 2500+ line file
 
 # ---------------- AUTO-REPLY ----------------
 async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -2658,20 +2658,26 @@ async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # Get AI reply
             reply = await ask_ai_async(update.effective_chat.id, text)
 
-            # === CLEANING LOGIC START ===
-            # 1. Remove "Yuuri:" or "Yuuri :" from the start
-            reply = re.sub(r'^yuuri\s*:\s*', '', reply, flags=re.IGNORECASE)
+            # === AGGRESSIVE CLEANING START ===
+            
+            # 1. Remove "Yuuri:" or "Yᴜᴜʀɪ:" (including fancy fonts) from anywhere in the text
+            # This handles the "Yuuri: *eyes narrow*" format
+            reply = re.sub(r'(?i)^(Yuuri|Yᴜᴜʀɪ|Yuri)\s*[:：]\s*', '', reply)
 
-            # 2. Remove roleplay text like *eyes narrow* or (smiles)
-            # This removes anything between * * or ( )
-            reply = re.sub(r'\*.*?\*', '', reply)
-            reply = re.sub(r'\(.*?\)', '', reply)
+            # 2. Remove roleplay actions between asterisks (Handles * * and ** **)
+            # The DOTALL flag ensures it catches it even if there are new lines
+            reply = re.sub(r'\*+.*?\*+', '', reply, flags=re.DOTALL)
 
-            # 3. Clean up extra spaces
+            # 3. Remove text between parentheses ( ) or brackets [ ]
+            reply = re.sub(r'\(.*?\)|\[.*?\]', '', reply, flags=re.DOTALL)
+
+            # 4. Final Cleanup: Remove multiple newlines and leading/trailing whitespace
+            reply = re.sub(r'\n\s*\n', '\n', reply) # Fixes gaps left by deleted text
             reply = reply.strip()
-            # === CLEANING LOGIC END ===
+            
+            # === AGGRESSIVE CLEANING END ===
 
-            print("Yuuri (Clean) Reply:", reply)
+            print("Yuuri (Aggressive Clean) Reply:", reply)
 
             # Only send if there is still text left after cleaning
             if reply:
