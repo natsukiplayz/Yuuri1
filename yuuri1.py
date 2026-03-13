@@ -2483,14 +2483,15 @@ async def demote(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 #===========Random_Sticker_Sendef=======
 import random
+import asyncio
 from telegram import Update
-from telegram.ext import ContextTypes, MessageHandler, filters
+from telegram.ext import ContextTypes
 
-# Yuuri stickers
-YUURI_STICKERS = [
-"CAACAgQAAxkBAAFErB5ps_HS9VaB369-Dbtw_0wXTZi-SgACaQwAAvWU4FLampxudkKH_joE",
-"CAACAgUAAxkBAAFErCBps_HUCqpleGNG8sh6T6D4VnTy3AACshIAAj-4WVbd72QQN6FJ2ToE",
-"CAACAgUAAxkBAAFErCJps_HXJA3SoTqIwrLTLTK4Q_9e_wACERoAAr1QeVbFlbbjEywZKjoE"
+# Sticker pack names
+STICKER_PACKS = [
+    "AnyaVid",
+    "Slaybie_by_fStikBot",
+    "Ministerial_Gray_Buzzard_by_fStikBot"
 ]
 
 
@@ -2498,18 +2499,33 @@ async def yuuri_sticker_reply(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     msg = update.message
 
-    # check if message is replying to something
+    # Only react if replying to bot
     if not msg.reply_to_message:
         return
 
-    # check if the reply is to the bot
     if msg.reply_to_message.from_user.id != context.bot.id:
         return
 
-    # choose random sticker
-    sticker = random.choice(YUURI_STICKERS)
+    # --- Sticker choosing simulation ---
+    await context.bot.send_chat_action(
+        chat_id=msg.chat_id,
+        action="choose_sticker"
+    )
 
-    await msg.reply_sticker(sticker)
+    # --- 1 second delay ---
+    await asyncio.sleep(1)
+
+    # Choose random sticker pack
+    pack_name = random.choice(STICKER_PACKS)
+
+    # Get sticker pack
+    sticker_pack = await context.bot.get_sticker_set(pack_name)
+
+    # Choose random sticker
+    sticker = random.choice(sticker_pack.stickers)
+
+    # Send sticker
+    await msg.reply_sticker(sticker.file_id)
 
 # ---------------- MEMORY STORAGE ----------------
 
