@@ -555,40 +555,42 @@ from telegram import Update
 from telegram.constants import ChatAction
 from telegram.ext import ContextTypes
 
+# ✅ Only the packs you want
+STICKER_PACKS = [
+    "AnyaVid",
+    "Slaybie_by_fStikBot",
+    "Ministerial_Gray_Buzzard_by_fStikBot"
+]
+
 async def yuuri_sticker_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
     if not msg or not msg.sticker:
         return
 
-    # Only reply if replying to the bot
+    # Must be a reply to the bot
     if not msg.reply_to_message or msg.reply_to_message.from_user.id != context.bot.id:
         return
 
-    pack_name = msg.sticker.set_name
-    if not pack_name:
-        print("[Sticker WARNING] Sticker has no set_name, skipping...")
-        return
+    # ===== Pick a random pack from your allowed packs =====
+    pack_name = random.choice(STICKER_PACKS)
 
     try:
         sticker_set = await context.bot.get_sticker_set(pack_name)
 
-        # Filter to only regular stickers (no PTB constructor issues)
-        stickers = [
-            s for s in sticker_set.stickers
-            if not getattr(s, "is_animated", False) and not getattr(s, "is_video", False)
-        ]
-
+        # Filter stickers to make sure they have file_id
+        stickers = [s for s in sticker_set.stickers if getattr(s, "file_id", None)]
         if not stickers:
-            print(f"[Sticker WARNING] Pack '{pack_name}' has no regular stickers, skipping...")
+            print(f"[Sticker WARNING] Pack '{pack_name}' has no usable stickers")
             return
 
+        # Pick a random sticker from the pack
         sticker = random.choice(stickers)
 
-        # Show "choosing sticker 👀"
+        # ===== Simulate choosing sticker 👀 =====
         await context.bot.send_chat_action(chat_id=msg.chat_id, action=ChatAction.TYPING)
         await asyncio.sleep(random.uniform(0.5, 1.0))
         await context.bot.send_chat_action(chat_id=msg.chat_id, action=ChatAction.UPLOAD_DOCUMENT)
-        await asyncio.sleep(random.uniform(0.5, 1.0))
+        await asyncio.sleep(random.uniform(0.5, 1.2))
 
         await msg.reply_sticker(sticker.file_id)
         print(f"[Sticker SENT] From pack '{pack_name}'")
