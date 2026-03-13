@@ -551,11 +551,11 @@ async def murder(update: Update, context: ContextTypes.DEFAULT_TYPE):
 #============sticker sending=========
 import random
 import asyncio
-from telegram import Update
+from telegram import Update, Sticker
 from telegram.constants import ChatAction
 from telegram.ext import ContextTypes
 
-# ✅ Only the packs you want
+# Only your packs
 STICKER_PACKS = [
     "AnyaVid",
     "Slaybie_by_fStikBot",
@@ -567,26 +567,29 @@ async def yuuri_sticker_reply(update: Update, context: ContextTypes.DEFAULT_TYPE
     if not msg or not msg.sticker:
         return
 
-    # Must be a reply to the bot
+    # Must reply to bot
     if not msg.reply_to_message or msg.reply_to_message.from_user.id != context.bot.id:
         return
 
-    # ===== Pick a random pack from your allowed packs =====
+    # Pick a random allowed pack
     pack_name = random.choice(STICKER_PACKS)
 
     try:
         sticker_set = await context.bot.get_sticker_set(pack_name)
 
-        # Filter stickers to make sure they have file_id
-        stickers = [s for s in sticker_set.stickers if getattr(s, "file_id", None)]
+        # Filter stickers to include only ones with a valid file_id
+        stickers = []
+        for s in sticker_set.stickers:
+            if hasattr(s, "file_id") and s.file_id:
+                stickers.append(s)
+
         if not stickers:
             print(f"[Sticker WARNING] Pack '{pack_name}' has no usable stickers")
             return
 
-        # Pick a random sticker from the pack
         sticker = random.choice(stickers)
 
-        # ===== Simulate choosing sticker 👀 =====
+        # Simulate "choosing sticker 👀"
         await context.bot.send_chat_action(chat_id=msg.chat_id, action=ChatAction.TYPING)
         await asyncio.sleep(random.uniform(0.5, 1.0))
         await context.bot.send_chat_action(chat_id=msg.chat_id, action=ChatAction.UPLOAD_DOCUMENT)
