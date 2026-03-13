@@ -2735,8 +2735,8 @@ def main():
     # =====================================================
     # GAME COMMANDS
     # =====================================================
-    app.add_handler(CommandHandler("kill", kill))
-    app.add_handler(CommandHandler("rob", robe))
+    app.add_handler(CommandHandler("kil", kill))
+    app.add_handler(CommandHandler("robb", robe))
     app.add_handler(CommandHandler("bounty", bounty))
 
     # =====================================================
