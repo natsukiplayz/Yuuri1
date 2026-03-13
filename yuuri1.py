@@ -551,7 +551,8 @@ async def murder(update: Update, context: ContextTypes.DEFAULT_TYPE):
 #=========sticker sender=======
 import random
 import logging
-from telegram import Update
+import asyncio # Added for the simulation delay
+from telegram import Update, constants
 from telegram.ext import ContextTypes
 
 MY_PACKS = [
@@ -561,27 +562,47 @@ MY_PACKS = [
 ]
 
 async def reply_with_random_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # 1. Basic safety check
     if not update.message or not update.message.sticker:
         return
 
-    # Check if replying to bot
-    if not update.message.reply_to_message or update.message.reply_to_message.from_user.id != context.bot.id:
-        return
-
-    chosen_pack = random.choice(MY_PACKS)
-
-    try:
-        # Use keyword name= to avoid positional argument issues
-        sticker_set = await context.bot.get_sticker_set(name=chosen_pack)
+    # 2. Identify the chat type (Private vs Group)
+    chat_type = update.effective_chat.type
+    
+    # 3. Logic: Trigger if it's a Private chat OR if it's a reply to the bot in a group
+    # If you want her to reply to EVERY sticker in groups too, just remove this 'if' block.
+    is_reply_to_bot = (
+        update.message.reply_to_message and 
+        update.message.reply_to_message.from_user.id == context.bot.id
+    )
+    
+    # Trigger on any sticker in Private, or a reply-trigger in Groups
+    if chat_type == constants.ChatType.PRIVATE or is_reply_to_bot:
         
-        if sticker_set and sticker_set.stickers:
-            random_sticker = random.choice(sticker_set.stickers)
+        chosen_pack = random.choice(MY_PACKS)
+
+        try:
+            # --- SIMULATION START ---
+            # This shows "Yuuri is choosing a sticker..." status
+            await context.bot.send_chat_action(
+                chat_id=update.effective_chat.id, 
+                action=constants.ChatAction.CHOOSE_STICKER
+            )
+            # A tiny 1-second delay makes the "choosing" look real
+            await asyncio.sleep(1) 
+            # --- SIMULATION END ---
+
+            # Fetch the pack
+            sticker_set = await context.bot.get_sticker_set(name=chosen_pack)
             
-            # Use file_id directly to avoid creating new Sticker objects that might crash
-            await update.message.reply_sticker(sticker=random_sticker.file_id)
-            
-    except Exception as e:
-        logging.error(f"Sticker Pack {chosen_pack} error: {e}")
+            if sticker_set and sticker_set.stickers:
+                random_sticker = random.choice(sticker_set.stickers)
+                
+                # Always reply directly to the user's sticker
+                await update.message.reply_sticker(sticker=random_sticker.file_id)
+                
+        except Exception as e:
+            logging.error(f"Sticker Pack {chosen_pack} error: {e}")
 
 # ================= BOT STATS =================
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
