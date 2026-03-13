@@ -361,75 +361,140 @@ async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
 #Kiss_Bite and all Commands=====
 import random
 from telegram import Update
-from telegram.ext import ContextTypes
+from telegram.ext import ContextTypes, CommandHandler
 
-# ===== GIF DATABASE =====
+# ===============================
+# GIF DATABASE
+# ===============================
 
 KISS_GIFS = [
-"https://media.tenor.com/Q_g9Z0XlK9MAAAAC/anime-kiss.gif",
-"https://media.tenor.com/Ie6y6Hn2yXQAAAAC/anime-kiss.gif"
+"CgACAgQAAxkBAAFEqThps851iVq2fmWNXo3sq1HTx8qP4QACggMAAp897VKT2Ktemaxp2joE",
+"CgACAgQAAxkBAAFEqUpps88XuvzJ7gKt9RgT8r3_MgpGhwACgAcAAvwpjFMTm9An_6_McToE",
+"CgACAgQAAxkBAAFEqUxps89ecJSnnN0UOSk13Y6xp7ZI3QACvgQAAp-RzVId4q-39NiNDjoE"
 ]
 
 HUG_GIFS = [
-"https://media.tenor.com/kCZjTqCKiggAAAAC/anime-hug.gif",
-"https://media.tenor.com/3fHcHqf8K9gAAAAC/anime-hug.gif"
-]
-
-SLAP_GIFS = [
-"https://media.tenor.com/zvJ9n9YF9NQAAAAC/anime-slap.gif",
-"https://media.tenor.com/tc7YhXh4H6QAAAAC/anime-slap.gif"
+"CgACAgQAAxkBAAFEqVRps9AQLzL3MSq0ciO-AAEzsh47bOEAAq4FAAIL_z1TzpL3e-CUa0I6BA",
+"CgACAgQAAxkBAAFEqVVps9AQMt85jqkHjtSeCzgLLfaFngAC7QUAAkWIzFF_W-zVNIr6QjoE",
+"CgACAgQAAxkBAAFEqVZps9AQUhBv94fq6VuPvtMeifMetQACpwgAAsq9fFK5IuJw0Q6KazoE"
 ]
 
 BITE_GIFS = [
-"https://media.tenor.com/F9d6W1N7p1UAAAAC/anime-bite.gif",
-"https://media.tenor.com/x9v2k4F6k8AAAAAC/anime-bite.gif"
+"CgACAgQAAxkBAAFEqXdps9F3CUDP_uXjN4HWcMBiacvatQACBQMAAsV7BVM4j4JdPptQDzoE",
+"CgACAgQAAxkBAAFEqXhps9F32LDcpcXH9NOS-ktnVDG-HgACOwMAAqV6RFELerv_D_rO8joE",
+"CgACAgQAAxkBAAFEqXlps9F3rRMKmv4PISyGVOxXs4v4EAACJQMAAudMBVPQtxclFSEtgDoE"
 ]
 
+SLAP_GIFS = [
+"CgACAgQAAxkBAAFEqaJps9JRC5Mfb5jNr5XgAm6RMWovEAACyQUAApZrVVAar3BemvEERjoE",
+"CgACAgQAAxkBAAFEqaNps9JRkv0XbMCeGvsQFLaGGUyuwAACbAMAAvp45FPnsYLcLNShDToE",
+"CgACAgQAAxkBAAFEqaRps9JRPuXBNf7aa9v_whuwU2nLEgACPQMAAhreBFPkfVHAxMcKpjoE"
+]
 
-# ===== UNIVERSAL ACTION FUNCTION =====
+FUCK_GIF = "CgACAgQAAxkBAAFEqbBps9MgM47P-hz6EvoVDMM02xItlAAC8AcAAp7ZbVI8nOlOymzBIjoE"
 
-async def action_gif(update: Update, context: ContextTypes.DEFAULT_TYPE, gifs, action):
-
-    msg = update.message
-    sender = update.effective_user
-
-    if not msg.reply_to_message:
-        await msg.reply_text("Reply to someone.")
-        return
-
-    target = msg.reply_to_message.from_user
-
-    user1 = sender.mention_html()
-    user2 = target.mention_html()
-
-    gif = random.choice(gifs)
-
-    caption = f"{user1} {action} {user2}"
-
-    try:
-        await msg.reply_animation(
-            animation=gif,
-            caption=caption,
-            parse_mode="HTML"
-        )
-    except Exception as e:
-        print("GIF ERROR:", e)
-        await msg.reply_text("⚠️ GIF failed to load.")
-
-
-# ===== COMMANDS =====
+# ===============================
+# KISS
+# ===============================
 
 async def kiss(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await action_gif(update, context, KISS_GIFS, "kissed")
+
+    if not update.message.reply_to_message:
+        await update.message.reply_text("Reply to someone to kiss 💋")
+        return
+
+    sender = update.effective_user
+    target = update.message.reply_to_message.from_user
+
+    gif = random.choice(KISS_GIFS)
+
+    await update.message.reply_animation(
+        gif,
+        caption=f"{sender.mention_html()} 💋 kissed {target.mention_html()}",
+        parse_mode="HTML"
+    )
+
+# ===============================
+# HUG
+# ===============================
 
 async def hug(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await action_gif(update, context, HUG_GIFS, "hugged")
 
-async def slap(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await action_gif(update, context, SLAP_GIFS, "slapped")
+    if not update.message.reply_to_message:
+        await update.message.reply_text("Reply to someone to hug 🤗")
+        return
+
+    sender = update.effective_user
+    target = update.message.reply_to_message.from_user
+
+    gif = random.choice(HUG_GIFS)
+
+    await update.message.reply_animation(
+        gif,
+        caption=f"{sender.mention_html()} 🤗 hugged {target.mention_html()}",
+        parse_mode="HTML"
+    )
+
+# ===============================
+# BITE
+# ===============================
 
 async def bite(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await action_gif(update, context, BITE_GIFS, "bit")
+
+    if not update.message.reply_to_message:
+        await update.message.reply_text("Reply to someone to bite 😈")
+        return
+
+    sender = update.effective_user
+    target = update.message.reply_to_message.from_user
+
+    gif = random.choice(BITE_GIFS)
+
+    await update.message.reply_animation(
+        gif,
+        caption=f"{sender.mention_html()} 😈 bit {target.mention_html()}",
+        parse_mode="HTML"
+    )
+
+# ===============================
+# SLAP
+# ===============================
+
+async def slap(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    if not update.message.reply_to_message:
+        await update.message.reply_text("Reply to someone to slap 👋")
+        return
+
+    sender = update.effective_user
+    target = update.message.reply_to_message.from_user
+
+    gif = random.choice(SLAP_GIFS)
+
+    await update.message.reply_animation(
+        gif,
+        caption=f"{sender.mention_html()} 👋 slapped {target.mention_html()}",
+        parse_mode="HTML"
+    )
+
+# ===============================
+# FUCK COMMAND
+# ===============================
+
+async def fuck(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    if not update.message.reply_to_message:
+        await update.message.reply_text("Reply to someone first 😏")
+        return
+
+    sender = update.effective_user
+    target = update.message.reply_to_message.from_user
+
+    await update.message.reply_animation(
+        FUCK_GIF,
+        caption=f"{sender.mention_html()} 😏 used the forbidden move on {target.mention_html()}",
+        parse_mode="HTML"
+    )
 
 # ================= BOT STATS =================
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -2544,8 +2609,9 @@ def main():
     app.add_handler(CommandHandler("obt", save_sticker))
     app.add_handler(CommandHandler("kiss", kiss))
     app.add_handler(CommandHandler("hug", hug))
-    app.add_handler(CommandHandler("slap", slap))
     app.add_handler(CommandHandler("bite", bite))
+    app.add_handler(CommandHandler("slap", slap))
+    app.add_handler(CommandHandler("fuck", fuck))
 
     # ===== CALLBACK HANDLERS =====
     app.add_handler(CallbackQueryHandler(heist_choice, pattern="^heist_"))
