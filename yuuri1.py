@@ -391,10 +391,13 @@ SLAP_GIFS = [
 "CgACAgQAAxkBAAFEqaRps9JRPuXBNf7aa9v_whuwU2nLEgACPQMAAhreBFPkfVHAxMcKpjoE"
 ]
 
-FUCK_GIF = [ 
-"CgACAgQAAxkBAAFEqeBps9Zcun4m23fzaW0mLC99kFpegAAC6AIAAn1wHVNreT7VbNXZcDoE",
-"CgACAgQAAxkBAAFEqbBps9MgM47P-hz6EvoVDMM02xItlAAC8AcAAp7ZbVI8nOlOymzBIjoE"
+FUCK_GIFS = [
+"CgACAgQAAxkBAAFEqbBps9MgM47P-hz6EvoVDMM02xItlAAC8AcAAp7ZbVI8nOlOymzBIjoE",
+"CgACAgQAAxkBAAFEqhdps9eWgMvR1Sl4OCBLlamhlxoLkAACCwMAApvFBVMgtpc5HVJpqzoE",
+"CgACAgQAAxkBAAFEqhhps9eWJkkgJuCrBIOh_HCT2rvWdQACZgMAAuQeBFMT2KsF-Ea6GDoE",
+"CgACAgQAAxkBAAFEqeBps9Zcun4m23fzaW0mLC99kFpegAAC6AIAAn1wHVNreT7VbNXZcDoE"
 ]
+
 # ===============================
 # KISS
 # ===============================
@@ -494,7 +497,7 @@ async def fuck(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_animation(
         FUCK_GIF,
-        caption=f"{sender.mention_html()} 😏 used the forbidden move on {target.mention_html()}",
+        caption=f"{sender.mention_html()} 😏 fucked 💀 {target.mention_html()}",
         parse_mode="HTML"
     )
 
