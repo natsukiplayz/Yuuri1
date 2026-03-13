@@ -550,6 +550,7 @@ async def murder(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 #============sticker sending=========
 import random
+import asyncio
 from telegram import Update
 from telegram.ext import ContextTypes
 
@@ -579,6 +580,9 @@ async def yuuri_reply_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE
     # Pick a random sticker pack
     pack_name = random.choice(list(STICKER_PACKS.keys()))
     stickers = STICKER_PACKS[pack_name]
+
+    # Simulate "choosing sticker 👀" delay without showing typing
+    await asyncio.sleep(random.uniform(0.5, 1.2))  # feels like bot is picking
 
     # Pick a random sticker from the chosen pack
     sticker_file_id = random.choice(stickers)
