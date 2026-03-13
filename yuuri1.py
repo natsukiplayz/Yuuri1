@@ -560,34 +560,36 @@ async def yuuri_sticker_reply(update: Update, context: ContextTypes.DEFAULT_TYPE
     if not msg or not msg.sticker:
         return
 
-    # Only reply if the message is replying to the bot
+    # Only reply if replying to the bot
     if not msg.reply_to_message or msg.reply_to_message.from_user.id != context.bot.id:
         return
 
-    # Get the sticker pack name from the incoming sticker
     pack_name = msg.sticker.set_name
     if not pack_name:
         print("[Sticker WARNING] Sticker has no set_name, skipping...")
         return
 
     try:
-        # Fetch the sticker set
         sticker_set = await context.bot.get_sticker_set(pack_name)
 
-        if not sticker_set.stickers:
-            print(f"[Sticker WARNING] Pack '{pack_name}' is empty, skipping...")
+        # Filter to only regular stickers (no PTB constructor issues)
+        stickers = [
+            s for s in sticker_set.stickers
+            if not getattr(s, "is_animated", False) and not getattr(s, "is_video", False)
+        ]
+
+        if not stickers:
+            print(f"[Sticker WARNING] Pack '{pack_name}' has no regular stickers, skipping...")
             return
 
-        # Pick a random sticker from the same pack
-        sticker = random.choice(sticker_set.stickers)
+        sticker = random.choice(stickers)
 
-        # ===== Simulate "choosing sticker 👀" =====
+        # Show "choosing sticker 👀"
         await context.bot.send_chat_action(chat_id=msg.chat_id, action=ChatAction.TYPING)
-        await asyncio.sleep(random.uniform(0.5, 1.0))  # thinking delay
+        await asyncio.sleep(random.uniform(0.5, 1.0))
         await context.bot.send_chat_action(chat_id=msg.chat_id, action=ChatAction.UPLOAD_DOCUMENT)
-        await asyncio.sleep(random.uniform(0.5, 1.0))  # choosing delay
+        await asyncio.sleep(random.uniform(0.5, 1.0))
 
-        # Send the sticker
         await msg.reply_sticker(sticker.file_id)
         print(f"[Sticker SENT] From pack '{pack_name}'")
 
