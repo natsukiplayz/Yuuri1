@@ -2494,34 +2494,32 @@ STICKER_PACKS = [
     "Ministerial_Gray_Buzzard_by_fStikBot"
 ]
 
-
 async def yuuri_sticker_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     msg = update.message
 
-    # Only react if replying to bot
     if not msg.reply_to_message:
         return
 
     if msg.reply_to_message.from_user.id != context.bot.id:
         return
 
-    # --- Sticker choosing simulation ---
+    # Show typing simulation
     await context.bot.send_chat_action(
         chat_id=msg.chat_id,
-        action="choose_sticker"
+        action="typing"
     )
 
-    # --- 1 second delay ---
+    # Delay
     await asyncio.sleep(1)
 
-    # Choose random sticker pack
+    # Pick random sticker pack
     pack_name = random.choice(STICKER_PACKS)
 
-    # Get sticker pack
+    # Get stickers from pack
     sticker_pack = await context.bot.get_sticker_set(pack_name)
 
-    # Choose random sticker
+    # Pick random sticker
     sticker = random.choice(sticker_pack.stickers)
 
     # Send sticker
