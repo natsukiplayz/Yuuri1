@@ -172,31 +172,44 @@ async def save_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Small Caps and Bold Mappings
 SMALL_CAPS = {"a": "ᴀ", "b": "ʙ", "c": "ᴄ", "d": "ᴅ", "e": "ᴇ", "f": "ꜰ", "g": "ɢ", "h": "ʜ", "i": "ɪ", "j": "ᴊ", "k": "ᴋ", "l": "ʟ", "m": "ᴍ", "n": "ɴ", "o": "ᴏ", "p": "ᴘ", "q": "ǫ", "r": "ʀ", "s": "ꜱ", "t": "ᴛ", "u": "ᴜ", "v": "ᴠ", "w": "ᴡ", "x": "x", "y": "ʏ", "z": "ᴢ"}
 
-# Bold and Serif versions for Font 2 and 3
 BOLD_SERIF = {"a": "𝐚", "b": "𝐛", "c": "𝐜", "d": "𝐝", "e": "𝐞", "f": "𝐟", "g": "𝐠", "h": "𝐡", "i": "𝐢", "j": "𝐣", "k": "𝐤", "l": "𝐥", "m": "𝐦", "n": "𝐧", "o": "𝐨", "p": "𝐩", "q": "𝐪", "r": "𝐫", "s": "𝐬", "t": "𝐭", "u": "𝐮", "v": "𝐯", "w": "𝐰", "x": "𝐱", "y": "𝐲", "z": "𝐳"}
 
 def get_fancy_text(text, font_type):
-    result = ""
-    for char in text:
-        lower_char = char.lower()
-        if font_type == "1":
-            # Pure Small Caps
-            result += SMALL_CAPS.get(lower_char, char)
-        elif font_type == "2":
-            # Small Caps but keeps Original Casing for the first letter of words
-            if char.isupper():
-                result += char
+    words = text.split(" ")
+    final_output = []
+
+    for word in words:
+        if not word:
+            final_output.append("")
+            continue
+            
+        new_word = ""
+        for i, char in enumerate(word):
+            low_char = char.lower()
+            
+            if font_type == "1":
+                # ALL SMALL CAPS: ɴɪᴄᴇ ꜱᴇᴛᴜᴘ
+                new_word += SMALL_CAPS.get(low_char, char)
+                
+            elif font_type == "2":
+                # FIRST LETTER CAPS + REST SMALL CAPS: Nɪᴄᴇ Sᴇᴛᴜᴘ
+                if i == 0:
+                    new_word += char.upper()
+                else:
+                    new_word += SMALL_CAPS.get(low_char, char)
+                    
+            elif font_type == "3":
+                # FIRST LETTER BOLD + REST SMALL CAPS: 𝐧ɪ𝐜ᴇ 𝐬ᴇ𝐭𝐮𝐩
+                if i == 0:
+                    new_word += BOLD_SERIF.get(low_char, char)
+                else:
+                    new_word += SMALL_CAPS.get(low_char, char)
             else:
-                result += SMALL_CAPS.get(lower_char, char)
-        elif font_type == "3":
-            # Mix of Bold Serif and Small Caps
-            if lower_char in BOLD_SERIF:
-                result += BOLD_SERIF[lower_char]
-            else:
-                result += SMALL_CAPS.get(lower_char, char)
-        else:
-            result += char
-    return result
+                new_word += char
+        
+        final_output.append(new_word)
+
+    return " ".join(final_output)
 
 #============ Side_Features ========
 #--
