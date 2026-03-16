@@ -2123,358 +2123,160 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler, CommandHandler
 
 # == /heist ==
-
 async def heist(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
     msg = update.message
     chat = update.effective_chat
     user = update.effective_user
 
     active = heists.find_one({"chat_id": chat.id})
-
     if active:
-        return await msg.reply_text(
-            "❌ A heist is already running."
-        )
+        # Using font 2 for error message
+        text = get_fancy_text("❌ A heist is already running.", "2")
+        return await msg.reply_text(text)
 
     heists.insert_one({
         "chat_id": chat.id,
         "host": user.id,
         "started": False,
-        "players": [{
-            "id": user.id,
-            "name": user.first_name
-        }],
+        "players": [{"id": user.id, "name": user.first_name}],
         "choices": {}
     })
 
-    await msg.reply_text(
-        f"""
-🏦 HEIST CREATED
-
+    # Creating the heist message in Font 2
+    raw_text = f"""🏦 HEIST CREATED
 💰 Prize Pot: {HEIST_REWARD}
-
 Host: {user.first_name}
-
 Players: 1/{HEIST_MAX_PLAYERS}
 
-Join using:
-/joinheist
+Join using: /joinheist
+Heist starts automatically in 60 seconds."""
+    
+    await msg.reply_text(get_fancy_text(raw_text, "2"))
 
-Heist starts automatically in 60 seconds.
-"""
-    )
-
-    context.job_queue.run_once(
-        heist_timer,
-        HEIST_WAIT_TIME,
-        chat_id=chat.id
-    )
-
+    context.job_queue.run_once(heist_timer, HEIST_WAIT_TIME, chat_id=chat.id)
 
 # == /joinheist ==
-
 async def joinheist(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
     msg = update.message
     chat = update.effective_chat
     user = update.effective_user
 
-    heist = heists.find_one({"chat_id": chat.id})
+    heist_data = heists.find_one({"chat_id": chat.id})
+    if not heist_data:
+        return await msg.reply_text(get_fancy_text("❌ No active heist.", "2"))
 
-    if not heist:
-        return await msg.reply_text("❌ No active heist.")
+    if heist_data["started"]:
+        return await msg.reply_text(get_fancy_text("❌ Heist already started.", "2"))
 
-    if heist["started"]:
-        return await msg.reply_text("❌ Heist already started.")
-
-    for p in heist["players"]:
+    for p in heist_data["players"]:
         if p["id"] == user.id:
-            return await msg.reply_text("❌ You already joined.")
+            return await msg.reply_text(get_fancy_text("❌ You already joined.", "2"))
 
-    if len(heist["players"]) >= HEIST_MAX_PLAYERS:
-        return await msg.reply_text("❌ Heist is full.")
+    if len(heist_data["players"]) >= HEIST_MAX_PLAYERS:
+        return await msg.reply_text(get_fancy_text("❌ Heist is full.", "2"))
 
     heists.update_one(
         {"chat_id": chat.id},
-        {"$push": {"players": {
-            "id": user.id,
-            "name": user.first_name
-        }}}
+        {"$push": {"players": {"id": user.id, "name": user.first_name}}}
     )
 
-    heist = heists.find_one({"chat_id": chat.id})
+    heist_data = heists.find_one({"chat_id": chat.id})
+    players_list = "\n".join([p["name"] for p in heist_data["players"]])
 
-    players = "\n".join([p["name"] for p in heist["players"]])
-
-    await msg.reply_text(
-        f"""
-👥 {user.first_name} joined the heist
-
-Players ({len(heist['players'])}/{HEIST_MAX_PLAYERS})
-
-{players}
-"""
-    )
-
-
-# == AUTO TIMER ==
-
-async def heist_timer(context: ContextTypes.DEFAULT_TYPE):
-
-    chat_id = context.job.chat_id
-
-    heist = heists.find_one({"chat_id": chat_id})
-
-    if not heist:
-        return
-
-    if heist["started"]:
-        return
-
-    await start_heist(chat_id, context)
-
-
-# == /stfast ==
-
-async def stfast(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    msg = update.message
-    chat = update.effective_chat
-    user = update.effective_user
-
-    heist = heists.find_one({"chat_id": chat.id})
-
-    if not heist:
-        return await msg.reply_text("❌ No heist running.")
-
-    if heist["host"] != user.id:
-        return await msg.reply_text("❌ Only host can start.")
-
-    if heist["started"]:
-        return await msg.reply_text("❌ Heist already started.")
-
-    await start_heist(chat.id, context)
-
-
-# == /stopheist ==
-
-async def stopheist(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    chat = update.effective_chat
-    user = update.effective_user
-
-    heist = heists.find_one({"chat_id": chat.id})
-
-    if not heist:
-        return await update.message.reply_text("❌ No heist.")
-
-    if heist["host"] != user.id:
-        return await update.message.reply_text("❌ Only host can cancel.")
-
-    heists.delete_one({"chat_id": chat.id})
-
-    await update.message.reply_text("🛑 Heist cancelled.")
+    response = f"👥 {user.first_name} joined the heist\nPlayers ({len(heist_data['players'])}/{HEIST_MAX_PLAYERS})\n\n{players_list}"
+    await msg.reply_text(get_fancy_text(response, "2"))
 
 # == START HEIST ==
 async def start_heist(chat_id, context):
+    heist_data = heists.find_one({"chat_id": chat_id})
+    if not heist_data: return
 
-    heist = heists.find_one({"chat_id": chat_id})
-
-    if not heist:
-        return
-
-    players = heist["players"]
-
+    players = heist_data["players"]
     if len(players) < HEIST_MIN_PLAYERS:
-
-        await context.bot.send_message(
-            chat_id,
-            "❌ Not enough players for heist."
-        )
-
+        await context.bot.send_message(chat_id, get_fancy_text("❌ Not enough players for heist.", "2"))
         heists.delete_one({"chat_id": chat_id})
         return
 
-    heists.update_one(
-        {"chat_id": chat_id},
-        {"$set": {"started": True}}
-    )
-
+    heists.update_one({"chat_id": chat_id}, {"$set": {"started": True}})
+    
     gif = "https://media.tenor.com/U1Xw3ZL0E7kAAAAC/money-heist-mask.gif"
-
-    await context.bot.send_animation(
-        chat_id,
-        gif,
-        caption="🏦 Breaking into the vault..."
-    )
+    await context.bot.send_animation(chat_id, gif, caption=get_fancy_text("🏦 Breaking into the vault...", "2"))
 
     await asyncio.sleep(4)
-
-    await context.bot.send_message(
-        chat_id,
-        "💰 Vault opened\n\nCheck your DM to choose your action."
-    )
+    await context.bot.send_message(chat_id, get_fancy_text("💰 Vault opened\nCheck your DM to choose.", "2"))
 
     keyboard = InlineKeyboardMarkup([
         [
             InlineKeyboardButton("💰 Steal", callback_data=f"heist_steal_{chat_id}"),
             InlineKeyboardButton("🤝 Share", callback_data=f"heist_share_{chat_id}")
         ],
-        [
-            InlineKeyboardButton("🚪 Leave", callback_data=f"heist_leave_{chat_id}")
-        ]
+        [InlineKeyboardButton("🚪 Leave", callback_data=f"heist_leave_{chat_id}")]
     ])
 
     for p in players:
-
         try:
-            await context.bot.send_message(
-                p["id"],
-                f"""
-🏦 HEIST DECISION
+            dm_text = f"🏦 HEIST DECISION\nVault contains {HEIST_REWARD}\n\nSteal = take everything\nShare = split money\nLeave = escape safely"
+            await context.bot.send_message(p["id"], get_fancy_text(dm_text, "2"), reply_markup=keyboard)
+        except: pass
 
-Vault contains {HEIST_REWARD}
+    context.job_queue.run_once(heist_result_timer, HEIST_DECISION_TIME, chat_id=chat_id)
 
-Steal = take everything  
-Share = split money  
-Leave = escape safely
-
-You have 40 seconds.
-""",
-                reply_markup=keyboard
-            )
-        except:
-            pass
-
-    context.job_queue.run_once(
-        heist_result_timer,
-        HEIST_DECISION_TIME,
-        chat_id=chat_id
-    )
-
-
-# == PLAYER CHOICE ==
+# == PLAYER CHOICE (CALLBACK) ==
 async def heist_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
     query = update.callback_query
     await query.answer()
-
     user = query.from_user
-
     data = query.data.split("_")
-
     choice = data[1]
     chat_id = int(data[2])
 
-    heist = heists.find_one({"chat_id": chat_id})
+    heist_data = heists.find_one({"chat_id": chat_id})
+    if not heist_data: return
 
-    if not heist:
-        return
-
-    choices = heist["choices"]
-
-    if str(user.id) in choices:
-        return
+    choices = heist_data.get("choices", {})
+    if str(user.id) in choices: return
 
     choices[str(user.id)] = choice
+    heists.update_one({"chat_id": chat_id}, {"$set": {"choices": choices}})
 
-    heists.update_one(
-        {"chat_id": chat_id},
-        {"$set": {"choices": choices}}
-    )
+    await query.edit_message_text(get_fancy_text(f"You chose: {choice}", "2"))
 
-    await query.edit_message_text(
-        f"You chose: {choice}"
-    )
+    remaining = [p["name"] for p in heist_data["players"] if str(p["id"]) not in choices]
+    rem_text = "\n".join(remaining) if remaining else "None"
 
-    remaining = []
-
-    for p in heist["players"]:
-        if str(p["id"]) not in choices:
-            remaining.append(p["name"])
-
-    text = "\n".join(remaining) if remaining else "None"
-
-    await context.bot.send_message(
-        chat_id,
-        f"""
-{user.first_name} chosen his option
-
-Remaining:
-{text}
-"""
-    )
-
-
-# == RESULT TIMER ==
-
-async def heist_result_timer(context: ContextTypes.DEFAULT_TYPE):
-
-    chat_id = context.job.chat_id
-
-    heist = heists.find_one({"chat_id": chat_id})
-
-    if not heist:
-        return
-
-    await finish_heist(chat_id, context)
-
+    update_msg = f"{user.first_name} chose an option\nRemaining:\n{rem_text}"
+    await context.bot.send_message(chat_id, get_fancy_text(update_msg, "2"))
 
 # == FINISH HEIST ==
-
 async def finish_heist(chat_id, context):
+    heist_data = heists.find_one({"chat_id": chat_id})
+    if not heist_data: return
 
-    heist = heists.find_one({"chat_id": chat_id})
-
-    if not heist:
-        return
-
-    players = heist["players"]
-    choices = heist["choices"]
-
-    stealers = []
-    sharers = []
+    players = heist_data["players"]
+    choices = heist_data.get("choices", {})
+    stealers, sharers = [], []
 
     for p in players:
-
         choice = choices.get(str(p["id"]))
+        if choice == "steal": stealers.append(p)
+        elif choice == "share": sharers.append(p)
 
-        if choice == "steal":
-            stealers.append(p)
-
-        elif choice == "share":
-            sharers.append(p)
-
-    result = "🏦 HEIST RESULT\n\n"
+    result_text = "🏦 HEIST RESULT\n\n"
 
     if len(stealers) == 0 and sharers:
-
         reward = HEIST_REWARD // len(sharers)
-
         for p in sharers:
-            users.update_one(
-                {"id": p["id"]},
-                {"$inc": {"coins": reward}}
-            )
-
-        result += f"Crew shared the loot\nEach got {reward}"
-
+            users.update_one({"id": p["id"]}, {"$inc": {"coins": reward}})
+        result_text += f"Crew shared the loot!\nEach got {reward} coins."
     elif len(stealers) == 1:
-
-        users.update_one(
-            {"id": stealers[0]["id"]},
-            {"$inc": {"coins": HEIST_REWARD}}
-        )
-
-        result += f"{stealers[0]['name']} stole everything!"
-
+        users.update_one({"id": stealers[0]["id"]}, {"$inc": {"coins": HEIST_REWARD}})
+        result_text += f"{stealers[0]['name']} stole everything! Greed wins."
+    elif len(stealers) > 1:
+        result_text += "Too many greedy players.\nEveryone tried to steal, and the alarms went off.\nNobody got the money!"
     else:
+        result_text += "Heist failed. Nobody chose to steal or share."
 
-        result += "Too many greedy players\nNobody got the money."
-
-    await context.bot.send_message(chat_id, result)
-
+    await context.bot.send_message(chat_id, get_fancy_text(result_text, "2"))
     heists.delete_one({"chat_id": chat_id})
 
 #===============Management_Commands============
