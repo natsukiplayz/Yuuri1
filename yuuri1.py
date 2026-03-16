@@ -2330,10 +2330,11 @@ async def user_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await msg.reply_text(text, parse_mode="Markdown")
 
+# --- SET YOUR ID HERE ---
+
+OWNER_ID = 5773908061  
+
 #=========promote users (MongoDB + Real Sync)========
-
-OWNER_ID: 5773908061
-
 async def promote(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
     chat_id = update.effective_chat.id
@@ -2341,9 +2342,12 @@ async def promote(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # --- PERMISSION CHECK ---
     is_owner = (sender.id == OWNER_ID)
+    
+    # Check DB for sender's level
     sender_data = admins_db.find_one({"chat_id": chat_id, "user_id": sender.id})
     sender_level = sender_data["level"] if sender_data else 0
 
+    # If you are NOT the owner AND you aren't Lv 3 in the DB, block access
     if not is_owner and sender_level < 3:
         return await msg.reply_text(get_fancy_text("❌ Yᴏᴜ ɴᴇᴇᴅ Lᴇᴠᴇʟ 3 ᴏʀ Oᴡɴᴇʀ ʀɪɢʜᴛꜱ!", "2"))
 
@@ -2354,7 +2358,7 @@ async def promote(update: Update, context: ContextTypes.DEFAULT_TYPE):
         level = int(args[1]) if len(args) > 1 else 1
     elif len(args) >= 2 and args[1].lower() == "me" and is_owner:
         target = sender
-        level = 100
+        level = 100 # God Level
     elif len(args) >= 3:
         username = args[1].replace("@","")
         level = int(args[2])
@@ -2376,7 +2380,6 @@ async def promote(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 can_invite_users=True
             )
             text = f"🥇 {target.first_name} ɪꜱ ɴᴏᴡ ᴀ Bᴀꜱɪᴄ Aᴅᴍɪɴ (Lᴠ.1)"
-            
         elif level == 2:
             # Level 2: Moderator
             await context.bot.promote_chat_member(
@@ -2387,9 +2390,8 @@ async def promote(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 can_pin_messages=True
             )
             text = f"🥈 {target.first_name} ɪꜱ ɴᴏᴡ ᴀ Mᴏᴅᴇʀᴀᴛᴏʀ (Lᴠ.2)"
-            
         else:
-            # Level 3/Owner: FULL POWER (Except Anonymous & Stories)
+            # Level 3/God: Full Power (EXCLUDING Anonymous & Stories)
             await context.bot.promote_chat_member(
                 chat_id, target.id,
                 can_change_info=True,
@@ -2397,14 +2399,13 @@ async def promote(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 can_invite_users=True,
                 can_restrict_members=True,
                 can_pin_messages=True,
-                can_promote_members=True if is_owner or sender_level >= 3 else False,
                 can_manage_chat=True,
                 can_manage_video_chats=True,
-                # Explicitly excluded:
-                is_anonymous=False,
-                can_post_stories=False,
-                can_edit_stories=False,
-                can_delete_stories=False
+                can_promote_members=True if is_owner else False, # Only Owner can give others promote rights
+                is_anonymous=False,      # <--- REQUESTED: OFF
+                can_post_stories=False,   # <--- REQUESTED: OFF
+                can_edit_stories=False,   # <--- REQUESTED: OFF
+                can_delete_stories=False  # <--- REQUESTED: OFF
             )
             text = f"🥉 {target.first_name} ɪꜱ ɴᴏᴡ ᴀ Fᴜʟʟ Aᴅᴍɪɴ (Lᴠ.3)"
 
@@ -2422,7 +2423,7 @@ async def promote(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.reply_text(get_fancy_text(text, "2"))
 
     except Exception as e:
-        await msg.reply_text(f"❌ API Error: {e}")
+        await msg.reply_text(f"❌ API Error: {e}\n(Make sure I have 'Add New Admins' rights!)")
 
 #========demote users (MongoDB + Real Sync)======
 async def demote(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -2437,7 +2438,7 @@ async def demote(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_owner and sender_level < 3:
         return await msg.reply_text(get_fancy_text("❌ Yᴏᴜ ɴᴇᴇᴅ Lᴇᴠᴇʟ 3 ᴏʀ Oᴡɴᴇʀ ʀɪɢʜᴛꜱ!", "2"))
 
-    # Target Finding
+    # --- TARGET FINDING ---
     if msg.reply_to_message:
         target = msg.reply_to_message.from_user
     else:
@@ -2453,7 +2454,7 @@ async def demote(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await msg.reply_text("❌ You cannot demote the Global Owner!")
 
     try:
-        # Strip ALL rights in Telegram
+        # Strip ALL rights
         await context.bot.promote_chat_member(
             chat_id, target.id,
             can_change_info=False, can_delete_messages=False,
@@ -2462,9 +2463,7 @@ async def demote(update: Update, context: ContextTypes.DEFAULT_TYPE):
             can_manage_chat=False, can_manage_video_chats=False
         )
         
-        # Remove from MongoDB
         admins_db.delete_one({"chat_id": chat_id, "user_id": target.id})
-        
         await msg.reply_text(get_fancy_text(f"⁉️ {target.first_name} ʜᴀꜱ ʙᴇᴇɴ ꜰᴜʟʟʏ ᴅᴇᴍᴏᴛᴇᴅ!", "2"))
     except Exception as e:
         await msg.reply_text(f"❌ Error: {e}")
