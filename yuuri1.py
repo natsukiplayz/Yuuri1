@@ -168,6 +168,36 @@ async def save_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         upsert=True
     )
 
+#========fonts-command========
+# Small Caps and Bold Mappings
+SMALL_CAPS = {"a": "ᴀ", "b": "ʙ", "c": "ᴄ", "d": "ᴅ", "e": "ᴇ", "f": "ꜰ", "g": "ɢ", "h": "ʜ", "i": "ɪ", "j": "ᴊ", "k": "ᴋ", "l": "ʟ", "m": "ᴍ", "n": "ɴ", "o": "ᴏ", "p": "ᴘ", "q": "ǫ", "r": "ʀ", "s": "ꜱ", "t": "ᴛ", "u": "ᴜ", "v": "ᴠ", "w": "ᴡ", "x": "x", "y": "ʏ", "z": "ᴢ"}
+
+# Bold and Serif versions for Font 2 and 3
+BOLD_SERIF = {"a": "𝐚", "b": "𝐛", "c": "𝐜", "d": "𝐝", "e": "𝐞", "f": "𝐟", "g": "𝐠", "h": "𝐡", "i": "𝐢", "j": "𝐣", "k": "𝐤", "l": "𝐥", "m": "𝐦", "n": "𝐧", "o": "𝐨", "p": "𝐩", "q": "𝐪", "r": "𝐫", "s": "𝐬", "t": "𝐭", "u": "𝐮", "v": "𝐯", "w": "𝐰", "x": "𝐱", "y": "𝐲", "z": "𝐳"}
+
+def get_fancy_text(text, font_type):
+    result = ""
+    for char in text:
+        lower_char = char.lower()
+        if font_type == "1":
+            # Pure Small Caps
+            result += SMALL_CAPS.get(lower_char, char)
+        elif font_type == "2":
+            # Small Caps but keeps Original Casing for the first letter of words
+            if char.isupper():
+                result += char
+            else:
+                result += SMALL_CAPS.get(lower_char, char)
+        elif font_type == "3":
+            # Mix of Bold Serif and Small Caps
+            if lower_char in BOLD_SERIF:
+                result += BOLD_SERIF[lower_char]
+            else:
+                result += SMALL_CAPS.get(lower_char, char)
+        else:
+            result += char
+    return result
+
 #============ Side_Features ========
 #--
 #=== Quote_transformer =======
@@ -604,6 +634,33 @@ async def reply_with_random_sticker(update: Update, context: ContextTypes.DEFAUL
                 
         except Exception as e:
             logging.error(f"Sticker Pack {chosen_pack} error: {e}")
+
+#========Font-command======
+async def font_converter(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    usage_msg = "❌ Uꜱᴀɢᴇ: /font 1/2/3" # Small caps usage as requested
+    
+    # 1. Check if user provided an argument
+    if not context.args:
+        await update.message.reply_text(usage_msg)
+        return
+
+    font_choice = context.args[0]
+    
+    # 2. Validate choice
+    if font_choice not in ["1", "2", "3"]:
+        await update.message.reply_text(usage_msg)
+        return
+
+    # 3. Check if replying to a message
+    if not update.message.reply_to_message or not update.message.reply_to_message.text:
+        await update.message.reply_text("❌ Rᴇᴘʟʏ ᴛᴏ ᴀ ᴛᴇxᴛ ᴍᴇꜱꜱᴀɢᴇ ᴛᴏ ᴄᴏɴᴠᴇʀᴛ ɪᴛ!")
+        return
+
+    # 4. Convert and send
+    target_text = update.message.reply_to_message.text
+    converted_text = get_fancy_text(target_text, font_choice)
+    
+    await update.message.reply_text(converted_text)
 
 # ================= BOT STATS =================
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -2759,6 +2816,7 @@ def main():
     app.add_handler(CommandHandler("kick", kick))
     app.add_handler(CommandHandler("punch", punch))
     app.add_handler(CommandHandler("murder", murder))
+    app.add_handler(CommandHandler("font", font_converter))
 
     # =====================================================
     # CALLBACK HANDLERS
