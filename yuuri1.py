@@ -290,27 +290,35 @@ async def save_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     sticker = message.reply_to_message.sticker
     
-    # Correct mapping for InputSticker format
+    # 1. API Logic (Must stay plain lowercase)
     if sticker.is_animated:
-        st_type = "Aɴɪᴍᴀᴛᴇᴅ"
+        st_logic = "animated"
+        fancy_type = "Aɴɪᴍᴀᴛᴇᴅ"
+        type_desc = "ᴀʟʟ Aɴɪᴍᴀᴛᴇᴅ"
     elif sticker.is_video:
-        st_type = "Vɪᴅᴇᴏ"
+        st_logic = "video"
+        fancy_type = "Vɪᴅᴇᴏ"
+        type_desc = "ᴀʟʟ Vɪᴅᴇᴏ"
     else:
-        st_type = "Sᴛᴀᴛɪᴄ"
+        st_logic = "static"
+        fancy_type = "Sᴛᴀᴛɪᴄ"
+        type_desc = "ᴀʟʟ Nᴏɴ-ᴀɴɪᴍᴀᴛᴇᴅ"
 
-    # Pack name must end with _by_botusername
-    bot_username = (await context.bot.get_me()).username
-    pack_name = f"user_{user_id}_{st_type}_by_{bot_username}"
-    pack_title = f"{user.first_name[:15]}'s {st_type.capitalize()} Sᴛɪᴄᴋᴇʀs"
+    # Fetch bot username
+    bot_info = await context.bot.get_me()
+    bot_username = bot_info.username
+
+    # Pack name must be lowercase for Telegram
+    pack_name = f"user_{user_id}_{st_logic}_by_{bot_username}".lower()
+    pack_title = f"{user.first_name[:15]}'s {fancy_type} Sᴛɪᴄᴋᴇʀs"
 
     saving_msg = await message.reply_text("🪄 Sᴀᴠɪɴɢ Sᴛɪᴄᴋᴇʀ...")
 
     try:
-        # ✅ FIX: Added the 'format' argument here
         input_sticker = InputSticker(
             sticker=sticker.file_id,
             emoji_list=[sticker.emoji or "🙂"],
-            format=st_type # This was the missing argument!
+            format=st_logic 
         )
 
         try:
@@ -327,17 +335,21 @@ async def save_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     name=pack_name,
                     title=pack_title,
                     stickers=[input_sticker],
-                    sticker_format=st_type
+                    sticker_format=st_logic
                 )
             else:
                 raise e
 
-        await saving_msg.edit_text(
-            f"✨ Sᴛɪᴄᴋᴇʀ Sᴀᴠᴇᴅ Tᴏ Yᴏᴜʀ {st_type.upper()} Pᴀᴄᴋ!🔰
-        ᴀʟʟ Nᴏɴ-ᴀɴɪᴍᴀᴛᴇᴅ 
-        ʟɪᴍɪᴛ: 120 Sᴛɪᴄᴋᴇʀꜱ
+        # 2. Fancy Description Style
+        description = (
+            f"🔰 ꜱᴛɪᴄᴋᴇʀ Sᴀᴠᴇᴅ Tᴏ Yᴏᴜʀ {fancy_type} Pᴀᴄᴋ\n\n"
+            f"{type_desc}\n"
+            f"ʟɪᴍɪᴛ: 120 Sᴛɪᴄᴋᴇʀꜱ\n\n"
+            f"🤖 Tᴀᴋᴇꜱ 2-3 Mɪɴᴜᴛᴇꜱ Tᴏ Sʜᴏᴡ Tʜᴇ Sᴛɪᴄᴋᴇʀ Iɴ Yᴏᴜʀ Pᴀᴄᴋ 🪄"
+        )
 
-        🤖 Tᴀᴋᴇꜱ 2-3 Mɪɴᴜᴛᴇꜱ Tᴏ Sʜᴏᴡ Tʜᴇ Sᴛɪᴄᴋᴇʀ Iɴ Yᴏᴜʀ Pᴀᴄᴋ 🪄",
+        await saving_msg.edit_text(
+            text=description,
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton("👀 Oᴘᴇɴ Pᴀᴄᴋ", url=f"https://t.me/addstickers/{pack_name}")
             ]])
