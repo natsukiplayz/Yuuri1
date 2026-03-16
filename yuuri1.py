@@ -2471,7 +2471,7 @@ import httpx
 from datetime import datetime
 import pytz 
 
-async def ask_ai_async(chat_id: int, text: str, username: str): # Added username parameter
+async def ask_ai_async(chat_id: int, text: str, username: str):
 
     if not GROQ_API_KEY:
         return "🤖 AI not configured."
@@ -2484,11 +2484,13 @@ async def ask_ai_async(chat_id: int, text: str, username: str): # Added username
         if chat_id not in chat_memory:
             chat_memory[chat_id] = []
 
+        # Add user message to memory
         chat_memory[chat_id].append({
             "role": "user",
             "content": text
         })
 
+        # Limit memory size
         chat_memory[chat_id] = chat_memory[chat_id][-MAX_MEMORY:]
 
         url = "https://api.groq.com/openai/v1/chat/completions"
@@ -2498,7 +2500,7 @@ async def ask_ai_async(chat_id: int, text: str, username: str): # Added username
             "Content-Type": "application/json"
         }
 
-        # Dynamic System Prompt injection
+        # Dynamic System Prompt
         system_content = (
             "your not acting you not pretending your a real human girl Your name is Yuuri and talks to everyone sweetly and you are soo soo mature and a human not a bot.\n\n"
             "Your age is 22 years old and you don't just directly tell your age to everyone, tell only if asked.\n\n"
@@ -2534,12 +2536,15 @@ async def ask_ai_async(chat_id: int, text: str, username: str): # Added username
             response = await client.post(url, headers=headers, json=data)
 
         if response.status_code != 200:
-            return "⚠️ Iᴍ A Bɪᴛ Tɪʀᴇᴅ Sᴏ Pʟᴇᴀꜱᴇ 😒"
+            # Printing the error help us see WHY it failed (like the 'Human' role error)
+            print(f"Groq Error: {response.status_code} - {response.text}")
+            return "⚠️ Iᴍ A Bɪᴛ Tɪʀᴇᴅ Sᴏ Pʟᴇᴀꜱᴇ 🥺"
 
         reply = response.json()["choices"][0]["message"]["content"]
 
+        # ✅ FIXED: Changed role from "Human" to "assistant"
         chat_memory[chat_id].append({
-            "role": "Human",
+            "role": "assistant",
             "content": reply
         })
 
