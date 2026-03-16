@@ -53,6 +53,9 @@ guilds = db["guilds"]
 sticker_packs = db["sticker_packs"]
 heists = db["heists"]
 
+#============ Management Db Collection ==========
+admins_db = db["admins"] 
+
 # ================= LOG =================
 logging.basicConfig(level=logging.INFO)
 
@@ -2328,127 +2331,138 @@ async def user_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await msg.reply_text(text, parse_mode="Markdown")
 
 # --- SET YOUR ID HERE ---
-OWNER_ID = 5773908061  # <--- REPLACE THIS WITH YOUR ACTUAL TELEGRAM ID
+OWNER_ID = 5773908061  
 
-# ===== ADMIN STORAGE =====
-# It's better to use a database for this so it doesn't reset on restart, 
-# but for now, we will use the dictionary.
-ADMINS = {}
-
-#=========promote users========
+#=========promote users (MongoDB + Real Sync)========
 async def promote(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
     chat_id = update.effective_chat.id
     sender = update.effective_user
-
-    if chat_id not in ADMINS:
-        ADMINS[chat_id] = {}
-
-    # Check if sender is Owner or Level 3
-    sender_data = ADMINS[chat_id].get(sender.id)
-    sender_level = sender_data["level"] if sender_data else 0
     
+    # --- PERMISSION CHECK ---
     is_owner = (sender.id == OWNER_ID)
+    
+    # Check DB for sender's level
+    sender_data = admins_db.find_one({"chat_id": chat_id, "user_id": sender.id})
+    sender_level = sender_data["level"] if sender_data else 0
 
-    # Permission Gate
     if not is_owner and sender_level < 3:
-        await msg.reply_text(get_fancy_text("❌ Yᴏᴜ Nᴇᴇᴅ Aᴅᴍɪɴ Tᴏ Pʀᴏᴍᴏᴛᴇ Oᴛʜᴇʀꜱ", "2"))
-        return
+        return await msg.reply_text(get_fancy_text("❌ Yᴏᴜ ɴᴇᴇᴅ Lᴇᴠᴇʟ 3 ᴏʀ Oᴡɴᴇʀ ʀɪɢʜᴛꜱ!", "2"))
 
+    # --- TARGET IDENTIFICATION ---
     args = msg.text.split()
-
-    # Determine Target
     if msg.reply_to_message:
         target = msg.reply_to_message.from_user
         level = int(args[1]) if len(args) > 1 else 1
-    else:
-        if len(args) < 2:
-            await msg.reply_text(".promote @username 1|2|3")
-            return
-        
-        # Self promotion check for owner
-        if args[1].lower() == "me" and is_owner:
-            target = sender
-            level = 100 # God Level
-        else:
-            if len(args) < 3:
-                await msg.reply_text("Usage: .promote @username 1|2|3")
-                return
-            username = args[1].replace("@","")
-            level = int(args[2])
-            try:
-                member = await context.bot.get_chat_member(chat_id, username)
-                target = member.user
-            except:
-                await msg.reply_text("❌ User not found")
-                return
-
-    # Granting Permissions
-    ADMINS[chat_id][target.id] = {
-        "level": level,
-        "promoted_by": sender.id
-    }
-
-    if level >= 100:
-        text = f"👑 {target.first_name} Rᴇᴄᴏɢɴɪᴢᴇᴅ Aꜱ Tʜᴇ Gʟᴏʙᴀʟ Oᴡɴᴇʀ 🎖"
-    elif level == 1:
-        text = f"🥇 {target.first_name} Pʀᴏᴍᴏᴛᴇᴅ Tᴏ Lᴇᴠᴇʟ 1 Aᴅᴍɪɴ (Bᴀꜱɪᴄ) 🎖"
-    elif level == 2:
-        text = f"🥈 {target.first_name} Pʀᴏᴍᴏᴛᴇᴅ Tᴏ Lᴇᴠᴇʟ 2 Aᴅᴍɪɴ (Bᴀɴ/Mᴜᴛᴇ) 🎖"
-    else:
-        text = f"🥉 {target.first_name} Pʀᴏᴍᴏᴛᴇᴅ Tᴏ Lᴇᴠᴇʟ 3 Aᴅᴍɪɴ (Fᴜʟʟ) 🎖"
-
-    await msg.reply_text(get_fancy_text(text, "2"))
-
-#========demote users======
-async def demote(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = update.message
-    chat_id = update.effective_chat.id
-    sender = update.effective_user
-
-    if chat_id not in ADMINS:
-        ADMINS[chat_id] = {}
-
-    sender_data = ADMINS[chat_id].get(sender.id)
-    sender_level = sender_data["level"] if sender_data else 0
-    is_owner = (sender.id == OWNER_ID)
-
-    if not is_owner and sender_level < 3:
-        await msg.reply_text(get_fancy_text("❌ Yᴏᴜ Nᴇᴇᴅ Aᴅᴍɪɴ Tᴏ Dᴇᴍᴏᴛᴇ Oᴛʜᴇʀꜱ", "2"))
-        return
-
-    if msg.reply_to_message:
-        target = msg.reply_to_message.from_user
-    else:
-        args = msg.text.split()
-        if len(args) < 2:
-            await msg.reply_text(".demote @username")
-            return
+    elif len(args) >= 2 and args[1].lower() == "me" and is_owner:
+        target = sender
+        level = 100
+    elif len(args) >= 3:
         username = args[1].replace("@","")
+        level = int(args[2])
         try:
             member = await context.bot.get_chat_member(chat_id, username)
             target = member.user
         except:
-            await msg.reply_text("❌ User not found")
-            return
+            return await msg.reply_text("❌ User not found.")
+    else:
+        return await msg.reply_text("Usage: .promote @username <level> or reply to a message.")
 
-    if target.id not in ADMINS[chat_id]:
-        await msg.reply_text("❌ User is not promoted")
-        return
+    # --- TELEGRAM ACTIONS ---
+    try:
+        if level == 1:
+            # Level 1: Pin & Invite
+            await context.bot.promote_chat_member(
+                chat_id, target.id,
+                can_pin_messages=True, can_invite_users=True
+            )
+            text = f"🥇 {target.first_name} ɪꜱ ɴᴏᴡ ᴀ Bᴀꜱɪᴄ Aᴅᴍɪɴ (Lᴠ.1)"
+        elif level == 2:
+            # Level 2: Ban/Mute/Delete
+            await context.bot.promote_chat_member(
+                chat_id, target.id,
+                can_restrict_members=True, can_delete_messages=True,
+                can_invite_users=True, can_pin_messages=True
+            )
+            text = f"🥈 {target.first_name} ɪꜱ ɴᴏᴡ ᴀ Mᴏᴅᴇʀᴀᴛᴏʀ (Lᴠ.2)"
+        else:
+            # Level 3/Owner: Full Power
+            await context.bot.promote_chat_member(
+                chat_id, target.id,
+                can_restrict_members=True, can_delete_messages=True,
+                can_promote_members=True if is_owner else False,
+                can_change_info=True, can_invite_users=True, can_pin_messages=True
+            )
+            text = f"🥉 {target.first_name} ɪꜱ ɴᴏᴡ ᴀ Fᴜʟʟ Aᴅᴍɪɴ (Lᴠ.3)"
 
-    # Owner can demote anyone, but Level 3 can only demote people they promoted
-    target_data = ADMINS[chat_id][target.id]
+        # --- SAVE TO MONGODB ---
+        admins_db.update_one(
+            {"chat_id": chat_id, "user_id": target.id},
+            {"$set": {
+                "user_name": target.first_name,
+                "level": level,
+                "promoted_by": sender.id
+            }},
+            upsert=True
+        )
+        
+        await msg.reply_text(get_fancy_text(text, "2"))
+
+    except Exception as e:
+        await msg.reply_text(f"❌ API Error: {e}\n(Make sure I have 'Add New Admins' rights!)")
+
+#========demote users (MongoDB + Real Sync)======
+async def demote(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = update.message
+    chat_id = update.effective_chat.id
+    sender = update.effective_user
+    is_owner = (sender.id == OWNER_ID)
+
+    # Check sender's level
+    sender_data = admins_db.find_one({"chat_id": chat_id, "user_id": sender.id})
+    sender_level = sender_data["level"] if sender_data else 0
+
+    if not is_owner and sender_level < 3:
+        return await msg.reply_text(get_fancy_text("❌ Yᴏᴜ ɴᴇᴇᴅ Lᴇᴠᴇʟ 3 ᴏʀ Oᴡɴᴇʀ ʀɪɢʜᴛꜱ!", "2"))
+
+    # --- TARGET FINDING ---
+    if msg.reply_to_message:
+        target = msg.reply_to_message.from_user
+    else:
+        args = msg.text.split()
+        if len(args) < 2: return await msg.reply_text(".demote @username")
+        username = args[1].replace("@","")
+        try:
+            m = await context.bot.get_chat_member(chat_id, username)
+            target = m.user
+        except: return await msg.reply_text("❌ User not found.")
+
+    # --- DEMOTE LOGIC ---
+    target_data = admins_db.find_one({"chat_id": chat_id, "user_id": target.id})
+    if not target_data:
+        return await msg.reply_text("❌ This user is not in my database staff list.")
+
     if not is_owner and target_data["promoted_by"] != sender.id:
-        await msg.reply_text(get_fancy_text("❌ Tʜɪꜱ Uꜱᴇʀ Wᴀꜱ Pʀᴏᴍᴏᴛᴇᴅ Bʏ Sᴏᴍᴇᴏɴᴇ Eʟꜱᴇ", "2"))
-        return
+        return await msg.reply_text("❌ You can only demote people you promoted personally.")
 
-    # Prevent demoting the owner
     if target.id == OWNER_ID:
-        await msg.reply_text("❌ You cannot demote the Global Owner!")
-        return
+        return await msg.reply_text("❌ You cannot demote the Global Owner!")
 
-    del ADMINS[chat_id][target.id]
-    await msg.reply_text(get_fancy_text(f"⁉️ {target.first_name} Dᴇᴍᴏᴛᴇᴅ!", "2"))
+    try:
+        # Remove from Telegram Staff
+        await context.bot.promote_chat_member(
+            chat_id, target.id,
+            can_change_info=False, can_delete_messages=False,
+            can_invite_users=False, can_restrict_members=False,
+            can_pin_messages=False, can_promote_members=False
+        )
+        
+        # Remove from MongoDB
+        admins_db.delete_one({"chat_id": chat_id, "user_id": target.id})
+        
+        await msg.reply_text(get_fancy_text(f"⁉️ {target.first_name} ʜᴀꜱ ʙᴇᴇɴ ꜰᴜʟʟʏ ᴅᴇᴍᴏᴛᴇᴅ!", "2"))
+    except Exception as e:
+        await msg.reply_text(f"❌ Error: {e}")
 
 # ---------------- MEMORY STORAGE ----------------
 
