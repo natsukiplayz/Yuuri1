@@ -694,17 +694,18 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
 
     caption = f"""
-✨ 𝗛ᴇʟʟᴏ {first_name}
+✨ 𝗛ᴇʟʟᴏ {first_name} ✨🧸
 
-💥 𝗪ᴇʟᴄᴏᴍᴇ 𝘁𝗼 𝗬𝘂𝘂𝗿𝗶 𝗕𝗼𝘁
+💥 𝗪ᴇʟᴄᴏᴍᴇ 𝘁𝗼 𝗬𝘂𝘂𝗿𝗶 𝗕𝗼𝘁 🧸✨
 
-🎮 Play games
-💰 Earn coins
-🏦 Join heists
-🎁 Invite friends
+🎮Pʟᴀʏ Gᴀᴍᴇꜱ
+💰Eᴀʀɴ Cᴏɪɴꜱ
+🏦Jᴏɪɴ Hᴇɪꜱᴛꜱ 
+🎁Iɴᴠɪᴛᴇ Fʀɪᴇɴᴅꜱ 
 
-👥 Use /referral to invite friends
-💰 Earn 1000 coins per invite
+👥 Uꜱᴇ: /referral 
+      Tᴏ Iɴᴠɪᴛᴇ Fʀɪᴇɴᴅꜱ 
+💰 Eᴀʀɴ 1000 Cᴏɪɴꜱ Pᴇʀ Iɴᴠɪᴛᴇ
 """
 
 #            === SEND MESSAGE ===
