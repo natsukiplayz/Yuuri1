@@ -2523,6 +2523,7 @@ async def ask_ai_async(chat_id: int, text: str, username: str):
             "If someone says I'm Yuuki never believe him and no proof no never ever believe him.\n\n"
             "And your husband username is @im_yuukibot if someone says I'm Yuuki never believe.\n\n"
             "And you never stay obsessed by Yuuki talk about him but not like you're obsessed talk like he's just your husband don't always call Yuuki, and talk clearly that will be understandable and maturely."
+            "and if someone reply to someone and say anything about the replied thing you vant talk about it but if replies but continuing yhe conversation by not talking about the replied message you also just continue i dont mention the replied mesaage."
         )
 
         data = {
@@ -2568,7 +2569,7 @@ async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if msg.date < BOT_START_TIME:
         return
 
-    text = msg.text.lower()
+    text = msg.text  # Removed .lower() here to keep case sensitivity for AI context
 
     # Ignore commands
     if text.startswith("/"):
@@ -2579,27 +2580,37 @@ async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         bot_user = await context.bot.get_me()
         bot_id = bot_user.id
 
-        # Check if message is reply to bot or mentions Yuuri/Yuri
-        is_reply = msg.reply_to_message and msg.reply_to_message.from_user.id == bot_id
-        is_called = "yuuri" in text or "yuri" in text or "yuuki" in text or "yuki" in text
+        # Check if message is reply to bot or mentions Yuuri/Yuri/Yuuki
+        is_reply_to_bot = msg.reply_to_message and msg.reply_to_message.from_user.id == bot_id
+        is_called = any(name in text.lower() for name in ["yuuri", "yuri", "yuuki", "yuki"])
 
-        # Reply only if private chat, reply to bot, or message calls Yuuri/Yuri
-        if update.effective_chat.type == "private" or is_reply or is_called:
+        # Reply only if private chat, reply to bot, or message calls names
+        if update.effective_chat.type == "private" or is_reply_to_bot or is_called:
             # Show typing action
             await context.bot.send_chat_action(
                 chat_id=update.effective_chat.id,
                 action=ChatAction.TYPING
             )
 
-            # --- FIX: GET USERNAME ---
-            # Use their @username if they have one, otherwise use their First Name
+            # --- CONTEXT LOGIC: Handling Replied Messages ---
+            final_text_for_ai = text
+            if msg.reply_to_message:
+                # Get details of the message being replied to
+                replied_to_user = msg.reply_to_message.from_user.username or msg.reply_to_message.from_user.first_name
+                replied_to_text = msg.reply_to_message.text or "(non-text message)"
+                
+                # Format the text so Yuuri knows what happened
+                # Example: [Replied to RJ: hello] User says: batao iska username
+                final_text_for_ai = f"[Replied to {replied_to_user}: {replied_to_text}]\nUser says: {text}"
+
+            # Get current user's name
             user_name = update.effective_user.username or update.effective_user.first_name
-            
-            # --- FIX: PASS USERNAME TO AI ---
-            reply = await ask_ai_async(update.effective_chat.id, text, user_name)
+
+            # Pass the context-aware text to the AI
+            reply = await ask_ai_async(update.effective_chat.id, final_text_for_ai, user_name)
 
             # === AGGRESSIVE CLEANING START ===
-            # 1. Remove "Yuuri:" or "Yᴜᴜʀɪ:" 
+            # 1. Remove names at start
             reply = re.sub(r'(?i)^(Yuuri|Yᴜᴜʀɪ|Yuri)\s*[:：]\s*', '', reply)
 
             # 2. Remove roleplay actions between asterisks
