@@ -292,11 +292,11 @@ async def save_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Correct mapping for InputSticker format
     if sticker.is_animated:
-        st_type = "animated"
+        st_type = "Aɴɪᴍᴀᴛᴇᴅ"
     elif sticker.is_video:
-        st_type = "video"
+        st_type = "Vɪᴅᴇᴏ"
     else:
-        st_type = "static"
+        st_type = "Sᴛᴀᴛɪᴄ"
 
     # Pack name must end with _by_botusername
     bot_username = (await context.bot.get_me()).username
@@ -333,7 +333,11 @@ async def save_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 raise e
 
         await saving_msg.edit_text(
-            f"✨ Sᴛɪᴄᴋᴇʀ Sᴀᴠᴇᴅ Tᴏ Yᴏᴜʀ {st_type.upper()} Pᴀᴄᴋ!",
+            f"✨ Sᴛɪᴄᴋᴇʀ Sᴀᴠᴇᴅ Tᴏ Yᴏᴜʀ {st_type.upper()} Pᴀᴄᴋ!🔰
+        ᴀʟʟ Nᴏɴ-ᴀɴɪᴍᴀᴛᴇᴅ 
+        ʟɪᴍɪᴛ: 120 Sᴛɪᴄᴋᴇʀꜱ
+
+        🤖 Tᴀᴋᴇꜱ 2-3 Mɪɴᴜᴛᴇꜱ Tᴏ Sʜᴏᴡ Tʜᴇ Sᴛɪᴄᴋᴇʀ Iɴ Yᴏᴜʀ Pᴀᴄᴋ 🪄",
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton("👀 Oᴘᴇɴ Pᴀᴄᴋ", url=f"https://t.me/addstickers/{pack_name}")
             ]])
