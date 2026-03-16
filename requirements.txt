@@ -1,4 +1,6 @@
-python-telegram-bot>=21.0
+Python-telegram-bot>=21.0
 pymongo
 requests
 dnspython
+httpx
+pytz
