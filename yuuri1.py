@@ -1110,13 +1110,15 @@ async def kill(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not target_user:
         return await msg.reply_text("❌ Iɴᴠᴀʟɪᴅ Tᴀʀɢᴇᴛ.")
 
+    # ❌ Cannot kill any bot (including other bots in the group)
+    if target_user.is_bot:
+        if target_user.id == BOT_ID:
+            return await msg.reply_text("😂 Nɪᴄᴇ Tʀʏ Oɴ Mᴇ!")
+        return await msg.reply_text("🤖 Yᴏᴜ Cᴀɴ'ᴛ Kɪʟʟ Bᴏᴛs, Tʜᴇʏ Hᴀᴠᴇ Nᴏ Sᴏᴜʟ.")
+
     # ❌ Cannot kill bot owner
     if target_user.id == OWNER_ID:
         return await msg.reply_text("😒 Yᴏᴜ Cᴀɴ'ᴛ Kɪʟʟ Mʏ Dᴇᴀʀᴇsᴛ Oᴡɴᴇʀ.")
-
-    # ❌ Cannot kill bot
-    if target_user.id == BOT_ID:
-        return await msg.reply_text("😂 Nɪᴄᴇ Tʀʏ Oɴ Mᴇ!")
 
     # ❌ Cannot kill yourself
     if target_user.id == user.id:
@@ -1128,12 +1130,16 @@ async def kill(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # 🛡️ Protection check
     if victim.get("protect_until"):
-        expire = datetime.strptime(victim["protect_until"], "%Y-%m-%d %H:%M:%S")
-        if expire > datetime.utcnow():
-            return await msg.reply_text(
-                "🛡️ Tʜɪꜱ Uꜱᴇʀ Iꜱ Pʀᴏᴛᴇᴄᴛᴇᴅ.\n"
-                "🔒 Cʜᴇᴄᴋ Pʀᴏᴛᴇᴄᴛɪᴏɴ Tɪᴍᴇ → Cᴏᴍɪɴɢ Sᴏᴏɴ 🔜"
-            )
+        # Use try/except or safe get for date parsing
+        try:
+            expire = datetime.strptime(victim["protect_until"], "%Y-%m-%d %H:%M:%S")
+            if expire > datetime.utcnow():
+                return await msg.reply_text(
+                    "🛡️ Tʜɪꜱ Uꜱᴇʀ Iꜱ Pʀᴏᴛᴇᴄᴛᴇᴅ.\n"
+                    "🔒 Cʜᴇᴄᴋ Pʀᴏᴛᴇᴄᴛɪᴏɴ Tɪᴍᴇ → Cᴏᴍɪɴɢ Sᴏᴏɴ 🔜"
+                )
+        except (ValueError, TypeError):
+            pass
 
     # ❌ Check if already dead
     if victim.get("dead", False):
@@ -1143,14 +1149,17 @@ async def kill(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reward = random.randint(50, 299)
     xp_gain = random.randint(1, 19)
 
-    killer["coins"] += reward
+    killer["coins"] = killer.get("coins", 0) + reward
     killer["xp"] = killer.get("xp", 0) + xp_gain
     killer["kills"] = killer.get("kills", 0) + 1
 
-    # 🏰 Guild XP
+    # 🏰 Guild XP logic (ensure add_guild_xp is defined)
     guild_name = killer.get("guild")
     if guild_name:
-        await add_guild_xp(guild_name, context)
+        try:
+            await add_guild_xp(guild_name, context)
+        except NameError:
+            pass
 
     # 🎯 Bounty reward
     bounty_reward = victim.get("bounty", 0)
