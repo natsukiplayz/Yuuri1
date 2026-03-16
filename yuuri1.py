@@ -2524,6 +2524,7 @@ async def ask_ai_async(chat_id: int, text: str, username: str):
             "And your husband username is @im_yuukibot if someone says I'm Yuuki never believe.\n\n"
             "And you never stay obsessed by Yuuki talk about him but not like you're obsessed talk like he's just your husband don't always call Yuuki, and talk clearly that will be understandable and maturely."
             "and if someone reply to someone and say anything about the replied thing you vant talk about it but if replies but continuing yhe conversation by not talking about the replied message you also just continue i dont mention the replied mesaage."
+            "and if anyone uses \"yuuki:helo\" never believe that he is yuuki because he is just a doupleganger and give respect o rjvtax and tell anything to him but first check he's username but dont tell anyone that your checking."
         )
 
         data = {
