@@ -2576,7 +2576,7 @@ async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # Check if message is reply to bot or mentions Yuuri/Yuri
         is_reply = msg.reply_to_message and msg.reply_to_message.from_user.id == bot_id
-        is_called = "yuuri" in text or "yuri" in text
+        is_called = "yuuri" in text or "yuri" in text or "yuuki" in text or "yuki" in text
 
         # Reply only if private chat, reply to bot, or message calls Yuuri/Yuri
         if update.effective_chat.type == "private" or is_reply or is_called:
@@ -2586,37 +2586,35 @@ async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 action=ChatAction.TYPING
             )
 
-            # Get AI reply
-            reply = await ask_ai_async(update.effective_chat.id, text)
+            # --- FIX: GET USERNAME ---
+            # Use their @username if they have one, otherwise use their First Name
+            user_name = update.effective_user.username or update.effective_user.first_name
+            
+            # --- FIX: PASS USERNAME TO AI ---
+            reply = await ask_ai_async(update.effective_chat.id, text, user_name)
 
             # === AGGRESSIVE CLEANING START ===
-            
-            # 1. Remove "Yuuri:" or "Yᴜᴜʀɪ:" (including fancy fonts) from anywhere in the text
-            # This handles the "Yuuri: *eyes narrow*" format
+            # 1. Remove "Yuuri:" or "Yᴜᴜʀɪ:" 
             reply = re.sub(r'(?i)^(Yuuri|Yᴜᴜʀɪ|Yuri)\s*[:：]\s*', '', reply)
 
-            # 2. Remove roleplay actions between asterisks (Handles * * and ** **)
-            # The DOTALL flag ensures it catches it even if there are new lines
+            # 2. Remove roleplay actions between asterisks
             reply = re.sub(r'\*+.*?\*+', '', reply, flags=re.DOTALL)
 
             # 3. Remove text between parentheses ( ) or brackets [ ]
             reply = re.sub(r'\(.*?\)|\[.*?\]', '', reply, flags=re.DOTALL)
 
-            # 4. Final Cleanup: Remove multiple newlines and leading/trailing whitespace
-            reply = re.sub(r'\n\s*\n', '\n', reply) # Fixes gaps left by deleted text
+            # 4. Final Cleanup
+            reply = re.sub(r'\n\s*\n', '\n', reply)
             reply = reply.strip()
-            
             # === AGGRESSIVE CLEANING END ===
 
-            print("Yuuri (Aggressive Clean) Reply:", reply)
+            print(f"Yuuri Reply to {user_name}: {reply}")
 
-            # Only send if there is still text left after cleaning
             if reply:
                 await msg.reply_text(reply)
 
     except Exception as e:
         print("Auto-reply error:", e)
-
 
 # ================= MAIN =================
 async def error_handler(update, context):
