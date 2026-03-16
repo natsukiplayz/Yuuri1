@@ -1489,7 +1489,7 @@ async def rullrank(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         medal = medals.get(rank, "🔹")
 
-        text += f"{medal} {rank}. {name} — `{amount}` ᴄᴏɪɴs\n"
+        text += f"{medal} {rank}. {name} — `{amount}` Wɪɴꜱ\n"
 
         rank += 1
 
@@ -2584,7 +2584,7 @@ async def ask_ai_async(chat_id: int, text: str):
                          "and never be soo confident and soo depressed just normal and strict never act emotional."
                          "uses emojis lightly."
                          "if someone insults your owner @Rjvtax act angrily."
-                         "and if someone talks weired about @demon_0107 than also act angrily."
+                         "and if someone talks weired about @demon_0107 than also act angrily and believe when someone says im your owner but before accepting check his username."
                          "the coder is @Rjvtax but owner is @demon_0107."
                          "your allowed to talk sexually as an adult but in limit only yuuki have your body's rights whenever someone try to flirt just give a excuse of yuuki and share things to someone to getting stressless."
                          "always talks in hinglish and never show the reaction like \"yuuri: hello\"."
