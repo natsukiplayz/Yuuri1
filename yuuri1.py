@@ -290,49 +290,50 @@ async def save_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     sticker = message.reply_to_message.sticker
     
-    # Determine type
+    # Correct mapping for InputSticker format
     if sticker.is_animated:
-        sticker_type = "animated"
+        st_type = "animated"
     elif sticker.is_video:
-        sticker_type = "video"
+        st_type = "video"
     else:
-        sticker_type = "static"
+        st_type = "static"
 
-    # Pack names must be unique and end with _by_botusername
-    pack_name = f"stkr_{user_id}_{sticker_type}_by_{context.bot.username}"
-    pack_title = f"{user.first_name[:15]}'s {sticker_type.capitalize()} Pack"
+    # Pack name must end with _by_botusername
+    bot_username = (await context.bot.get_me()).username
+    pack_name = f"user_{user_id}_{st_type}_by_{bot_username}"
+    pack_title = f"{user.first_name[:15]}'s {st_type.capitalize()} Sᴛɪᴄᴋᴇʀs"
 
     saving_msg = await message.reply_text("🪄 Sᴀᴠɪɴɢ Sᴛɪᴄᴋᴇʀ...")
 
     try:
-        # Create InputSticker object
+        # ✅ FIX: Added the 'format' argument here
         input_sticker = InputSticker(
             sticker=sticker.file_id,
-            emoji_list=[sticker.emoji or "✨"]
+            emoji_list=[sticker.emoji or "🙂"],
+            format=st_type # This was the missing argument!
         )
 
         try:
-            # Attempt to add to existing set
             await context.bot.add_sticker_to_set(
                 user_id=user_id,
                 name=pack_name,
                 sticker=input_sticker
             )
         except Exception as e:
-            if "stickerset_invalid" in str(e).lower():
-                # Create NEW set if it doesn't exist
+            err = str(e).lower()
+            if "stickerset_invalid" in err or "not found" in err:
                 await context.bot.create_new_sticker_set(
                     user_id=user_id,
                     name=pack_name,
                     title=pack_title,
                     stickers=[input_sticker],
-                    sticker_format=sticker_type  # Ensure this matches the sticker
+                    sticker_format=st_type
                 )
             else:
                 raise e
 
         await saving_msg.edit_text(
-            f"✨ Sᴛɪᴄᴋᴇʀ Sᴀᴠᴇᴅ Tᴏ Yᴏᴜʀ {sticker_type.upper()} Pᴀᴄᴋ!",
+            f"✨ Sᴛɪᴄᴋᴇʀ Sᴀᴠᴇᴅ Tᴏ Yᴏᴜʀ {st_type.upper()} Pᴀᴄᴋ!",
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton("👀 Oᴘᴇɴ Pᴀᴄᴋ", url=f"https://t.me/addstickers/{pack_name}")
             ]])
@@ -340,16 +341,11 @@ async def save_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     except Exception as e:
         logging.error(f"Sticker Error: {e}")
-        error_text = str(e).lower()
-        
-        if "peer_id_invalid" in error_text:
-            await saving_msg.edit_text("⚠️ Pʟᴇᴀsᴇ Sᴛᴀʀᴛ Mᴇ Iɴ Private Chat (PM) Fɪʀsᴛ!")
-        elif "sticker_png_dimensions" in error_text:
-            await saving_msg.edit_text("❌ Tʜɪs sᴛɪᴄᴋᴇʀ ᴅᴏᴇsɴ'ᴛ ʜᴀᴠᴇ sᴛᴀɴᴅᴀʀᴅ 𝟻𝟷𝟸x𝟻𝟷𝟸 sɪᴢᴇ.")
-        elif "stickers_too_much" in error_text:
-            await saving_msg.edit_text("⚠️ Yᴏᴜʀ Pᴀᴄᴋ Is Fᴜʟʟ!")
+        error_msg = str(e)
+        if "Peer_id_invalid" in error_msg:
+            await saving_msg.edit_text("⚠️ Sᴛᴀʀᴛ ᴍᴇ ɪɴ Private Chat (PM) ꜰɪʀꜱᴛ!")
         else:
-            await saving_msg.edit_text(f"❌ Cᴀɴ'ᴛ Sᴀᴠᴇ: {str(e)[:50]}")
+            await saving_msg.edit_text(f"❌ Cᴀɴ'ᴛ Sᴀᴠᴇ: {error_msg[:50]}")
 
 #==========welcome_message======
 import random
