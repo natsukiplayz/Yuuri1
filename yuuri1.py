@@ -2335,7 +2335,7 @@ async def user_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await msg.reply_text(text, parse_mode="Markdown")
 
 # --- SET YOUR ID HERE ---
-OWNER_ID = 5773908061  
+OWNER_ID = 7139383373  
 
 #=========promote users (MongoDB + Real Sync)========
 async def promote(update: Update, context: ContextTypes.DEFAULT_TYPE):
