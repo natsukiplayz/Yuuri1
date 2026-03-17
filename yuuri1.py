@@ -217,7 +217,7 @@ import httpx
 import base64
 from io import BytesIO
 
-# Default color map
+# Simple color map
 COLOR_MAP = {
     "red": "#FF0000", "blue": "#0000FF", "green": "#008000",
     "yellow": "#FFFF00", "pink": "#FFC0CB", "purple": "#800080",
@@ -229,18 +229,15 @@ async def quote(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not msg or not msg.reply_to_message:
         return await msg.reply_text("❌ Rᴇᴘʟʏ ᴛᴏ ᴀ ᴍᴇꜱꜱᴀɢᴇ ᴛᴏ ᴄʀᴇᴀᴛᴇ Qᴜᴏᴛᴇ.")
 
-    # 1. Parse Args for Color & Reply Mode
+    # 1. Parse Arguments
     bg_color = "#1b1429"
     show_reply = False
-    
     if context.args:
-        args_str = [a.lower() for a in context.args]
-        if "r" in args_str or "reply" in args_str:
+        args_lower = [a.lower() for a in context.args]
+        if "r" in args_lower or "reply" in args_lower:
             show_reply = True
-        
-        # Color parsing
         for name, hex_val in COLOR_MAP.items():
-            if name in args_str:
+            if name in args_lower:
                 bg_color = hex_val
         for arg in context.args:
             if arg.startswith("#") and len(arg) == 7:
@@ -249,38 +246,37 @@ async def quote(update: Update, context: ContextTypes.DEFAULT_TYPE):
     target_msg = msg.reply_to_message
     loading = await msg.reply_text("⚙️ Gᴇɴᴇʀᴀᴛɪɴɢ...")
 
-    # 2. Build the Main Message (The "Yes I am so what?" part)
-    # We only send ONE message in the list to keep it in ONE bubble
-    message_data = {
+    # 2. Construct the Message Object
+    message_obj = {
         "entities": [],
         "avatar": True,
         "from": {
             "id": target_msg.from_user.id,
-            "name": target_msg.from_user.full_name, # 🇷 🇯
+            "name": target_msg.from_user.full_name,
             "photo": True
         },
         "text": target_msg.text or target_msg.caption or ""
     }
 
-    # 3. Add the INTERNAL Reply Box (The "You bullshit" part)
-    # This creates the small box with the vertical line inside the bubble
+    # 3. The "Quotly" Reply Box Logic
+    # This places the reply INSIDE the bubble, not as a new bubble
     if show_reply and target_msg.reply_to_message:
-        replied_to = target_msg.reply_to_message
-        message_data["replyMessage"] = {
-            "name": replied_to.from_user.full_name, # Nᵒᵇⁱᵗᵃ ᵏ
-            "text": replied_to.text or replied_to.caption or "Media",
-            "chatId": replied_to.from_user.id
+        prev = target_msg.reply_to_message
+        message_obj["replyMessage"] = {
+            "name": prev.from_user.full_name,
+            "text": prev.text or prev.caption or "Media",
+            "chatId": prev.from_user.id
         }
 
-    # 4. API Request - Scale 1.0 is the most realistic for small text
+    # 4. API Payload - Scale 1.1 makes the text smaller like real Telegram
     payload = {
         "type": "quote",
         "format": "webp",
         "backgroundColor": bg_color,
         "width": 512,
-        "height": 512,
-        "scale": 1.1, # <--- Very small, realistic text size
-        "messages": [message_data] # Just one message object with a reply nested inside
+        "height": 768,
+        "scale": 1.1,  # <--- Smaller scale = Real Telegram look
+        "messages": [message_obj]
     }
 
     try:
@@ -298,8 +294,8 @@ async def quote(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await loading.delete()
         else:
             await loading.edit_text("❌ API Error. Check your connection.")
-    except Exception as e:
-        await loading.edit_text("❌ Something went wrong.")
+    except Exception:
+        await loading.edit_text("❌ Sᴏᴍᴇᴛʜɪɴɢ Wᴇɴᴛ Wʀᴏɴɢ ⚠️.")
 
 #========== Sticker Create ========
 #--
