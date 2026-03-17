@@ -629,7 +629,7 @@ from telegram import Update, constants
 from telegram.ext import ContextTypes
 
 MY_PACKS = [
-    "YuuriStickerSet",
+    "YUUKI321",
     "Slaybie_by_fStikBot",
     "Bocchi_the_Rock_Part_1_by_Fix_x_Fox"
 ]
