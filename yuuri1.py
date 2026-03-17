@@ -217,9 +217,9 @@ import httpx
 import base64
 from io import BytesIO
 
-# Simple color map
+# Expanded Color Map
 COLOR_MAP = {
-    "red": "#FF0000", "blue": "#0000FF", "green": "#008000",
+    "red": "#1b1429", "blue": "#0000FF", "green": "#008000",
     "yellow": "#FFFF00", "pink": "#FFC0CB", "purple": "#800080",
     "orange": "#FFA500", "white": "#FFFFFF", "black": "#000000",
     "dark": "#1b1429"
@@ -230,13 +230,18 @@ async def quote(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not msg or not msg.reply_to_message:
         return await msg.reply_text("❌ Rᴇᴘʟʏ ᴛᴏ ᴀ ᴍᴇꜱꜱᴀɢᴇ ᴛᴏ ᴄʀᴇᴀᴛᴇ Qᴜᴏᴛᴇ.")
 
-    # 1. Setup Defaults
+    # 1. Defaults
     bg_color = "#1b1429"
-    target_msg = msg.reply_to_message  # The message we are quoting
-    
-    # 2. Parse Arguments (Color or Hex)
+    show_reply = False
+    target_msg = msg.reply_to_message
+
+    # 2. Check for 'r' or 'reply' AND Color
     if context.args:
-        args_str = " ".join(context.args).lower()
+        args_str = [a.lower() for a in context.args]
+        if "r" in args_str or "reply" in args_str:
+            show_reply = True
+        
+        # Color parsing
         for name, hex_val in COLOR_MAP.items():
             if name in args_str:
                 bg_color = hex_val
@@ -244,38 +249,38 @@ async def quote(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if arg.startswith("#") and len(arg) == 7:
                 bg_color = arg
 
-    loading = await msg.reply_text("⚙️ Gᴇɴᴇʀᴀᴛɪɴɢ Sᴛʏʟɪꜱʜ Qᴜᴏᴛᴇ...")
+    loading = await msg.reply_text("⚙️ Gᴇɴᴇʀᴀᴛɪɴɢ...")
 
-    # 3. Build the Main Message Object
+    # 3. Main Message
     message_obj = {
         "entities": [],
         "avatar": True,
         "from": {
             "id": target_msg.from_user.id,
-            "name": target_msg.from_user.full_name,
+            "name": target_msg.from_user.full_name, # Preserves 🇷 🇯
             "photo": True
         },
         "text": target_msg.text or target_msg.caption or ""
     }
 
-    # --- THE MAGIC PART: NESTED REPLY BOX ---
-    # If the message we are quoting is ITSELF a reply, add that box!
-    if target_msg.reply_to_message:
-        prev_msg = target_msg.reply_to_message
+    # 4. The "Quotly" Nested Reply Box
+    # Only triggered if user types /q r AND the message is a reply
+    if show_reply and target_msg.reply_to_message:
+        prev = target_msg.reply_to_message
         message_obj["replyMessage"] = {
-            "name": prev_msg.from_user.full_name,
-            "text": prev_msg.text or prev_msg.caption or "Media",
-            "chatId": prev_msg.from_user.id
+            "name": prev.from_user.full_name, # Preserves Nᵒᵇⁱᵗᵃ ᵏ
+            "text": prev.text or prev.caption or "Media",
+            "chatId": prev.from_user.id
         }
 
-    # 4. API Request
+    # 5. Payload for the API (Scale 1.5 makes text feel smaller/cleaner)
     payload = {
         "type": "quote",
         "format": "webp",
         "backgroundColor": bg_color,
         "width": 512,
-        "height": 512,
-        "scale": 2,
+        "height": 768, # Increased height for better reply box spacing
+        "scale": 1.5,   # Lower scale = smaller text/elements
         "messages": [message_obj]
     }
 
@@ -284,16 +289,17 @@ async def quote(update: Update, context: ContextTypes.DEFAULT_TYPE):
             res = await client.post("https://bot.lyo.su/quote/generate", json=payload, timeout=30.0)
 
         if res.status_code == 200:
-            image_data = res.json().get("result", {}).get("image") or res.json().get("image")
+            data = res.json()
+            image_data = data.get("result", {}).get("image") or data.get("image")
             sticker_file = BytesIO(base64.b64decode(image_data))
             sticker_file.name = "quote.webp"
             
             await msg.reply_sticker(sticker=sticker_file)
             await loading.delete()
         else:
-            await loading.edit_text("❌ API Error. Try again later.")
-    except Exception:
-        await loading.edit_text("❌ Sᴏᴍᴇᴛʜɪɴɢ ᴡᴇɴᴛ ᴡʀᴏɴɢ.")
+            await loading.edit_text("❌ API Error.")
+    except Exception as e:
+        await loading.edit_text(f"❌ Error: {str(e)[:30]}")
 
 #========== Sticker Create ========
 #--
