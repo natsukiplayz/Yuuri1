@@ -168,7 +168,10 @@ async def save_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Small Caps and Bold Mappings
 SMALL_CAPS = {"a": "ᴀ", "b": "ʙ", "c": "ᴄ", "d": "ᴅ", "e": "ᴇ", "f": "ꜰ", "g": "ɢ", "h": "ʜ", "i": "ɪ", "j": "ᴊ", "k": "ᴋ", "l": "ʟ", "m": "ᴍ", "n": "ɴ", "o": "ᴏ", "p": "ᴘ", "q": "ǫ", "r": "ʀ", "s": "ꜱ", "t": "ᴛ", "u": "ᴜ", "v": "ᴠ", "w": "ᴡ", "x": "x", "y": "ʏ", "z": "ᴢ"}
 
-BOLD_SERIF = {"a": "𝐚", "b": "𝐛", "c": "𝐜", "d": "𝐝", "e": "𝐞", "f": "𝐟", "g": "𝐠", "h": "𝐡", "i": "𝐢", "j": "𝐣", "k": "𝐤", "l": "𝐥", "m": "𝐦", "n": "𝐧", "o": "𝐨", "p": "𝐩", "q": "𝐪", "r": "𝐫", "s": "𝐬", "t": "𝐭", "u": "𝐮", "v": "𝐯", "w": "𝐰", "x": "𝐱", "y": "𝐲", "z": "𝐳"}
+BOLD_SERIF = {
+    "a": "𝐚", "b": "𝐛", "c": "𝐜", "d": "𝐝", "e": "𝐞", "f": "𝐟", "g": "𝐠", "h": "𝐡", "i": "𝐢", "j": "𝐣", "k": "𝐤", "l": "𝐥", "m": "𝐦", "n": "𝐧", "o": "𝐨", "p": "𝐩", "q": "𝐪", "r": "𝐫", "s": "𝐬", "t": "𝐭", "u": "𝐮", "v": "𝐯", "w": "𝐰", "x": "𝐱", "y": "𝐲", "z": "𝐳",
+    "A": "𝐀", "B": "𝐁", "C": "𝐂", "D": "𝐃", "E": "𝐄", "F": "𝐅", "G": "𝐆", "H": "𝐇", "I": "𝐈", "J": "𝐉", "K": "𝐊", "L": "𝐋", "M": "𝐌", "N": "𝐍", "O": "𝐎", "P": "𝐏", "Q": "𝐐", "R": "𝐑", "S": "𝐒", "T": "𝐓", "U": "𝐔", "V": "𝐕", "W": "𝐖", "X": "𝐗", "Y": "𝐘", "Z": "𝐙"
+}
 
 def get_fancy_text(text, font_type):
     words = text.split(" ")
@@ -210,68 +213,100 @@ def get_fancy_text(text, font_type):
 #============ Side_Features ========
 #--
 #=== Quote_transformer =======
+import httpx
+import base64
+from io import BytesIO
+
+# Simple color mapping for ease of use
+COLOR_MAP = {
+    "red": "#800000", "blue": "#000080", "green": "#006400", 
+    "black": "#000000", "purple": "#4B0082", "dark": "#1b1429",
+    "white": "#FFFFFF", "grey": "#2F4F4F"
+}
+
 async def quote(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
     msg = update.message
-
     if not msg.reply_to_message:
         return await msg.reply_text("❌ Rᴇᴘʟʏ ᴛᴏ ᴀ ᴍᴇꜱꜱᴀɢᴇ ᴛᴏ ᴄʀᴇᴀᴛᴇ Qᴜᴏᴛᴇ.")
 
+    # --- 1. Settings & Arguments Parsing ---
+    # Default values
+    bg_color = "#1b1429" 
+    show_reply = False
+    
+    # Check arguments: /q <color> <r>
+    if context.args:
+        args_str = " ".join(context.args).lower()
+        # Check for reply flag
+        if " r" in f" {args_str}" or "reply" in args_str:
+            show_reply = True
+        
+        # Check for color
+        for name, hex_val in COLOR_MAP.items():
+            if name in args_str:
+                bg_color = hex_val
+                break
+
+    # --- 2. Data Extraction ---
     replied = msg.reply_to_message
     user = replied.from_user
-
-    text = replied.text or replied.caption
-
-    if not text:
-        return await msg.reply_text("❌ I ᴄᴀɴ ᴏɴʟʏ Qᴜᴏᴛᴇ ᴛᴇxᴛ ᴍᴇꜱꜱᴀɢᴇꜱ.")
-
-    # Generating animation
+    text = replied.text or replied.caption or ""
+    
     loading = await msg.reply_text("⚙️ Gᴇɴᴇʀᴀᴛɪɴɢ Qᴜᴏᴛᴇ...")
 
+    # --- 3. Build the Message Object ---
+    message_obj = {
+        "entities": [],
+        "avatar": True,
+        "from": {
+            "id": user.id,
+            "name": user.full_name, # Preserves original name style
+            "photo": True
+        },
+        "text": text
+    }
+
+    # Handle nested reply: /q r
+    if show_reply and replied.reply_to_message:
+        prev_msg = replied.reply_to_message
+        message_obj["replyMessage"] = {
+            "name": prev_msg.from_user.full_name,
+            "text": prev_msg.text or prev_msg.caption or "Media",
+            "chatId": prev_msg.from_user.id
+        }
+
+    # Handle Sticker inside quote
+    if replied.sticker:
+        file = await context.bot.get_file(replied.sticker.file_id)
+        message_obj["media"] = {"url": file.file_path}
+        if not text: message_obj["text"] = ""
+
+    # --- 4. API Request ---
     payload = {
         "type": "quote",
-        "format": "webp",   # sticker format
-        "backgroundColor": "#1b1429",
+        "format": "webp",
+        "backgroundColor": bg_color,
         "width": 512,
         "height": 512,
         "scale": 2,
-        "messages": [
-            {
-                "entities": [],
-                "avatar": True,
-                "from": {
-                    "id": user.id,
-                    "name": user.first_name
-                },
-                "text": text
-            }
-        ]
+        "messages": [message_obj]
     }
 
     try:
+        async with httpx.AsyncClient() as client:
+            res = await client.post("https://bot.lyo.su/quote/generate", json=payload, timeout=30.0)
 
-        res = requests.post(
-            "https://bot.lyo.su/quote/generate",
-            json=payload
-        )
-
-        if res.status_code != 200:
-            await loading.edit_text("❌ Fᴀɪʟᴇᴅ ᴛᴏ ɢᴇɴᴇʀᴀᴛᴇ Qᴜᴏᴛᴇ.")
-            return
-
-        data = res.json()
-
-        image = base64.b64decode(data["result"]["image"])
-
-        sticker = BytesIO(image)
-        sticker.name = "quote.webp"
-
-        await msg.reply_sticker(sticker=sticker)
-
-        await loading.delete()
-
-    except Exception:
-        await loading.edit_text("❌ Eʀʀᴏʀ ᴡʜɪʟᴇ ɢᴇɴᴇʀᴀᴛɪɴɢ Qᴜᴏᴛᴇ.")
+        if res.status_code == 200:
+            data = res.json()
+            image = base64.b64decode(data["result"]["image"])
+            sticker_file = BytesIO(image)
+            sticker_file.name = "quote.webp"
+            await msg.reply_sticker(sticker=sticker_file)
+            await loading.delete()
+        else:
+            await loading.edit_text(f"❌ API Error: {res.status_code}")
+    except Exception as e:
+        await loading.edit_text(f"❌ Eʀʀᴏʀ: {str(e)[:50]}")
 
 #========== Sticker Create ========
 #--
@@ -640,29 +675,42 @@ async def reply_with_random_sticker(update: Update, context: ContextTypes.DEFAUL
 
 #========Font-command======
 async def font_converter(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    usage_msg = "❌ Uꜱᴀɢᴇ: /font 1/2/3" # Small caps usage as requested
+    # Updated usage message to show both ways
+    usage_msg = (
+        "❌ **Uꜱᴀɢᴇ:**\n"
+        "1️⃣ `/font 1 Hello` (Direct text)\n"
+        "2️⃣ Reply to a message with `/font 1`"
+    )
     
-    # 1. Check if user provided an argument
+    # 1. Check for the font choice (1, 2, or 3)
     if not context.args:
-        await update.message.reply_text(usage_msg)
+        await update.message.reply_text(usage_msg, parse_mode="Markdown")
         return
 
     font_choice = context.args[0]
-    
-    # 2. Validate choice
     if font_choice not in ["1", "2", "3"]:
-        await update.message.reply_text(usage_msg)
+        await update.message.reply_text(usage_msg, parse_mode="Markdown")
         return
 
-    # 3. Check if replying to a message
-    if not update.message.reply_to_message or not update.message.reply_to_message.text:
-        await update.message.reply_text("❌ Rᴇᴘʟʏ ᴛᴏ ᴀ ᴛᴇxᴛ ᴍᴇꜱꜱᴀɢᴇ ᴛᴏ ᴄᴏɴᴠᴇʀᴛ ɪᴛ!")
-        return
+    target_text = ""
 
-    # 4. Convert and send
-    target_text = update.message.reply_to_message.text
-    converted_text = get_fancy_text(target_text, font_choice)
+    # 2. Check if text was provided DIRECTLY: /font 1 My Text
+    if len(context.args) > 1:
+        target_text = " ".join(context.args[1:])
     
+    # 3. If no direct text, check if it's a REPLY
+    elif update.message.reply_to_message:
+        replied = update.message.reply_to_message
+        # This handles both plain text and photo captions
+        target_text = replied.text or replied.caption
+
+    # 4. If still no text found, give up
+    if not target_text:
+        await update.message.reply_text("❌ Nᴏ ᴛᴇxᴛ ꜰᴏᴜɴᴅ ᴛᴏ ᴄᴏɴᴠᴇʀᴛ!")
+        return
+
+    # 5. Process and send
+    converted_text = get_fancy_text(target_text, font_choice)
     await update.message.reply_text(converted_text)
 
 # ================= BOT STATS =================
@@ -2724,40 +2772,17 @@ def main():
     app.add_handler(CommandHandler("stfast", stfast))
     app.add_handler(CommandHandler("stopheist", stopheist))
 
+     # =====================================================
+    # RUSSIAN ROULETTE (CONTINUED)
     # =====================================================
-    # RUSSIAN ROULETTE
-    # =====================================================
-    app.add_handler(CommandHandler("rullate", rullate))
-    app.add_handler(CommandHandler("join", join))
-    app.add_handler(CommandHandler("shot", shot))
     app.add_handler(CommandHandler("on", on))
+    app.add_handler(CommandHandler("shot", shot))
     app.add_handler(CommandHandler("out", out))
     app.add_handler(CommandHandler("rullrank", rullrank))
 
     # =====================================================
-    # GAME COMMANDS
+    # FUN & INTERACTION
     # =====================================================
-    app.add_handler(CommandHandler("kil", kill))
-    app.add_handler(CommandHandler("robb", robe))
-    app.add_handler(CommandHandler("bounty", bounty))
-
-    # =====================================================
-    # GROUP MANAGEMENT (REWRITTEN)
-    # =====================================================
-    app.add_handler(CommandHandler("user", user_command))
-    
-    # This handler processes all comma-prefixed commands (,promote, ,ban, etc.)
-    # It MUST stay above auto_reply to intercept the commands first.
-    app.add_handler(MessageHandler(
-        filters.TEXT & filters.Regex(r"^,") & filters.ChatType.GROUPS, 
-        management_handler
-    ))
-
-    # =====================================================
-    # FUN / SIDE FEATURES
-    # =====================================================
-    app.add_handler(CommandHandler("q", quote))
-    app.add_handler(CommandHandler("obt", save_sticker))
     app.add_handler(CommandHandler("kiss", kiss))
     app.add_handler(CommandHandler("hug", hug))
     app.add_handler(CommandHandler("bite", bite))
@@ -2765,35 +2790,61 @@ def main():
     app.add_handler(CommandHandler("kick", kick))
     app.add_handler(CommandHandler("punch", punch))
     app.add_handler(CommandHandler("murder", murder))
-    app.add_handler(CommandHandler("font", font_converter))
 
     # =====================================================
-    # CALLBACK & WELCOME & STICKERS
+    # TOOLS & MEDIA
+    # =====================================================
+    app.add_handler(CommandHandler("q", quote))
+    app.add_handler(CommandHandler("save", save_sticker))
+    app.add_handler(CommandHandler("aniworld", aniworld_command))
+    app.add_handler(CommandHandler("font", font_converter))
+    app.add_handler(CommandHandler("id", user_command))
+
+    # =====================================================
+    # ECONOMY & SHOP
+    # =====================================================
+    app.add_handler(CommandHandler("kill", kill))
+    app.add_handler(CommandHandler("rob", robe))
+    app.add_handler(CommandHandler("bounty", bounty))
+    app.add_handler(CommandHandler("shop", shop))
+    app.add_handler(CommandHandler("purchase", purchase))
+
+    # =====================================================
+    # MANAGEMENT
+    # =====================================================
+    app.add_handler(CommandHandler("ban", ban))
+    app.add_handler(CommandHandler("unban", unban))
+    app.add_handler(CommandHandler("mute", mute))
+    app.add_handler(CommandHandler("unmute", unmute))
+    app.add_handler(CommandHandler("promote", promote))
+    app.add_handler(CommandHandler("demote", demote))
+    app.add_handler(CommandHandler("warn", warn))
+    app.add_handler(CommandHandler("unwarn", unwarn))
+
+    # =====================================================
+    # MESSAGE HANDLERS (ORDER MATTERS)
+    # =====================================================
+    
+    # 1. Track every message to update user/chat DB
+    app.add_handler(MessageHandler(filters.ALL, save_chat_and_user), group=-1)
+
+    # 2. Welcome new members
+    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
+
+    # 3. Sticker reply logic
+    app.add_handler(MessageHandler(filters.Sticker.ALL, reply_with_random_sticker))
+
+    # 4. AI Auto-reply (Keep this last so it doesn't intercept commands)
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, auto_reply))
+
+    # =====================================================
+    # CALLBACKS & ERROR HANDLING
     # =====================================================
     app.add_handler(CallbackQueryHandler(heist_choice, pattern="^heist_"))
     app.add_handler(CallbackQueryHandler(callback_handler))
-    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
-    app.add_handler(MessageHandler(filters.Sticker.ALL, reply_with_random_sticker))
-
-    # =====================================================
-    # MESSAGE HANDLERS (CLEANED)
-    # =====================================================
-    # We add ~filters.Regex(r"^,") here so the bot doesn't try to 
-    # "chat" with you when you are using management commands.
-    app.add_handler(MessageHandler(
-        filters.TEXT & ~filters.COMMAND & ~filters.Regex(r"^,"), 
-        auto_reply
-    ))
-    
-    # Save all other message data
-    app.add_handler(MessageHandler(filters.ALL, save_chat))
-
-    # =====================================================
-    # ERROR HANDLER
-    # =====================================================
     app.add_error_handler(error_handler)
 
-    print("🚀 Yuuri Bot Running...")
+    print("✅ Yuuri is Live!")
     app.run_polling()
 
 if __name__ == "__main__":
