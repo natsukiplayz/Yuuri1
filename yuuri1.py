@@ -217,12 +217,11 @@ import httpx
 import base64
 from io import BytesIO
 
-# Default color map
+# Color Map for custom backgrounds
 COLOR_MAP = {
     "red": "#FF0000", "blue": "#0000FF", "green": "#008000",
     "yellow": "#FFFF00", "pink": "#FFC0CB", "purple": "#800080",
-    "orange": "#FFA500", "white": "#FFFFFF", "black": "#000000",
-    "dark": "#1b1429"
+    "dark": "#1b1429", "black": "#000000", "white": "#FFFFFF"
 }
 
 async def quote(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -230,18 +229,17 @@ async def quote(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not msg or not msg.reply_to_message:
         return await msg.reply_text("❌ Rᴇᴘʟʏ ᴛᴏ ᴀ ᴍᴇꜱꜱᴀɢᴇ ᴛᴏ ᴄʀᴇᴀᴛᴇ Qᴜᴏᴛᴇ.")
 
-    # 1. Defaults & Logic Check
-    bg_color = "#1b1429"
-    show_reply = False
-    target_msg = msg.reply_to_message
-
+    # --- 1. Settings & Command Parsing ---
+    bg_color = "#1b1429"  # Default Dark
+    is_multi = False
+    
     if context.args:
         args_str = [a.lower() for a in context.args]
-        # Check if user wants the reply box
+        # Check for multi-message trigger: /q r or /q reply
         if "r" in args_str or "reply" in args_str:
-            show_reply = True
+            is_multi = True
         
-        # Parse Colors
+        # Check for colors
         for name, hex_val in COLOR_MAP.items():
             if name in args_str:
                 bg_color = hex_val
@@ -249,38 +247,48 @@ async def quote(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if arg.startswith("#") and len(arg) == 7:
                 bg_color = arg
 
-    loading = await msg.reply_text("⚙️ Gᴇɴᴇʀᴀᴛɪɴɢ...")
+    replied_msg = msg.reply_to_message 
+    messages_list = []
 
-    # 2. Build the Message Object
-    message_obj = {
+    # --- 2. Build the Conversation List ---
+    
+    # If /q r used and there's a message above the one we replied to
+    if is_multi and replied_msg.reply_to_message:
+        parent = replied_msg.reply_to_message
+        messages_list.append({
+            "entities": [],
+            "avatar": True,
+            "from": {
+                "id": parent.from_user.id,
+                "name": parent.from_user.full_name,
+                "photo": True
+            },
+            "text": parent.text or parent.caption or "Media"
+        })
+
+    # Always add the main replied-to message
+    messages_list.append({
         "entities": [],
         "avatar": True,
         "from": {
-            "id": target_msg.from_user.id,
-            "name": target_msg.from_user.full_name, # Preserves 🇷 🇯
+            "id": replied_msg.from_user.id,
+            "name": replied_msg.from_user.full_name,
             "photo": True
         },
-        "text": target_msg.text or target_msg.caption or ""
-    }
+        "text": replied_msg.text or replied_msg.caption or ""
+    })
 
-    # 3. Add the Nested Reply (The "What?" box)
-    if show_reply and target_msg.reply_to_message:
-        prev = target_msg.reply_to_message
-        message_obj["replyMessage"] = {
-            "name": prev.from_user.full_name, # Preserves Nᵒᵇⁱᵗᵃ ᵏ
-            "text": prev.text or prev.caption or "Media",
-            "chatId": prev.from_user.id
-        }
+    loading = await msg.reply_text("⚙️ Gᴇɴᴇʀᴀᴛɪɴɢ...")
 
-    # 4. API Payload - Scale 1.2 makes the text much smaller and cleaner
+    # --- 3. Payload & API Request ---
     payload = {
         "type": "quote",
         "format": "webp",
         "backgroundColor": bg_color,
         "width": 512,
-        "height": 768, 
-        "scale": 1.2,  # <--- Lowering this makes it look like real Telegram text
-        "messages": [message_obj]
+        "height": 768 if is_multi else 512, # Extra space for conversation
+        "scale": 1.5, # Professional clean text size
+        "messages": messages_list
     }
 
     try:
@@ -289,18 +297,18 @@ async def quote(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         if res.status_code == 200:
             data = res.json()
-            # Handle potential differences in API response structure
-            img_data = data.get("result", {}).get("image") or data.get("image")
+            img_base64 = data.get("result", {}).get("image") or data.get("image")
             
-            sticker_file = BytesIO(base64.b64decode(img_data))
+            sticker_file = BytesIO(base64.b64decode(img_base64))
             sticker_file.name = "quote.webp"
             
             await msg.reply_sticker(sticker=sticker_file)
             await loading.delete()
         else:
-            await loading.edit_text("❌ API Error. Please try again.")
+            await loading.edit_text("❌ API Error. Could not create sticker.")
+            
     except Exception as e:
-        await loading.edit_text(f"❌ Error: {str(e)[:40]}")
+        await loading.edit_text("❌ Sᴏᴍᴇᴛʜɪɴɢ ᴡᴇɴᴛ ᴡʀᴏɴɢ.")
 
 #========== Sticker Create ========
 #--
@@ -2789,7 +2797,7 @@ def main():
     # TOOLS & MEDIA
     # =====================================================
     app.add_handler(CommandHandler("q", quote))
-    app.add_handler(CommandHandler("save", save_sticker))
+    app.add_handler(CommandHandler("obt", save_sticker))
     app.add_handler(CommandHandler("aniworld", aniworld_command))
     app.add_handler(CommandHandler("font", font_converter))
     app.add_handler(CommandHandler("id", user_command))
