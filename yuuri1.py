@@ -217,11 +217,11 @@ import httpx
 import base64
 from io import BytesIO
 
-# Color Map for custom backgrounds
+# Default color map
 COLOR_MAP = {
     "red": "#FF0000", "blue": "#0000FF", "green": "#008000",
     "yellow": "#FFFF00", "pink": "#FFC0CB", "purple": "#800080",
-    "dark": "#1b1429", "black": "#000000", "white": "#FFFFFF"
+    "dark": "#1b1429"
 }
 
 async def quote(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -229,17 +229,16 @@ async def quote(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not msg or not msg.reply_to_message:
         return await msg.reply_text("❌ Rᴇᴘʟʏ ᴛᴏ ᴀ ᴍᴇꜱꜱᴀɢᴇ ᴛᴏ ᴄʀᴇᴀᴛᴇ Qᴜᴏᴛᴇ.")
 
-    # --- 1. Settings & Command Parsing ---
-    bg_color = "#1b1429"  # Default Dark
-    is_multi = False
+    # 1. Parse Args for Color & Reply Mode
+    bg_color = "#1b1429"
+    show_reply = False
     
     if context.args:
         args_str = [a.lower() for a in context.args]
-        # Check for multi-message trigger: /q r or /q reply
         if "r" in args_str or "reply" in args_str:
-            is_multi = True
+            show_reply = True
         
-        # Check for colors
+        # Color parsing
         for name, hex_val in COLOR_MAP.items():
             if name in args_str:
                 bg_color = hex_val
@@ -247,48 +246,41 @@ async def quote(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if arg.startswith("#") and len(arg) == 7:
                 bg_color = arg
 
-    replied_msg = msg.reply_to_message 
-    messages_list = []
+    target_msg = msg.reply_to_message
+    loading = await msg.reply_text("⚙️ Gᴇɴᴇʀᴀᴛɪɴɢ...")
 
-    # --- 2. Build the Conversation List ---
-    
-    # If /q r used and there's a message above the one we replied to
-    if is_multi and replied_msg.reply_to_message:
-        parent = replied_msg.reply_to_message
-        messages_list.append({
-            "entities": [],
-            "avatar": True,
-            "from": {
-                "id": parent.from_user.id,
-                "name": parent.from_user.full_name,
-                "photo": True
-            },
-            "text": parent.text or parent.caption or "Media"
-        })
-
-    # Always add the main replied-to message
-    messages_list.append({
+    # 2. Build the Main Message (The "Yes I am so what?" part)
+    # We only send ONE message in the list to keep it in ONE bubble
+    message_data = {
         "entities": [],
         "avatar": True,
         "from": {
-            "id": replied_msg.from_user.id,
-            "name": replied_msg.from_user.full_name,
+            "id": target_msg.from_user.id,
+            "name": target_msg.from_user.full_name, # 🇷 🇯
             "photo": True
         },
-        "text": replied_msg.text or replied_msg.caption or ""
-    })
+        "text": target_msg.text or target_msg.caption or ""
+    }
 
-    loading = await msg.reply_text("⚙️ Gᴇɴᴇʀᴀᴛɪɴɢ...")
+    # 3. Add the INTERNAL Reply Box (The "You bullshit" part)
+    # This creates the small box with the vertical line inside the bubble
+    if show_reply and target_msg.reply_to_message:
+        replied_to = target_msg.reply_to_message
+        message_data["replyMessage"] = {
+            "name": replied_to.from_user.full_name, # Nᵒᵇⁱᵗᵃ ᵏ
+            "text": replied_to.text or replied_to.caption or "Media",
+            "chatId": replied_to.from_user.id
+        }
 
-    # --- 3. Payload & API Request ---
+    # 4. API Request - Scale 1.0 is the most realistic for small text
     payload = {
         "type": "quote",
         "format": "webp",
         "backgroundColor": bg_color,
         "width": 512,
-        "height": 768 if is_multi else 512, # Extra space for conversation
-        "scale": 1.5, # Professional clean text size
-        "messages": messages_list
+        "height": 512,
+        "scale": 1.1, # <--- Very small, realistic text size
+        "messages": [message_data] # Just one message object with a reply nested inside
     }
 
     try:
@@ -305,10 +297,9 @@ async def quote(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await msg.reply_sticker(sticker=sticker_file)
             await loading.delete()
         else:
-            await loading.edit_text("❌ API Error. Could not create sticker.")
-            
+            await loading.edit_text("❌ API Error. Check your connection.")
     except Exception as e:
-        await loading.edit_text("❌ Sᴏᴍᴇᴛʜɪɴɢ ᴡᴇɴᴛ ᴡʀᴏɴɢ.")
+        await loading.edit_text("❌ Something went wrong.")
 
 #========== Sticker Create ========
 #--
