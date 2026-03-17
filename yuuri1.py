@@ -217,12 +217,12 @@ import httpx
 import base64
 from io import BytesIO
 
-# Built-in color map for Railway (No extra install needed)
+# Simple color map
 COLOR_MAP = {
-    "red": "#800000", "blue": "#000080", "green": "#006400",
-    "yellow": "#D4AF37", "pink": "#FFC0CB", "purple": "#4B0082",
-    "orange": "#FF8C00", "white": "#FFFFFF", "black": "#000000",
-    "dark": "#1b1429", "cyan": "#008B8B"
+    "red": "#FF0000", "blue": "#0000FF", "green": "#008000",
+    "yellow": "#FFFF00", "pink": "#FFC0CB", "purple": "#800080",
+    "orange": "#FFA500", "white": "#FFFFFF", "black": "#000000",
+    "dark": "#1b1429"
 }
 
 async def quote(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -230,65 +230,45 @@ async def quote(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not msg or not msg.reply_to_message:
         return await msg.reply_text("❌ Rᴇᴘʟʏ ᴛᴏ ᴀ ᴍᴇꜱꜱᴀɢᴇ ᴛᴏ ᴄʀᴇᴀᴛᴇ Qᴜᴏᴛᴇ.")
 
-    # --- 1. Settings (Color & Reply Check) ---
-    bg_color = "#1b1429"  # Default
-    show_reply = False
+    # 1. Setup Defaults
+    bg_color = "#1b1429"
+    target_msg = msg.reply_to_message  # The message we are quoting
     
+    # 2. Parse Arguments (Color or Hex)
     if context.args:
         args_str = " ".join(context.args).lower()
-        # Enable reply box if 'r' or 'reply' is mentioned
-        if "r" in context.args or "reply" in context.args:
-            show_reply = True
-        
-        # Check for color name
-        for color_name, hex_code in COLOR_MAP.items():
-            if color_name in args_str:
-                bg_color = hex_code
-                break
-        
-        # Support for raw Hex codes (e.g., /q #ff5555)
+        for name, hex_val in COLOR_MAP.items():
+            if name in args_str:
+                bg_color = hex_val
         for arg in context.args:
             if arg.startswith("#") and len(arg) == 7:
                 bg_color = arg
 
-    # --- 2. Data Extraction ---
-    replied = msg.reply_to_message
-    user = replied.from_user
-    text = replied.text or replied.caption or ""
-    
-    loading = await msg.reply_text("⚙️ Gᴇɴᴇʀᴀᴛɪɴɢ Qᴜᴏᴛᴇ...")
+    loading = await msg.reply_text("⚙️ Gᴇɴᴇʀᴀᴛɪɴɢ Sᴛʏʟɪꜱʜ Qᴜᴏᴛᴇ...")
 
-    # --- 3. Build the Message Object ---
+    # 3. Build the Main Message Object
     message_obj = {
         "entities": [],
         "avatar": True,
         "from": {
-            "id": user.id,
-            "name": user.full_name, # Preserves the exact name/emoji style
+            "id": target_msg.from_user.id,
+            "name": target_msg.from_user.full_name,
             "photo": True
         },
-        "text": text
+        "text": target_msg.text or target_msg.caption or ""
     }
 
-    # Handle the Nested Reply (The "What?" inside the "Heyyyy" box)
-    if show_reply and replied.reply_to_message:
-        prev = replied.reply_to_message
+    # --- THE MAGIC PART: NESTED REPLY BOX ---
+    # If the message we are quoting is ITSELF a reply, add that box!
+    if target_msg.reply_to_message:
+        prev_msg = target_msg.reply_to_message
         message_obj["replyMessage"] = {
-            "name": prev.from_user.full_name,
-            "text": prev.text or prev.caption or "Media",
-            "chatId": prev.from_user.id
+            "name": prev_msg.from_user.full_name,
+            "text": prev_msg.text or prev_msg.caption or "Media",
+            "chatId": prev_msg.from_user.id
         }
 
-    # Handle Sticker content
-    if replied.sticker:
-        file = await context.bot.get_file(replied.sticker.file_id)
-        # Construct the URL so the API can download the sticker image
-        token = context.bot.token
-        message_obj["media"] = {"url": f"https://api.telegram.org/file/bot{token}/{file.file_path}"}
-        if not text:
-            message_obj["text"] = ""
-
-    # --- 4. API Request ---
+    # 4. API Request
     payload = {
         "type": "quote",
         "format": "webp",
@@ -304,22 +284,16 @@ async def quote(update: Update, context: ContextTypes.DEFAULT_TYPE):
             res = await client.post("https://bot.lyo.su/quote/generate", json=payload, timeout=30.0)
 
         if res.status_code == 200:
-            data = res.json()
-            # Result image is usually in data["result"]["image"]
-            img_base64 = data.get("result", {}).get("image")
-            if not img_base64:
-                img_base64 = data.get("image") # Fallback for different API versions
-
-            image = base64.b64decode(img_base64)
-            sticker_file = BytesIO(image)
+            image_data = res.json().get("result", {}).get("image") or res.json().get("image")
+            sticker_file = BytesIO(base64.b64decode(image_data))
             sticker_file.name = "quote.webp"
             
             await msg.reply_sticker(sticker=sticker_file)
             await loading.delete()
         else:
-            await loading.edit_text(f"❌ API Error: {res.status_code}")
-    except Exception as e:
-        await loading.edit_text("❌ Eʀʀᴏʀ ᴡʜɪʟᴇ ɢᴇɴᴇʀᴀᴛɪɴɢ Qᴜᴏᴛᴇ.")
+            await loading.edit_text("❌ API Error. Try again later.")
+    except Exception:
+        await loading.edit_text("❌ Sᴏᴍᴇᴛʜɪɴɢ ᴡᴇɴᴛ ᴡʀᴏɴɢ.")
 
 #========== Sticker Create ========
 #--
