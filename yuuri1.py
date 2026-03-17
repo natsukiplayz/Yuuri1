@@ -217,10 +217,11 @@ import httpx
 import base64
 from io import BytesIO
 
+# Real Telegram Dark Theme Colors
 COLOR_MAP = {
-    "red": "#FF0000", "blue": "#0000FF", "green": "#008000",
-    "yellow": "#FFFF00", "pink": "#FFC0CB", "purple": "#800080",
-    "dark": "#1b1429"
+    "red": "#FF595A", "blue": "#3E885B", "green": "#008000",
+    "yellow": "#FFD700", "pink": "#FFC0CB", "purple": "#800080",
+    "dark": "#1b1429", "black": "#000000"
 }
 
 async def quote(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -228,22 +229,40 @@ async def quote(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not msg or not msg.reply_to_message:
         return await msg.reply_text("❌ Rᴇᴘʟʏ ᴛᴏ ᴀ ᴍᴇꜱꜱᴀɢᴇ ᴛᴏ ᴄʀᴇᴀᴛᴇ Qᴜᴏᴛᴇ.")
 
-    # 1. Parse Command Settings
-    bg_color = "#1b1429"
-    show_reply = False
+    # 1. Parse Args (Color and Multi-mode)
+    bg_color = "#1b1429" 
+    is_multi = False
+    
     if context.args:
-        args_lower = [a.lower() for a in context.args]
-        if "r" in args_lower or "reply" in args_lower:
-            show_reply = True
+        args_str = [a.lower() for a in context.args]
+        if "r" in args_str or "reply" in args_str:
+            is_multi = True
         for name, hex_val in COLOR_MAP.items():
-            if name in args_lower:
+            if name in args_str:
                 bg_color = hex_val
 
     target_msg = msg.reply_to_message
-    loading = await msg.reply_text("⚙️ Gᴇɴᴇʀᴀᴛɪɴɢ...")
+    messages_list = []
 
-    # 2. The Main Message Data
-    message_obj = {
+    # 2. Build High-Quality Conversation List
+    # We add both messages to the list to get the "Stacked Bubbles" look
+    
+    # Message A (The one being replied to)
+    if is_multi and target_msg.reply_to_message:
+        parent = target_msg.reply_to_message
+        messages_list.append({
+            "entities": [],
+            "avatar": True,
+            "from": {
+                "id": parent.from_user.id,
+                "name": parent.from_user.full_name,
+                "photo": True
+            },
+            "text": parent.text or parent.caption or "Media"
+        })
+
+    # Message B (The main message)
+    messages_list.append({
         "entities": [],
         "avatar": True,
         "from": {
@@ -252,46 +271,46 @@ async def quote(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "photo": True
         },
         "text": target_msg.text or target_msg.caption or ""
-    }
+    })
 
-    # 3. Add Reply Box (Telegram Style)
-    if show_reply and target_msg.reply_to_message:
-        prev = target_msg.reply_to_message
-        message_obj["replyMessage"] = {
-            "name": prev.from_user.full_name,
-            "text": prev.text or prev.caption or "Media",
-            "chatId": prev.from_user.id
-        }
+    loading = await msg.reply_text("🪄 Gᴇɴᴇʀᴀᴛɪɴɢ HD Qᴜᴏᴛᴇ...")
 
-    # 4. Payload adjusted for the Quotly look
-    # Height is set smaller (512) to prevent big empty spaces
+    # 3. Enhanced HD Payload
     payload = {
         "type": "quote",
         "format": "webp",
         "backgroundColor": bg_color,
         "width": 512,
-        "height": 512, 
-        "scale": 1.1, # Makes text clean and small
-        "messages": [message_obj]
+        "height": 768 if is_multi else 512,
+        "scale": 2,  # <--- Increased to 2 for sharp HD text
+        "messages": messages_list
     }
 
     try:
+        # Using the faster, high-quality bot.lyo API with optimized settings
         async with httpx.AsyncClient() as client:
-            res = await client.post("https://bot.lyo.su/quote/generate", json=payload, timeout=30.0)
+            res = await client.post(
+                "https://bot.lyo.su/quote/generate", 
+                json=payload, 
+                timeout=30.0,
+                headers={"Content-Type": "application/json"}
+            )
 
         if res.status_code == 200:
             data = res.json()
-            img_base64 = data.get("result", {}).get("image") or data.get("image")
+            img_data = data.get("result", {}).get("image") or data.get("image")
             
-            sticker_file = BytesIO(base64.b64decode(img_base64))
+            # Decode with high precision
+            sticker_file = BytesIO(base64.b64decode(img_data))
             sticker_file.name = "quote.webp"
             
+            # Send as Sticker with high priority
             await msg.reply_sticker(sticker=sticker_file)
             await loading.delete()
         else:
-            await loading.edit_text("❌ API Error. Check your logs.")
-    except Exception:
-        await loading.edit_text("❌ Connection failed.")
+            await loading.edit_text(f"❌ API Error: {res.status_code}")
+    except Exception as e:
+        await loading.edit_text("❌ Fᴀɪʟᴇᴅ ᴛᴏ ɢᴇɴᴇʀᴀᴛᴇ HD Qᴜᴏᴛᴇ.")
 
 #========== Sticker Create ========
 #--
