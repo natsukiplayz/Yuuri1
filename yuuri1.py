@@ -2334,176 +2334,188 @@ async def user_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await msg.reply_text(text, parse_mode="Markdown")
 
-import logging
-from telegram import Update, ChatPermissions
-from telegram.ext import ContextTypes, MessageHandler, filters
+from telegram.constants import ChatMemberStatus
 
-# --- CONFIGURATION ---
-OWNER_ID = 7139383373  
-PREFIX = ","
+# ================= MANAGEMENT HELPERS =================
 
-# --- HELPER FUNCTIONS ---
-
-def get_fancy_text(text, style="2"):
-    # Replace this with your actual typography/font logic
-    return text 
-
-def check_cmd(text, command):
-    """Checks if the message starts with the prefix and the specific command."""
-    if not text: return False
-    return text.lower().startswith(f"{PREFIX}{command.lower()}")
-
-async def get_target(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Identifies target via reply or @username/ID."""
+async def resolve_user_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Advanced Resolver:
+    1. Reply to message
+    2. Mention (@username) - Checks DB first, then Telegram
+    3. User ID
+    """
     msg = update.message
-    args = msg.text.split()
+    args = context.args
+    chat_id = update.effective_chat.id
+
     if msg.reply_to_message:
-        return msg.reply_to_message.from_user
-    if len(args) > 1:
-        user_input = args[1].replace("@", "")
+        return msg.reply_to_message.from_user.id, msg.reply_to_message.from_user.first_name
+
+    if args:
+        target = args[0]
+        if target.isdigit():
+            return int(target), "User"
+
+        username = target.replace("@", "").lower()
+        
+        # 1. Check our database first (The "Baka" Method)
+        cached = users.find_one({"username": username})
+        if cached:
+            return cached["id"], cached["name"]
+
+        # 2. Try Telegram (only works if user is in group)
         try:
-            member = await context.bot.get_chat_member(update.effective_chat.id, user_input)
-            return member.user
-        except: return None
-    return None
+            member = await context.bot.get_chat_member(chat_id, target)
+            return member.user.id, member.user.first_name
+        except:
+            pass
 
-# --- CORE MANAGEMENT LOGIC ---
+    return None, None
 
-async def management_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = update.message
-    if not msg or not msg.text: return
+async def is_admin(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id):
+    """Checks if a user is a Chat Admin or the Global Owner."""
+    if user_id == OWNER_ID:
+        return True
     
     chat_id = update.effective_chat.id
-    sender = update.effective_user
-    text = msg.text
-    is_owner = (sender.id == OWNER_ID)
+    member = await context.bot.get_chat_member(chat_id, user_id)
+    return member.status in [ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER]
 
-    # --- PERMISSION CHECKS (Rose Style) ---
-    chat_member = await context.bot.get_chat_member(chat_id, sender.id)
-    is_tg_admin = chat_member.status in ["administrator", "creator"]
+# ================= CORE COMMANDS =================
+
+async def ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await is_admin(update, context, update.effective_user.id):
+        return await update.message.reply_text(get_fancy_text("Admin only!", "2"))
+
+    user_id, name = await resolve_user_all(update, context)
+    if not user_id:
+        return await update.message.reply_text("❌ User not found in database or chat.")
+    if user_id == OWNER_ID:
+        return await update.message.reply_text("😂 Nice try, but I won't ban my owner.")
+
+    try:
+        await context.bot.ban_chat_member(update.effective_chat.id, user_id)
+        await update.message.reply_text(get_fancy_text(f"🚫 {name} has been banned.", "2"))
+    except Exception as e:
+        await update.message.reply_text(f"❌ Error: {e}")
+
+async def unban(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await is_admin(update, context, update.effective_user.id): return
+    user_id, name = await resolve_user_all(update, context)
+    if not user_id: return
     
-    # Check Database for custom levels
-    sender_data = admins_db.find_one({"chat_id": chat_id, "user_id": sender.id})
-    sender_level = sender_data["level"] if sender_data else 0
+    await context.bot.unban_chat_member(update.effective_chat.id, user_id)
+    await update.message.reply_text(get_fancy_text(f"✅ {name} has been unbanned.", "2"))
 
-    # Logic: Real admins or Level 3 have Full Power. Level 2 has Mod Power.
-    has_full_power = is_owner or is_tg_admin or sender_level >= 3
-    has_mod_power = has_full_power or sender_level >= 2
+async def mute(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await is_admin(update, context, update.effective_user.id): return
+    user_id, name = await resolve_user_all(update, context)
+    if not user_id: return
 
-    # 1. PROMOTE COMMAND
-    if check_cmd(text, "promote"):
-        if not has_full_power:
-            return await msg.reply_text(get_fancy_text("❌ Yᴏᴜ ɴᴇᴇᴅ Aᴅᴍɪɴ ᴏʀ Oᴡɴᴇʀ ʀɪɢʜᴛꜱ!", "2"))
+    try:
+        await context.bot.restrict_chat_member(
+            update.effective_chat.id, user_id, 
+            permissions=ChatPermissions(can_send_messages=False)
+        )
+        await update.message.reply_text(get_fancy_text(f"🔇 {name} is now muted.", "2"))
+    except Exception as e:
+        await update.message.reply_text(f"❌ Error: {e}")
 
-        target = await get_target(update, context)
-        if not target:
-            return await msg.reply_text(get_fancy_text("⚠️ Rᴇᴘʟʏ Tᴏ Sᴏᴍᴇᴏɴᴇ Oʀ Uꜱᴇ Hᴇ'ꜱ Uꜱᴇʀɴᴀᴍᴇ", "2"))
+async def unmute(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await is_admin(update, context, update.effective_user.id): return
+    user_id, name = await resolve_user_all(update, context)
+    if not user_id: return
 
-        args = text.split()
-        level = 0  # Default: Pin only
-        for arg in args:
-            if arg.isdigit():
-                level = int(arg)
-                break
+    await context.bot.restrict_chat_member(
+        update.effective_chat.id, user_id, 
+        permissions=ChatPermissions(can_send_messages=True, can_send_media_messages=True, can_send_other_messages=True, can_add_web_page_previews=True)
+    )
+    await update.message.reply_text(get_fancy_text(f"🔊 {name} can speak again.", "2"))
 
-        try:
-            if level == 3:
-                # 100% POWER
-                await context.bot.promote_chat_member(
-                    chat_id, target.id,
-                    can_manage_chat=True, can_delete_messages=True, can_manage_video_chats=True, 
-                    can_restrict_members=True, can_change_info=True, can_invite_users=True, 
-                    can_pin_messages=True, can_promote_members=True if is_owner else False
-                )
-                res_text = f"{target.first_name} Pʀᴏᴍᴏᴛᴇᴅ! (ʟᴠ:3) 🥉"
-            elif level == 2:
-                # BAN/MUTE/DELETE/INFO
-                await context.bot.promote_chat_member(
-                    chat_id, target.id,
-                    can_delete_messages=True, can_restrict_members=True,
-                    can_change_info=True, can_invite_users=True, can_pin_messages=True
-                )
-                res_text = f"{target.first_name} Pʀᴏᴍᴏᴛᴇᴅ! (ʟᴠ:2) 🥈"
-            elif level == 1:
-                # PIN/DELETE/INFO
-                await context.bot.promote_chat_member(
-                    chat_id, target.id,
-                    can_pin_messages=True, can_delete_messages=True, can_change_info=True
-                )
-                res_text = f"{target.first_name} Pʀᴏᴍᴏᴛᴇᴅ! (ʟᴠ:1) 🥇"
-            else:
-                # PIN ONLY
-                await context.bot.promote_chat_member(chat_id, target.id, can_pin_messages=True)
-                res_text = f"{target.first_name} Pʀᴏᴍᴏᴛᴇᴅ! (Pɪɴ Oɴʟʏ) 📍"
+# ================= PROMOTION SYSTEM =================
 
-            admins_db.update_one(
-                {"chat_id": chat_id, "user_id": target.id},
-                {"$set": {"user_name": target.first_name, "level": level, "promoted_by": sender.id}},
-                upsert=True
-            )
-            await msg.reply_text(get_fancy_text(res_text, "2"))
-        except Exception as e:
-            await msg.reply_text(f"❌ API Error: {e}")
+async def promote(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await is_admin(update, context, update.effective_user.id): return
+    user_id, name = await resolve_user_all(update, context)
+    if not user_id: return
 
-    # 2. DEMOTE COMMAND
-    elif check_cmd(text, "demote"):
-        if not has_full_power:
-            return await msg.reply_text(get_fancy_text("❌ Yᴏᴜ ɴᴇᴇᴅ Aᴅᴍɪɴ ᴏʀ Oᴡɴᴇʀ ʀɪɢʜᴛꜱ!", "2"))
+    try:
+        # Full promotion logic
+        await context.bot.promote_chat_member(
+            update.effective_chat.id, user_id,
+            can_manage_chat=True, can_delete_messages=True, 
+            can_restrict_members=True, can_pin_messages=True,
+            can_promote_members=False # Usually False unless user is owner
+        )
+        await update.message.reply_text(get_fancy_text(f"🎖️ {name} has been promoted!", "2"))
+    except Exception as e:
+        await update.message.reply_text(f"❌ API Error: {e}")
 
-        target = await get_target(update, context)
-        if not target: return
-        if target.id == OWNER_ID:
-            return await msg.reply_text(get_fancy_text("⚠️ ɴɪᴄᴇ Tʀʏ Bᴜᴛ Yᴏᴜ Cᴀɴ'ᴛ Dᴇᴍᴏᴛᴇ Hɪᴍ 😂", "2"))
+async def demote(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await is_admin(update, context, update.effective_user.id): return
+    user_id, name = await resolve_user_all(update, context)
+    if not user_id: return
 
-        try:
-            await context.bot.promote_chat_member(
-                chat_id, target.id,
-                can_change_info=False, can_delete_messages=False, can_invite_users=False,
-                can_restrict_members=False, can_pin_messages=False, can_promote_members=False,
-                can_manage_chat=False
-            )
-            admins_db.delete_one({"chat_id": chat_id, "user_id": target.id})
-            await msg.reply_text(get_fancy_text(f"⁉️ {target.first_name} Dᴇᴍᴏᴛᴇᴅ!", "2"))
-        except Exception as e:
-            await msg.reply_text(f"❌ Error: {e}")
+    await context.bot.promote_chat_member(
+        update.effective_chat.id, user_id,
+        can_manage_chat=False, can_delete_messages=False, 
+        can_restrict_members=False, can_pin_messages=False
+    )
+    await update.message.reply_text(get_fancy_text(f"📉 {name} has been demoted.", "2"))
 
-    # 3. BAN COMMAND
-    elif check_cmd(text, "ban"):
-        if not has_mod_power: return
-        target = await get_target(update, context)
-        if not target: return
-        t_status = (await context.bot.get_chat_member(chat_id, target.id)).status
-        if t_status in ["administrator", "creator"]:
-            return await msg.reply_text(get_fancy_text("Yᴏᴜ Cᴀɴ'ᴛ Bᴀɴ Oᴛʜᴇʀ Aᴅᴍɪɴꜱ 🔰", "2"))
-        await context.bot.ban_chat_member(chat_id, target.id)
-        await msg.reply_text(get_fancy_text(f"{target.first_name} Bᴀɴɴᴇᴅ! 🚫", "2"))
+# ================= WARN SYSTEM =================
 
-    # 4. UNBAN COMMAND
-    elif check_cmd(text, "unban"):
-        if not has_mod_power: return
-        target = await get_target(update, context)
-        if not target: return
-        await context.bot.unban_chat_member(chat_id, target.id)
-        await msg.reply_text(get_fancy_text(f"{target.first_name} Uɴʙᴀɴɴᴇᴅ! ✅", "2"))
+async def warn(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await is_admin(update, context, update.effective_user.id): return
+    user_id, name = await resolve_user_all(update, context)
+    if not user_id: return
 
-    # 5. MUTE COMMAND
-    elif check_cmd(text, "mute"):
-        if not has_mod_power: return
-        target = await get_target(update, context)
-        if not target: return
-        t_status = (await context.bot.get_chat_member(chat_id, target.id)).status
-        if t_status in ["administrator", "creator"]:
-            return await msg.reply_text(get_fancy_text("Yᴏᴜ Cᴀɴ'ᴛ Mᴜᴛᴇ Oᴛʜᴇʀ Aᴅᴍɪɴꜱ 🔰", "2"))
-        await context.bot.restrict_chat_member(chat_id, target.id, permissions=ChatPermissions(can_send_messages=False))
-        await msg.reply_text(get_fancy_text(f"{target.first_name} Mᴜᴛᴇᴅ! 🔕", "2"))
+    # Save warn in admins_db
+    chat_id = update.effective_chat.id
+    res = admins_db.find_one_and_update(
+        {"chat_id": chat_id, "user_id": user_id},
+        {"$inc": {"warns": 1}},
+        upsert=True, return_document=True
+    )
+    
+    warn_count = res.get("warns", 0)
+    if warn_count >= 3:
+        await context.bot.ban_chat_member(chat_id, user_id)
+        admins_db.update_one({"chat_id": chat_id, "user_id": user_id}, {"$set": {"warns": 0}})
+        await update.message.reply_text(get_fancy_text(f"🛑 {name} reached 3 warns and was banned!", "2"))
+    else:
+        await update.message.reply_text(get_fancy_text(f"⚠️ {name} has been warned. ({warn_count}/3)", "2"))
 
-    # 6. UNMUTE COMMAND
-    elif check_cmd(text, "unmute"):
-        if not has_mod_power: return
-        target = await get_target(update, context)
-        if not target: return
-        await context.bot.restrict_chat_member(chat_id, target.id, permissions=ChatPermissions(can_send_messages=True, can_send_media_messages=True, can_send_other_messages=True, can_add_web_page_previews=True))
-        await msg.reply_text(get_fancy_text(f"{target.first_name} Uɴᴍᴜᴛᴇᴅ! ✅", "2"))
+async def unwarn(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await is_admin(update, context, update.effective_user.id): return
+    user_id, name = await resolve_user_all(update, context)
+    if not user_id: return
+
+    admins_db.update_one({"chat_id": update.effective_chat.id, "user_id": user_id}, {"$set": {"warns": 0}})
+    await update.message.reply_text(get_fancy_text(f"✅ Warns for {name} have been reset.", "2"))
+
+# ================= AUTO-UPDATE USER CACHE =================
+
+async def save_chat_and_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """This function replaces your old save_chat and fixes the username lookup."""
+    chat = update.effective_chat
+    user = update.effective_user
+    if not chat or not user: return
+
+    # 1. Update Chat
+    db["chats"].update_one({"id": chat.id}, {"$set": {"id": chat.id, "type": chat.type, "title": getattr(chat, "title", None)}}, upsert=True)
+
+    # 2. Update User (Crucial for Baka-style username lookup)
+    users.update_one(
+        {"id": user.id},
+        {"$set": {
+            "id": user.id,
+            "name": user.first_name,
+            "username": user.username.lower() if user.username else None
+        }},
+        upsert=True
+    )
 
 # ---------------- MEMORY STORAGE ----------------
 
