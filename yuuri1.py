@@ -742,8 +742,10 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(text, parse_mode="Markdown")
 
 #==================Main StartUp Of Yuuri==================
-async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ContextTypes
 
+async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
     if not msg:
         return
@@ -751,42 +753,41 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = msg.from_user
     first_name = user.first_name or "User"
     args = context.args
+    
+    # Video File ID provided
+    START_VIDEO = "VID_20260316_083355_613"
 
+    # --- REFERRAL LOGIC ---
     user_data = get_user(user)
 
     if user_data.get("referred_by") is None and args:
-
         ref = args[0]
-
         if ref.startswith("ref_"):
-
             try:
                 referrer_id = int(ref.split("_")[1])
-
                 if referrer_id != user.id:
-
+                    # Update New User
                     users.update_one(
                         {"id": user.id},
                         {"$set": {"referred_by": referrer_id}}
                     )
-
+                    # Reward Referrer
                     users.update_one(
                         {"id": referrer_id},
                         {"$inc": {"coins": 1000}}
                     )
-
+                    # Notify Referrer
                     try:
                         await context.bot.send_message(
                             referrer_id,
                             f"🎉 {first_name} joined using your referral!\n💰 You earned 1000 coins!"
                         )
-                    except:
+                    except Exception:
                         pass
-
-            except:
+            except (ValueError, IndexError):
                 pass
 
-    # ================= BUTTONS =================
+    # --- BUTTONS & CAPTION ---
     bot = await context.bot.get_me()
 
     keyboard = [
@@ -810,22 +811,31 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 💥 𝗪ᴇʟᴄᴏᴍᴇ 𝘁𝗼 𝗬𝘂𝘂𝗿𝗶 𝗕𝗼𝘁 🧸✨
 
-🎮Pʟᴀʏ Gᴀᴍᴇꜱ
-💰Eᴀʀɴ Cᴏɪɴꜱ
-🏦Jᴏɪɴ Hᴇɪꜱᴛꜱ 
-🎁Iɴᴠɪᴛᴇ Fʀɪᴇɴᴅꜱ 
+🎮 Pʟᴀʏ Gᴀᴍᴇꜱ
+💰 Eᴀʀɴ Cᴏɪɴꜱ
+🏦 Jᴏɪɴ Hᴇɪꜱᴛꜱ 
+🎁 Iɴᴠɪᴛᴇ Fʀɪᴇɴᴅꜱ 
 
 👥 Uꜱᴇ: /referral 
       Tᴏ Iɴᴠɪᴛᴇ Fʀɪᴇɴᴅꜱ 
 💰 Eᴀʀɴ 1000 Cᴏɪɴꜱ Pᴇʀ Iɴᴠɪᴛᴇ
 """
 
-#            === SEND MESSAGE ===
-
-    sent_msg = await msg.reply_text(
-        caption,
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+    # --- SEND VIDEO MESSAGE ---
+    try:
+        sent_msg = await msg.reply_video(
+            video=START_VIDEO,
+            caption=caption,
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="HTML" # Using HTML to support your bold styling
+        )
+    except Exception as e:
+        # Fallback to text if video fails (e.g. invalid File ID)
+        sent_msg = await msg.reply_text(
+            caption,
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="HTML"
+        )
 
     context.chat_data["start_message_id"] = sent_msg.message_id
 
