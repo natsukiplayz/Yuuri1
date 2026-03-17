@@ -217,7 +217,6 @@ import httpx
 import base64
 from io import BytesIO
 
-# Simple color map
 COLOR_MAP = {
     "red": "#FF0000", "blue": "#0000FF", "green": "#008000",
     "yellow": "#FFFF00", "pink": "#FFC0CB", "purple": "#800080",
@@ -229,7 +228,7 @@ async def quote(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not msg or not msg.reply_to_message:
         return await msg.reply_text("❌ Rᴇᴘʟʏ ᴛᴏ ᴀ ᴍᴇꜱꜱᴀɢᴇ ᴛᴏ ᴄʀᴇᴀᴛᴇ Qᴜᴏᴛᴇ.")
 
-    # 1. Parse Arguments
+    # 1. Parse Command Settings
     bg_color = "#1b1429"
     show_reply = False
     if context.args:
@@ -239,14 +238,11 @@ async def quote(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for name, hex_val in COLOR_MAP.items():
             if name in args_lower:
                 bg_color = hex_val
-        for arg in context.args:
-            if arg.startswith("#") and len(arg) == 7:
-                bg_color = arg
 
     target_msg = msg.reply_to_message
     loading = await msg.reply_text("⚙️ Gᴇɴᴇʀᴀᴛɪɴɢ...")
 
-    # 2. Construct the Message Object
+    # 2. The Main Message Data
     message_obj = {
         "entities": [],
         "avatar": True,
@@ -258,8 +254,7 @@ async def quote(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "text": target_msg.text or target_msg.caption or ""
     }
 
-    # 3. The "Quotly" Reply Box Logic
-    # This places the reply INSIDE the bubble, not as a new bubble
+    # 3. Add Reply Box (Telegram Style)
     if show_reply and target_msg.reply_to_message:
         prev = target_msg.reply_to_message
         message_obj["replyMessage"] = {
@@ -268,14 +263,15 @@ async def quote(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "chatId": prev.from_user.id
         }
 
-    # 4. API Payload - Scale 1.1 makes the text smaller like real Telegram
+    # 4. Payload adjusted for the Quotly look
+    # Height is set smaller (512) to prevent big empty spaces
     payload = {
         "type": "quote",
         "format": "webp",
         "backgroundColor": bg_color,
         "width": 512,
-        "height": 768,
-        "scale": 1.1,  # <--- Smaller scale = Real Telegram look
+        "height": 512, 
+        "scale": 1.1, # Makes text clean and small
         "messages": [message_obj]
     }
 
@@ -293,9 +289,9 @@ async def quote(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await msg.reply_sticker(sticker=sticker_file)
             await loading.delete()
         else:
-            await loading.edit_text("❌ API Error. Check your connection.")
+            await loading.edit_text("❌ API Error. Check your logs.")
     except Exception:
-        await loading.edit_text("❌ Sᴏᴍᴇᴛʜɪɴɢ Wᴇɴᴛ Wʀᴏɴɢ ⚠️.")
+        await loading.edit_text("❌ Connection failed.")
 
 #========== Sticker Create ========
 #--
