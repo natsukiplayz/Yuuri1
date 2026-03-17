@@ -2334,135 +2334,168 @@ async def user_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await msg.reply_text(text, parse_mode="Markdown")
 
-# --- SET YOUR ID HERE ---
+import logging
+from telegram import Update, ChatPermissions
+from telegram.ext import ContextTypes, MessageHandler, filters
+
+# --- CONFIGURATION ---
 OWNER_ID = 7139383373  
+PREFIX = ","
 
-#=========promote users (MongoDB + Real Sync)========
-async def promote(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# --- HELPER FUNCTIONS ---
+
+def get_fancy_text(text, style="2"):
+    # This assumes you have your get_fancy_text function defined elsewhere
+    # If not, this is a placeholder for your typography logic
+    return text 
+
+def check_cmd(text, command):
+    """Checks if the message starts with the prefix and the command."""
+    if not text: return False
+    return text.lower().startswith(f"{PREFIX}{command.lower()}")
+
+async def get_target(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Identifies the target user from a reply or a username/ID in the arguments."""
     msg = update.message
-    chat_id = update.effective_chat.id
-    sender = update.effective_user
-    
-    # --- PERMISSION CHECK ---
-    is_owner = (sender.id == OWNER_ID)
-    sender_data = admins_db.find_one({"chat_id": chat_id, "user_id": sender.id})
-    sender_level = sender_data["level"] if sender_data else 0
-
-    if not is_owner and sender_level < 3:
-        return await msg.reply_text(get_fancy_text("❌ Yᴏᴜ ɴᴇᴇᴅ Lᴇᴠᴇʟ 3 ᴏʀ Oᴡɴᴇʀ ʀɪɢʜᴛꜱ!", "2"))
-
-    # --- TARGET IDENTIFICATION ---
     args = msg.text.split()
-    target = None
-    level = 1
-
-    if msg.reply_to_message:
-        target = msg.reply_to_message.from_user
-        level = int(args[1]) if len(args) > 1 else 1
-    elif len(args) >= 2:
-        if args[1].lower() == "me":
-            if is_owner:
-                target = sender
-                level = 100
-            else:
-                return await msg.reply_text(get_fancy_text("⚠️ Nɪᴄᴇ ᴛʀʏ, ʙᴜᴛ ʏᴏᴜ ᴄᴀɴ'ᴛ ᴘʀᴏᴍᴏᴛᴇ ʏᴏᴜʀꜱᴇʟғ!", "2"))
-        else:
-            username = args[1].replace("@","")
-            level = int(args[2]) if len(args) > 2 else 1
-            try:
-                member = await context.bot.get_chat_member(chat_id, username)
-                target = member.user
-            except:
-                return await msg.reply_text(get_fancy_text("❌ Uꜱᴇʀ ɴᴏᴛ ғᴏᴜɴᴅ.", "2"))
     
-    if not target:
-        return await msg.reply_text(get_fancy_text("⚠️ Rᴇᴘʟʏ Tᴏ Sᴏᴍᴇᴏɴᴇ Oʀ Uꜱᴇ Hᴇ'ꜱ Uꜱᴇʀɴᴀᴍᴇ ⚠️\nᴛᴏ Pʀᴏᴍᴏᴛᴇ|ᴅᴇᴍᴏᴛᴇ Oᴛʜᴇʀ", "2"))
+    if msg.reply_to_message:
+        return msg.reply_to_message.from_user
+    
+    if len(args) > 1:
+        user_input = args[1].replace("@", "")
+        try:
+            # Try getting member by username/ID
+            member = await context.bot.get_chat_member(update.effective_chat.id, user_input)
+            return member.user
+        except Exception:
+            return None
+    return None
 
-    # --- CHECK IF ALREADY PROMOTED ---
-    existing_admin = admins_db.find_one({"chat_id": chat_id, "user_id": target.id})
-    if existing_admin and existing_admin["level"] == level:
-        return await msg.reply_text(get_fancy_text("Hᴇ'ꜱ Aʟʀᴇᴀᴅʏ Aɴ Aᴅᴍɪɴ 🔰", "2"))
+# --- CORE MANAGEMENT LOGIC ---
 
-    # --- TELEGRAM ACTIONS ---
-    try:
-        if level == 1:
-            await context.bot.promote_chat_member(chat_id, target.id, can_pin_messages=True, can_invite_users=True)
-            text = f"🥇 {target.first_name} ɪꜱ ɴᴏᴡ ᴀ Bᴀꜱɪᴄ Aᴅᴍɪɴ (Lᴠ.1)"
-        elif level == 2:
-            await context.bot.promote_chat_member(chat_id, target.id, can_restrict_members=True, can_delete_messages=True, can_invite_users=True, can_pin_messages=True)
-            text = f"🥈 {target.first_name} ɪꜱ ɴᴏᴡ ᴀ Mᴏᴅᴇʀᴀᴛᴏʀ (Lᴠ.2)"
-        else:
-            await context.bot.promote_chat_member(
-                chat_id, target.id,
-                can_change_info=True, can_delete_messages=True, can_invite_users=True,
-                can_restrict_members=True, can_pin_messages=True, can_manage_chat=True,
-                can_manage_video_chats=True, 
-                can_promote_members=True if is_owner else False,
-                is_anonymous=False, can_post_stories=False, can_edit_stories=False, can_delete_stories=False
-            )
-            text = f"🥉 {target.first_name} ɪꜱ ɴᴏᴡ ᴀ Fᴜʟʟ Aᴅᴍɪɴ (Lᴠ.3)"
-
-        admins_db.update_one(
-            {"chat_id": chat_id, "user_id": target.id},
-            {"$set": {"user_name": target.first_name, "level": level, "promoted_by": sender.id}},
-            upsert=True
-        )
-        await msg.reply_text(get_fancy_text(text, "2"))
-    except Exception as e:
-        await msg.reply_text(f"❌ API Error: {e}")
-
-#========demote users (MongoDB + Real Sync)======
-async def demote(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def management_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
+    if not msg or not msg.text: return
+    
     chat_id = update.effective_chat.id
     sender = update.effective_user
+    text = msg.text
     is_owner = (sender.id == OWNER_ID)
 
+    # Fetch Sender Permissions from MongoDB
     sender_data = admins_db.find_one({"chat_id": chat_id, "user_id": sender.id})
     sender_level = sender_data["level"] if sender_data else 0
 
-    if not is_owner and sender_level < 3:
-        return await msg.reply_text(get_fancy_text("❌ Yᴏᴜ ɴᴇᴇᴅ Lᴇᴠᴇʟ 3 ᴏʀ Oᴡɴᴇʀ ʀɪɢʜᴛꜱ!", "2"))
+    # 1. PROMOTE COMMAND
+    if check_cmd(text, "promote"):
+        if not is_owner and sender_level < 3:
+            return await msg.reply_text(get_fancy_text("❌ Yᴏᴜ ɴᴇᴇᴅ Lᴇᴠᴇʟ 3 ᴏʀ Oᴡɴᴇʀ ʀɪɢʜᴛꜱ!", "2"))
 
-    # --- TARGET FINDING ---
-    target = None
-    if msg.reply_to_message:
-        target = msg.reply_to_message.from_user
-    else:
-        args = msg.text.split()
-        if len(args) >= 2:
-            username = args[1].replace("@","")
-            try:
-                m = await context.bot.get_chat_member(chat_id, username)
-                target = m.user
-            except: pass
-    
-    if not target:
-        return await msg.reply_text(get_fancy_text("⚠️ Rᴇᴘʟʏ Tᴏ Sᴏᴍᴇᴏɴᴇ Oʀ Uꜱᴇ Hᴇ'ꜱ Uꜱᴇʀɴᴀᴍᴇ ⚠️\nᴛᴏ Pʀᴏᴍᴏᴛᴇ|ᴅᴇᴍᴏᴛᴇ Oᴛʜᴇʀ", "2"))
+        target = await get_target(update, context)
+        if not target:
+            return await msg.reply_text(get_fancy_text("⚠️ Rᴇᴘʟʏ Tᴏ Sᴏᴍᴇᴏɴᴇ Oʀ Uꜱᴇ Hᴇ'ꜱ Uꜱᴇʀɴᴀᴍᴇ", "2"))
 
-    # --- SASSY PROTECTION CHECKS ---
-    if target.id == OWNER_ID:
-        return await msg.reply_text(get_fancy_text("⚠️ ɴɪᴄᴇ Tʀʏ Bᴜᴛ Yᴏᴜ Cᴀɴ'ᴛ Dᴇᴍᴏᴛᴇ Hɪᴍ 😂", "2"))
+        # Extract Level
+        args = text.split()
+        try:
+            level = int(args[2]) if len(args) > 2 else (int(args[1]) if len(args) > 1 and args[1].isdigit() else 1)
+        except: level = 1
 
-    target_db = admins_db.find_one({"chat_id": chat_id, "user_id": target.id})
-    if not target_db:
-        return await msg.reply_text(get_fancy_text("❌ Tʜɪꜱ ᴜꜱᴇʀ ɪꜱɴ'ᴛ ɪɴ ᴍʏ Sᴛᴀғғ ᴅᴀᴛᴀʙᴀꜱᴇ.", "2"))
+        try:
+            if level == 1:
+                await context.bot.promote_chat_member(chat_id, target.id, can_pin_messages=True, can_invite_users=True)
+                res_text = f"{target.first_name} Pʀᴏᴍᴏᴛᴇᴅ! (ʟᴠ:1) 🥇"
+            elif level == 2:
+                await context.bot.promote_chat_member(chat_id, target.id, can_restrict_members=True, can_delete_messages=True, can_invite_users=True, can_pin_messages=True)
+                res_text = f"{target.first_name} Pʀᴏᴍᴏᴛᴇᴅ! (ʟᴠ:2) 🥈"
+            else:
+                await context.bot.promote_chat_member(
+                    chat_id, target.id,
+                    can_change_info=True, can_delete_messages=True, can_invite_users=True,
+                    can_restrict_members=True, can_pin_messages=True, can_manage_chat=True,
+                    can_promote_members=True if is_owner else False
+                )
+                res_text = f"{target.first_name} Pʀᴏᴍᴏᴛᴇᴅ! (ʟᴠ:3) 🥉"
 
-    # If sender isn't Owner and didn't promote the target
-    if not is_owner and target_db.get("promoted_by") != sender.id:
-        return await msg.reply_text(get_fancy_text("Hᴇ'ꜱ Pʀᴏᴍᴏᴛᴇᴅ Oᴛʜᴇʀ Tʜᴀɴ Mᴇ 🔰", "2"))
+            admins_db.update_one(
+                {"chat_id": chat_id, "user_id": target.id},
+                {"$set": {"user_name": target.first_name, "level": level, "promoted_by": sender.id}},
+                upsert=True
+            )
+            await msg.reply_text(get_fancy_text(res_text, "2"))
+        except Exception as e:
+            await msg.reply_text(f"❌ API Error: {e}")
 
-    try:
-        await context.bot.promote_chat_member(
-            chat_id, target.id,
-            can_change_info=False, can_delete_messages=False, can_invite_users=False,
-            can_restrict_members=False, can_pin_messages=False, can_promote_members=False,
-            can_manage_chat=False, can_manage_video_chats=False
-        )
-        admins_db.delete_one({"chat_id": chat_id, "user_id": target.id})
-        await msg.reply_text(get_fancy_text(f"⁉️ {target.first_name} Dᴇᴍᴏᴛᴇᴅ!", "2"))
-    except Exception as e:
-        await msg.reply_text(f"❌ Error: {e}")
+    # 2. DEMOTE COMMAND
+    elif check_cmd(text, "demote"):
+        if not is_owner and sender_level < 3:
+            return await msg.reply_text(get_fancy_text("❌ Yᴏᴜ ɴᴇᴇᴅ Lᴇᴠᴇʟ 3 ᴏʀ Oᴡɴᴇʀ ʀɪɢʜᴛꜱ!", "2"))
+
+        target = await get_target(update, context)
+        if not target: return
+        
+        if target.id == OWNER_ID:
+            return await msg.reply_text(get_fancy_text("⚠️ ɴɪᴄᴇ Tʀʏ Bᴜᴛ Yᴏᴜ Cᴀɴ'ᴛ Dᴇᴍᴏᴛᴇ Hɪᴍ 😂", "2"))
+
+        target_db = admins_db.find_one({"chat_id": chat_id, "user_id": target.id})
+        if not is_owner and target_db and target_db.get("promoted_by") != sender.id:
+            return await msg.reply_text(get_fancy_text(f"{target.first_name} Iꜱ Pʀᴏᴍᴏᴛᴇᴅ Oᴛʜᴇʀ Tʜᴀɴ Mᴇ 🧩", "2"))
+
+        try:
+            await context.bot.promote_chat_member(chat_id, target.id, can_manage_chat=False)
+            admins_db.delete_one({"chat_id": chat_id, "user_id": target.id})
+            await msg.reply_text(get_fancy_text(f"⁉️ {target.first_name} Dᴇᴍᴏᴛᴇᴅ!", "2"))
+        except Exception as e:
+            await msg.reply_text(f"❌ Error: {e}")
+
+    # 3. BAN COMMAND
+    elif check_cmd(text, "ban"):
+        if not is_owner and sender_level < 2: return
+        target = await get_target(update, context)
+        if not target: return
+
+        target_status = (await context.bot.get_chat_member(chat_id, target.id)).status
+        if target_status in ["administrator", "creator"]:
+            return await msg.reply_text(get_fancy_text("Yᴏᴜ Cᴀɴ'ᴛ Bᴀɴ Oᴛʜᴇʀ Aᴅᴍɪɴꜱ 🔰", "2"))
+
+        try:
+            await context.bot.ban_chat_member(chat_id, target.id)
+            await msg.reply_text(get_fancy_text(f"{target.first_name} Bᴀɴɴᴇᴅ! 🚫", "2"))
+        except:
+            await msg.reply_text(get_fancy_text(f"{target.first_name} Iꜱ Aʟʀᴇᴀᴅʏ Bᴀɴɴᴇᴅ! 🚫", "2"))
+
+    # 4. UNBAN COMMAND
+    elif check_cmd(text, "unban"):
+        if not is_owner and sender_level < 2: return
+        target = await get_target(update, context)
+        if not target: return
+        await context.bot.unban_chat_member(chat_id, target.id)
+        await msg.reply_text(get_fancy_text(f"{target.first_name} Uɴʙᴀɴɴᴇᴅ! ✅", "2"))
+
+    # 5. MUTE COMMAND
+    elif check_cmd(text, "mute"):
+        if not is_owner and sender_level < 2: return
+        target = await get_target(update, context)
+        if not target: return
+
+        target_status = (await context.bot.get_chat_member(chat_id, target.id)).status
+        if target_status in ["administrator", "creator"]:
+            return await msg.reply_text(get_fancy_text("Yᴏᴜ Cᴀɴ'ᴛ Mᴜᴛᴇ Oᴛʜᴇʀ Aᴅᴍɪɴꜱ 🔰", "2"))
+
+        try:
+            await context.bot.restrict_chat_member(chat_id, target.id, permissions=ChatPermissions(can_send_messages=False))
+            await msg.reply_text(get_fancy_text(f"{target.first_name} Mᴜᴛᴇᴅ! 🔕", "2"))
+        except:
+            await msg.reply_text(get_fancy_text(f"{target.first_name} Iꜱ Aʟʀᴇᴀᴅʏ Mᴜᴛᴇᴅ! 😋", "2"))
+
+    # 6. UNMUTE COMMAND
+    elif check_cmd(text, "unmute"):
+        if not is_owner and sender_level < 2: return
+        target = await get_target(update, context)
+        if not target: return
+        await context.bot.restrict_chat_member(chat_id, target.id, permissions=ChatPermissions(can_send_messages=True, can_send_media_messages=True, can_send_other_messages=True, can_add_web_page_previews=True))
+        await msg.reply_text(get_fancy_text(f"{target.first_name} Uɴᴍᴜᴛᴇᴅ! ✅", "2"))
 
 # ---------------- MEMORY STORAGE ----------------
 
@@ -2689,11 +2722,16 @@ def main():
     app.add_handler(CommandHandler("bounty", bounty))
 
     # =====================================================
-    # GROUP MANAGEMENT
+    # GROUP MANAGEMENT (REWRITTEN)
     # =====================================================
     app.add_handler(CommandHandler("user", user_command))
-    app.add_handler(MessageHandler(filters.Regex(r"^\.promote"), promote))
-    app.add_handler(MessageHandler(filters.Regex(r"^\.demote"), demote))
+    
+    # This handler processes all comma-prefixed commands (,promote, ,ban, etc.)
+    # It MUST stay above auto_reply to intercept the commands first.
+    app.add_handler(MessageHandler(
+        filters.TEXT & filters.Regex(r"^,") & filters.ChatType.GROUPS, 
+        management_handler
+    ))
 
     # =====================================================
     # FUN / SIDE FEATURES
@@ -2710,26 +2748,24 @@ def main():
     app.add_handler(CommandHandler("font", font_converter))
 
     # =====================================================
-    # CALLBACK HANDLERS
+    # CALLBACK & WELCOME & STICKERS
     # =====================================================
     app.add_handler(CallbackQueryHandler(heist_choice, pattern="^heist_"))
     app.add_handler(CallbackQueryHandler(callback_handler))
-
-    # =====================================================
-    # WELCOME SYSTEM
-    # =====================================================
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
-
-    # ====================================================
-    # RANDOM STICKER REPLY (NEW FEATURE)
-    # ====================================================
-    # We place this above the generic MessageHandlers to ensure it catches stickers first
     app.add_handler(MessageHandler(filters.Sticker.ALL, reply_with_random_sticker))
 
     # =====================================================
-    # MESSAGE HANDLERS
+    # MESSAGE HANDLERS (CLEANED)
     # =====================================================
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, auto_reply))
+    # We add ~filters.Regex(r"^,") here so the bot doesn't try to 
+    # "chat" with you when you are using management commands.
+    app.add_handler(MessageHandler(
+        filters.TEXT & ~filters.COMMAND & ~filters.Regex(r"^,"), 
+        auto_reply
+    ))
+    
+    # Save all other message data
     app.add_handler(MessageHandler(filters.ALL, save_chat))
 
     # =====================================================
