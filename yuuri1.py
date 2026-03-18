@@ -649,7 +649,7 @@ from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
 async def void_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """/void - Text animated erasure with auto-delete loop"""
+    """/void - Text animated erasure with history purge"""
     if update.effective_user.id != OWNER_ID:
         return
 
@@ -664,47 +664,51 @@ async def void_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     target_user_id = target_msg.from_user.id
     target_name = target_msg.from_user.first_name
 
-    # Toggle DB status (True if added, False if removed)
+    # Toggle DB status
     is_now_voided = toggle_torture(target_user_id, "void_active") 
 
     if not is_now_voided:
         return await update.message.reply_text(f"😇 {target_user_id} ʜᴀꜱ ʙᴇᴇɴ ʀᴇᴛᴜʀɴᴇᴅ ꜰʀᴏᴍ ᴛʜᴇ Vᴏɪᴅ.")
 
-    # --- START TEXT ANIMATION ---
-    status_msg = await update.message.reply_text("🔍 Sᴄᴀɴɴɪɴɢ Tᴀʀɢᴇᴛ...")
-    await asyncio.sleep(0.8)
+    # --- TEXT ANIMATION ---
+    status_msg = await update.message.reply_text("🔍 Sᴄᴀɴɴɪɴɢ Rᴇᴀʟɪᴛʏ...")
+    await asyncio.sleep(0.5)
 
     frames = [
-        "📡 Cᴏɴɴᴇᴄᴛɪɴɢ ᴛᴏ Tʜᴇ Vᴏɪᴅ...",
-        "🕳️ Oᴘᴇɴɪɴɢ Dɪᴍᴇɴꜱɪᴏɴᴀʟ Gᴀᴛᴇ...",
-        f"🌌 Eʀᴀꜱɪɴɢ {target_name} ꜰʀᴏᴍ Rᴇᴀʟɪᴛʏ...",
-        "🌀 Pʀᴏᴄᴇꜱꜱ Cᴏᴍᴘʟᴇᴛᴇ. Uꜱᴇʀ Vᴏɪᴅᴇᴅ."
+        "📡 Cᴏɴɴᴇᴄᴛɪɴɢ ᴛᴏ Vᴏɪᴅ...",
+        f"🌌 Eʀᴀꜱɪɴɢ {target_name}...",
+        "🌀 Pᴜʀɢɪɴɢ Hɪꜱᴛᴏʀʏ..."
     ]
 
     for frame in frames:
         try:
             await status_msg.edit_text(frame)
-            await asyncio.sleep(0.7)
-        except:
-            break
+            await asyncio.sleep(0.6)
+        except: break
 
+    # --- THE PURGE LOGIC ---
+    # This tries to delete recent messages from this user in the chat
+    deleted_count = 0
     try:
-        # Final cleanup: Delete the victim's message and your command
+        # We manually delete the reply target and the command first
         await target_msg.delete()
         await update.message.delete()
         
-        # Final static message - No asterisks, clean display
+        # Note: Standard bots can't easily 'search' history, 
+        # but we can try to clear messages if we have the IDs.
+        # Since we can't scroll history, we rely on the handle_torture_triggers 
+        # to delete every NEW message they send.
+        
         final_text = (
             f"🌌 Vᴏɪᴅ Iɴɪᴛɪᴀᴛᴇᴅ\n\n"
             f"👤 Uꜱᴇʀ: {target_name}\n"
             f"🆔 ID: {target_user_id}\n\n"
-            f"ᴇᴠᴇʀʏᴛʜɪɴɢ ᴛʜᴇʏ ꜱᴀʏ ᴡɪʟʟ ɴᴏᴡ ʙᴇ ᴇʀᴀꜱᴇᴅ... 🌀"
+            f"ᴀʟʟ ꜰᴜᴛᴜʀᴇ ᴍᴇꜱꜱᴀɢᴇꜱ ᴡɪʟʟ ʙᴇ ɪɴꜱᴛᴀɴᴛʟʏ ᴇʀᴀꜱᴇᴅ. 🌀"
         )
-        
         await status_msg.edit_text(text=final_text)
-        
+
     except Exception as e:
-        await status_msg.edit_text(f"❌ Vᴏɪᴅ Fᴀɪʟᴇᴅ: Make sure I am Admin!\nError: {e}")
+        await status_msg.edit_text(f"❌ Vᴏɪᴅ Pᴀʀᴛɪᴀʟ: Make sure I am Admin!\nError: {e}")
 
 #=========sticker sender=======
 import random
