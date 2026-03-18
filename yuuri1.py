@@ -855,37 +855,54 @@ async def stop_all_torture_cmd(update: Update, context: ContextTypes.DEFAULT_TYP
     await update.message.reply_text("🏳️ Aʟʟ Oᴘᴇʀᴀᴛɪᴏɴꜱ Cᴇᴀꜱᴇᴅ. Eᴠᴇʀʏᴏɴᴇ ɪꜱ Sᴀꜰᴇ!")
 
 # --- TRIGGER HANDLER ---
+import asyncio
+import random
+import logging
+from telegram import Update
+from telegram.ext import ContextTypes
+from telegram.constants import ParseMode
+
+# --- WORKABLE TRIGGER HANDLER ---
 async def handle_torture_triggers(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Basic safety checks
     if not update.message or not update.message.from_user:
         return
     
     user_id = update.message.from_user.id
     chat_id = update.effective_chat.id
 
-    # --- 1. GHOST PING CHECK ---
+    # --- 1. GHOST PING CHECK (Notification Troll) ---
     if is_tortured(user_id, "ghost"):
         try:
-            # Invisible mention
+            # We use a zero-width non-joiner link. 
+            # This triggers the '@' notification icon but shows "empty" text.
             m = await context.bot.send_message(
-                chat_id=chat_id, 
-                text=f"[\u200b](tg://user?id={user_id})", 
-                parse_mode="Markdown"
+                chat_id=chat_id,
+                text=f'<a href="tg://user?id={user_id}">\u200c</a>', 
+                parse_mode=ParseMode.HTML
             )
+            # Delete instantly so the user sees the '1' notification but no message
             await m.delete()
         except Exception as e:
-            logging.error(f"Ghost Error: {e}")
+            logging.error(f"Ghost Ping Failed: {e}")
 
-    # --- 2. STICKER RAIN CHECK ---
+    # --- 2. STICKER RAIN CHECK (Screen Filler) ---
     if is_tortured(user_id, "rain"):
-        # Hum check karenge ki kya yeh sticker rain list mein hai
+        # We send 3 stickers from your MY_PACKS list
         for _ in range(3):
             try:
-                chosen_pack = random.choice(MY_PACKS)
-                sticker_set = await context.bot.get_sticker_set(name=chosen_pack)
-                sticker = random.choice(sticker_set.stickers)
-                await update.message.reply_sticker(sticker=sticker.file_id)
-                await asyncio.sleep(0.3) # Chota gap taaki spam filter na lage
-            except Exception:
+                chosen_pack_name = random.choice(MY_PACKS)
+                sticker_set = await context.bot.get_sticker_set(name=chosen_pack_name)
+                
+                if sticker_set.stickers:
+                    random_sticker = random.choice(sticker_set.stickers)
+                    # Reply directly to their message to bury it
+                    await update.message.reply_sticker(sticker=random_sticker.file_id)
+                    
+                # Essential: Tiny sleep to avoid Telegram's Flood Control (429 Error)
+                await asyncio.sleep(0.5) 
+            except Exception as e:
+                logging.error(f"Sticker Rain Error: {e}")
                 continue
 
 # ================= BOT STATS =================
