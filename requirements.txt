@@ -1,6 +1,8 @@
-Python-telegram-bot>=21.0
+python-telegram-bot>=21.0
 pymongo
 requests
 dnspython
 httpx
 pytz
+fastapi
+uvicorn[standard]
