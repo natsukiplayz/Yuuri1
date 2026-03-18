@@ -642,6 +642,53 @@ async def murder(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="HTML"
     )
 
+#========Void messages ========
+async def void_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """/void [reply|username] - Purges a user's messages from the group"""
+    if update.effective_user.id != OWNER_ID:
+        return
+
+    chat = update.effective_chat
+    if chat.type == "private":
+        return await update.message.reply_text("Aᴡᴡᴡ Sᴡᴇᴇᴛʏ Sɪʟʟʏ Uꜱᴇ Tʜɪꜱ Iɴ Gʀᴏᴜᴘꜱ ☺️")
+
+    target_user_id = None
+    
+    # 1. Check if replying to a user
+    if update.message.reply_to_message:
+        target_user_id = update.message.reply_to_message.from_user.id
+    # 2. Check if username/ID is provided in args
+    elif context.args:
+        try:
+            # Handle if user provides a raw ID
+            target_user_id = int(context.args[0])
+        except ValueError:
+            # If they provided @username, we can only get the ID if the bot has seen them
+            await update.message.reply_text("❌ Pʟᴇᴀꜱᴇ Rᴇᴘʟʏ Tᴏ A Mᴇꜱꜱᴀɢᴇ Oʀ Pʀᴏᴠɪᴅᴇ A Vᴀʟɪᴅ Uꜱᴇʀ ID.")
+            return
+
+    if not target_user_id:
+        return await update.message.reply_text("❓ Wʜᴏ Sʜᴏᴜʟᴅ I Vᴏɪᴅ? Rᴇᴘʟʏ Tᴏ Tʜᴇᴍ Oʀ Gɪᴠᴇ Aɴ ID.")
+
+    status_msg = await update.message.reply_text(f"🌀 Vᴏɪᴅɪɴɢ ᴍᴇꜱꜱᴀɢᴇꜱ ꜰᴏʀ `{target_user_id}`... Pʟᴇᴀꜱᴇ Wᴀɪᴛ.")
+
+    # We can't delete 'all' messages ever sent (Telegram API limit), 
+    # but we can purge the recent cache.
+    count = 0
+    try:
+        # We check the last 200 messages in the group
+        async for message in context.bot.get_chat_history(chat_id=chat.id, limit=200):
+            if message.from_user and message.from_user.id == target_user_id:
+                try:
+                    await message.delete()
+                    count += 1
+                except Exception:
+                    continue
+        
+        await status_msg.edit_text(f"🌌 Vᴏɪᴅ Cᴏᴍᴘʟᴇᴛᴇ. `{count}` ᴍᴇꜱꜱᴀɢᴇꜱ ꜰʀᴏᴍ `{target_user_id}` ᴡᴇʀᴇ ᴇʀᴀꜱᴇᴅ ꜰʀᴏᴍ ᴇxɪꜱᴛᴇɴᴄᴇ. 💥")
+    except Exception as e:
+        await status_msg.edit_text(f"❌ Vᴏɪᴅ Fᴀɪʟᴇᴅ: {e}")
+
 #=========sticker sender=======
 import random
 import logging
