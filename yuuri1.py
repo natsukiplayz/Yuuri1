@@ -446,23 +446,27 @@ from telegram.ext import ApplicationHandlerStop
 # --- BLOCK/UNBLOCK LOGIC ---
 
 async def block_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # 1. Security check: Only Owner can use this command
     if update.effective_user.id != OWNER_ID:
         return await update.message.reply_text("Oᴏᴘꜱ! Tʜɪꜱ Cᴏᴍᴍᴀɴᴅ Iꜱ Fᴏʀ Mʏ Oᴡɴᴇʀ Oɴʟʏ 😊")
 
     target_id = None
     if update.message.reply_to_message:
         target_id = update.message.reply_to_message.from_user.id
-        first_name = update.message.reply_to_message.from_user.first_name
     elif context.args:
         try:
             target_id = int(context.args[0])
-            first_name = f"Uꜱᴇʀ ({target_id})"
         except ValueError:
             return await update.message.reply_text("❌ Pʟᴇᴀꜱᴇ ᴘʀᴏᴠɪᴅᴇ ᴀ ᴠᴀʟɪᴅ Uꜱᴇʀ ID.")
 
+    # 2. THE SELF-BLOCK GUARD 🛑
+    if target_id == OWNER_ID:
+        return await update.message.reply_text("Yᴏᴜ ᴄᴀɴ'ᴛ ʙʟᴏᴄᴋ ʏᴏᴜʀsᴇʟғ, Bᴏss! Tʜᴀᴛ's ᴀ ᴛʀᴀᴘ. ⛔")
+
+    # 3. Proceed with blocking if it's someone else
     if target_id:
         users.update_one({"id": target_id}, {"$set": {"blocked": True}}, upsert=True)
-        await update.message.reply_text(f"{first_name} Bʟᴏᴄᴋᴇᴅ Sᴜᴄᴄᴇꜱꜱꜰᴜʟʟʏ ✅")
+        await update.message.reply_text(f"Uꜱᴇʀ `{target_id}` Bʟᴏᴄᴋᴇᴅ Sᴜᴄᴄᴇꜱꜱꜰᴜʟʟʏ ✅")
 
 async def unblock_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != OWNER_ID:
