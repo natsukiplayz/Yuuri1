@@ -54,14 +54,6 @@ guilds = db["guilds"]
 sticker_packs = db["sticker_packs"]
 heists = db["heists"]
 
-    user = update.effective_user
-    user_data = get_user(user)
-
-    # --- BLOCK CHECK ---
-    if user_data.get("blocked", False):
-        return await update.message.reply_text("Sᴏʀʀʏ Bᴜᴛ Yᴏᴜʀ Bʟᴏᴄᴋᴇᴅ 😒")
-    # -------------------
-
 #============ Management Db Collection ==========
 admins_db = db["admins"] 
 torture_db = db["torture_registry"]
@@ -449,60 +441,47 @@ async def save_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await saving_msg.edit_text(f"❌ Cᴀɴ'ᴛ Sᴀᴠᴇ: {error_msg[:50]}")
 
-#==========block_user=========
+from telegram.ext import ApplicationHandlerStop
+
+# --- BLOCK/UNBLOCK LOGIC ---
+
 async def block_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Non-Owner Check
     if update.effective_user.id != OWNER_ID:
         return await update.message.reply_text("Oᴏᴘꜱ! Tʜɪꜱ Cᴏᴍᴍᴀɴᴅ Iꜱ Fᴏʀ Mʏ Oᴡɴᴇʀ Oɴʟʏ 😊")
 
     target_id = None
-    target_name = "Uꜱᴇʀ"
-
-    # Check if replied to a user or provided an ID
     if update.message.reply_to_message:
         target_id = update.message.reply_to_message.from_user.id
-        target_name = update.message.reply_to_message.from_user.first_name
+        first_name = update.message.reply_to_message.from_user.first_name
     elif context.args:
         try:
             target_id = int(context.args[0])
+            first_name = f"Uꜱᴇʀ ({target_id})"
         except ValueError:
-            return await update.message.reply_text("❌ Pʟᴇᴀꜱᴇ ᴘʀᴏᴠɪᴅᴇ a valid User ID.")
+            return await update.message.reply_text("❌ Pʟᴇᴀꜱᴇ ᴘʀᴏᴠɪᴅᴇ ᴀ ᴠᴀʟɪᴅ Uꜱᴇʀ ID.")
 
-    if not target_id:
-        return await update.message.reply_text("❌ Rᴇᴘʟʏ ᴛᴏ ᴀ ᴜꜱᴇʀ ᴏʀ ᴘʀᴏᴠɪᴅᴇ ᴛʜᴇɪʀ ID.")
-
-    # Update Database (Setting blocked: True increases your /stats counter!)
-    db["chats"].update_one({"id": target_id}, {"$set": {"blocked": True}}, upsert=True)
-    db["users"].update_one({"user_id": target_id}, {"$set": {"blocked": True}}, upsert=True)
-
-    await update.message.reply_text(f"{target_name} Bʟᴏᴄᴋᴇᴅ Sᴜᴄᴄᴇꜱꜱꜰᴜʟʟʏ ✅")
-
+    if target_id:
+        users.update_one({"id": target_id}, {"$set": {"blocked": True}}, upsert=True)
+        await update.message.reply_text(f"{first_name} Bʟᴏᴄᴋᴇᴅ Sᴜᴄᴄᴇꜱꜱꜰᴜʟʟʏ ✅")
 
 async def unblock_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Non-Owner Check
     if update.effective_user.id != OWNER_ID:
         return await update.message.reply_text("Oᴏᴘꜱ! Tʜɪꜱ Cᴏᴍᴍᴀɴᴅ Iꜱ Fᴏʀ Mʏ Oᴡɴᴇʀ Oɴʟʏ 😊")
 
     target_id = None
-    target_name = "Uꜱᴇʀ"
-
     if update.message.reply_to_message:
         target_id = update.message.reply_to_message.from_user.id
-        target_name = update.message.reply_to_message.from_user.first_name
+        first_name = update.message.reply_to_message.from_user.first_name
     elif context.args:
         try:
             target_id = int(context.args[0])
+            first_name = f"Uꜱᴇʀ ({target_id})"
         except ValueError:
-            return await update.message.reply_text("❌ Pʟᴇᴀꜱᴇ ᴘʀᴏᴠɪᴅᴇ a valid User ID.")
+            return await update.message.reply_text("❌ Pʟᴇᴀꜱᴇ ᴘʀᴏᴠɪᴅᴇ ᴀ ᴠᴀʟɪᴅ Uꜱᴇʀ ID.")
 
-    if not target_id:
-        return await update.message.reply_text("❌ Rᴇᴘʟʏ ᴛᴏ ᴀ ᴜꜱᴇʀ ᴏʀ ᴘʀᴏᴠɪᴅᴇ ᴛʜᴇɪʀ ID.")
-
-    # Update Database (Removes the block flag)
-    db["chats"].update_one({"id": target_id}, {"$set": {"blocked": False}}, upsert=True)
-    db["users"].update_one({"user_id": target_id}, {"$set": {"blocked": False}}, upsert=True)
-
-    await update.message.reply_text(f"{target_name} Uɴʙʟᴏᴄᴋᴇᴅ Sᴜᴄᴄᴇꜱꜱꜰᴜʟʟʏ ✅")
+    if target_id:
+        users.update_one({"id": target_id}, {"$set": {"blocked": False}}, upsert=True)
+        await update.message.reply_text(f"{first_name} Uɴʙʟᴏᴄᴋᴇᴅ Sᴜᴄᴄᴇꜱꜱꜰᴜʟʟʏ ✅")
 
 #==========welcome_message======
 import random
@@ -958,11 +937,12 @@ import psutil
 from datetime import datetime, timezone
 
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Security check: Only Owner can see this
+    # 1. Security check: Only Owner can see this
     if update.effective_user.id != OWNER_ID:
         return
 
-    # Calculate Uptime
+    # 2. Calculate Uptime
+    # Ensure BOT_START_TIME is defined at the very top of your script
     now = datetime.now(timezone.utc)
     uptime_delta = now - BOT_START_TIME
     days = uptime_delta.days
@@ -974,31 +954,33 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         uptime_str = f"{hours}ʜ {minutes}ᴍ {seconds}ꜱ"
 
-    # Calculate RAM Usage
+    # 3. Calculate RAM Usage
     ram = psutil.virtual_memory()
-    ram_used = round(ram.used / (1024 ** 2), 2) # Converts bytes to Megabytes
-    ram_str = f"{ram.percent}% ({ram_used} MB)"
+    ram_used = round(ram.used / (1024 ** 2), 2)  # MB
+    ram_total = round(ram.total / (1024 ** 2), 2) # Total MB
+    ram_str = f"{ram.percent}% ({ram_used}/{ram_total} MB)"
 
-    # Database Queries
+    # 4. Database Queries
+    # Note: Using 'users' and 'db["chats"]' to match your previous code
     chats_col = db["chats"]
-    users_col = db["users"]
+    
+    groups_count = chats_col.count_documents({"type": {"$in": ["group", "supergroup"]}})
+    private_count = chats_col.count_documents({"type": "private"})
+    
+    # This counts users where 'blocked' is set to True
+    blocked_count = users.count_documents({"blocked": True})
+    total_users_count = users.count_documents({})
 
-    # If you use async mongo (Motor), these need to be 'await chats_col.count_documents(...)'
-    # If using synchronous PyMongo, keep it exactly as it is:
-    groups = chats_col.count_documents({"type": {"$in": ["group", "supergroup"]}})
-    private = chats_col.count_documents({"type": "private"})
-    blocked = chats_col.count_documents({"blocked": True})
-    total_users = users_col.count_documents({})
-
-    # Format the message exactly as you requested
+    # 5. Format the message
     text = (
-        "📊 𝗬𝘂𝘂𝗿𝗶 𝗕𝗼𝘁 𝗦𝘁𝗮𝘁𝘀\n\n"
-        f"👥 Gʀᴏᴜᴘꜱ : `{groups}`\n"
-        f"💬 Cʜᴀᴛꜱ : `{private}`\n"
-        f"🧑‍💻 Tᴏᴛᴀʟ Uꜱᴇʀꜱ : `{total_users}`\n"
+        "📊 **𝗬𝘂𝘂𝗿𝗶 𝗕𝗼𝘁 𝗦𝘁𝗮𝘁𝘀**\n\n"
+        f"👥 Gʀᴏᴜᴘꜱ : `{groups_count}`\n"
+        f"💬 Cʜᴀᴛꜱ : `{private_count}`\n"
+        f"🧑‍💻 Tᴏᴛᴀʟ Uꜱᴇʀꜱ : `{total_users_count}`\n"
+        f"🚫 Bʟᴏᴄᴋᴇᴅ Uꜱᴇʀꜱ : `{blocked_count}`\n"
+        "--- --- --- --- ---\n"
         f"⏱ Uᴘᴛɪᴍᴇ : `{uptime_str}`\n"
-        f"💾 Rᴀᴍ : `{ram_str}`\n\n"
-        f"🚫 Bʟᴏᴄᴋᴇᴅ Uꜱᴇʀꜱ : `{blocked}`\n"
+        f"💾 Rᴀᴍ : `{ram_str}`\n"
     )
 
     await update.message.reply_text(text, parse_mode="Markdown")
@@ -2902,18 +2884,35 @@ async def unwarn(update: Update, context: ContextTypes.DEFAULT_TYPE):
     admins_db.update_one({"chat_id": update.effective_chat.id, "user_id": user_id}, {"$set": {"warns": 0}})
     await update.message.reply_text(get_fancy_text(f"✅ Warns for {name} have been reset.", "2"))
 
-# ================= AUTO-UPDATE USER CACHE =================
+# ================= AUTO-UPDATE USER CACHE & BLOCK CHECK =================
 
 async def save_chat_and_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """This function replaces your old save_chat and fixes the username lookup."""
+    """Updates database cache and stops blocked users from using the bot."""
     chat = update.effective_chat
     user = update.effective_user
-    if not chat or not user: return
+    if not chat or not user: 
+        return
 
-    # 1. Update Chat
-    db["chats"].update_one({"id": chat.id}, {"$set": {"id": chat.id, "type": chat.type, "title": getattr(chat, "title", None)}}, upsert=True)
+    # 1. BLOCK CHECK (Crucial: Runs before anything else)
+    user_db = users.find_one({"id": user.id})
+    if user_db and user_db.get("blocked"):
+        # Send the rejection message
+        await update.message.reply_text("Sᴏʀʀʏ Bᴜᴛ Yᴏᴜʀ Bʟᴏᴄᴋᴇᴅ 😒")
+        # Stop all other handlers (group 1, group 2, etc.) from running
+        raise ApplicationHandlerStop
 
-    # 2. Update User (Crucial for Baka-style username lookup)
+    # 2. Update Chat
+    db["chats"].update_one(
+        {"id": chat.id}, 
+        {"$set": {
+            "id": chat.id, 
+            "type": chat.type, 
+            "title": getattr(chat, "title", None)
+        }}, 
+        upsert=True
+    )
+
+    # 3. Update User (Crucial for Baka-style username lookup)
     users.update_one(
         {"id": user.id},
         {"$set": {
