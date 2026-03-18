@@ -79,7 +79,7 @@ def get_user(user):
         "guild": None,
         "dead": False,
         "inventory": [],
-        "referred_by": None
+        "referred_by": None,
         "blocked": False
     }
         users.insert_one(data)
