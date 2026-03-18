@@ -2646,7 +2646,7 @@ async def ask_ai_async(chat_id: int, text: str, username: str):
         )
 
         data = {
-            "model": "moonshotai/moonshot-v1-8k",
+            "model": "moonshotai/kimi-k1.5-chat",
             "messages": [
                 {"role": "system", "content": system_content}
             ] + chat_memory[chat_id]
