@@ -718,10 +718,7 @@ async def font_converter(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(converted_text)
 
 #============ personal and leave ==========
-from telegram import Update
-from telegram.ext import ContextTypes, CommandHandler
-
-OWNER_ID = 5773908061
+# ================= OWNER COMMANDS =================
 
 async def leave_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Command: /leave - Yuri leaves with sass 💥"""
@@ -761,19 +758,16 @@ async def send_personal(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     try:
-        # OPTION A: If you are replying to something
+        # OPTION A: If you are replying to a message/sticker/GIF
         if update.message.reply_to_message:
             reply = update.message.reply_to_message
             
-            if reply.sticker:
-                await context.bot.send_sticker(chat_id=target_id, sticker=reply.sticker.file_id)
-            elif reply.text:
-                await context.bot.send_message(chat_id=target_id, text=reply.text)
-            elif reply.animation: # Gifs
-                await context.bot.send_animation(chat_id=target_id, animation=reply.animation.file_id)
-            else:
-                # Catch-all for other media (Photos, etc)
-                await context.bot.copy_message(chat_id=target_id, from_chat_id=chat.id, message_id=reply.message_id)
+            # Use copy_message to preserve the exact object (Sticker, GIF, Video, Photo)
+            await context.bot.copy_message(
+                chat_id=target_id, 
+                from_chat_id=update.effective_chat.id, 
+                message_id=reply.message_id
+            )
         
         # OPTION B: If you typed a message after the ID
         elif len(context.args) > 1:
@@ -781,7 +775,7 @@ async def send_personal(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_message(chat_id=target_id, text=text_to_send)
         
         else:
-            await update.message.reply_text("❓ Nothing to send. Reply to a sticker/msg or type text after the ID.")
+            await update.message.reply_text("❓ Nothing to send. Reply to something or type text.")
             return
 
         await update.message.reply_text(f"✅ Oʙᴊᴇᴄᴛ Sᴇɴᴛ Tᴏ `{target_id}` 🚀")
