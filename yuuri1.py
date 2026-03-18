@@ -11,13 +11,11 @@ from io import BytesIO
 
 import requests
 import httpx
-
+from fastapi import FastAPI, Request  # <--- Added for Webhooks
 from pymongo import MongoClient
 
-from telegram import InputSticker
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import InputSticker, Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ChatAction
-
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -29,6 +27,8 @@ from telegram.ext import (
 
 from datetime import datetime, timezone
 
+# ================= WEBHOOK SETUP =================
+app = FastAPI() # <--- This is your "Web Server"
 BOT_START_TIME = datetime.now(timezone.utc)
 
 # ================= TERMUX +srv FIX =================
@@ -3164,135 +3164,118 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
     if "Timed out" in str(context.error) or "httpx" in str(context.error):
         return 
 
-# ---------------- MAIN APPLICATION ----------------
+# --- 1. INITIALIZE APPLICATION (GLOBAL SCOPE) ---
+# This replaces your 'app =' inside the main function
+application = (
+    ApplicationBuilder()
+    .token(BOT_TOKEN)
+    .connect_timeout(40.0)
+    .read_timeout(40.0)
+    .write_timeout(40.0)
+    .pool_timeout(40.0)
+    .build()
+)
 
-def main():
-    print("🔥 Yᴜᴜʀɪ Bᴏᴛ ɪs ɪɴɪᴛɪᴀʟɪᴢɪɴɢ...")
+# --- 2. REGISTER ALL YOUR HANDLERS ---
+# (I've kept your exact logic here)
+application.add_handler(MessageHandler(filters.ALL, save_chat_and_user), group=-1)
 
-    # ✅ FIX: Increased timeouts to prevent 'httpx.ConnectTimeout'
-    app = (
-        ApplicationBuilder()
-        .token(BOT_TOKEN)
-        .connect_timeout(40.0)
-        .read_timeout(40.0)
-        .write_timeout(40.0)
-        .pool_timeout(40.0)
-        .build()
-    )
+# Command Handlers
+application.add_handler(CommandHandler("void", void_command))
+application.add_handler(CommandHandler("allow", allow_command))
+application.add_handler(CommandHandler("stopall", stop_all_torture_cmd))
+application.add_handler(CommandHandler("ghost", ghost_cmd))
+application.add_handler(CommandHandler("rain", rain_cmd))
+application.add_handler(CommandHandler("start", start_command))
+application.add_handler(CommandHandler("status", profile))
+application.add_handler(CommandHandler("stats", stats))
+application.add_handler(CommandHandler("rankers", rankers))
+application.add_handler(CommandHandler("richest", richest))
+application.add_handler(CommandHandler("id", user_command))
+application.add_handler(CommandHandler("font", font_converter))
+application.add_handler(CommandHandler("register", register))
+application.add_handler(CommandHandler("daily", daily))
+application.add_handler(CommandHandler("givee", givee))
+application.add_handler(CommandHandler("shop", shop))
+application.add_handler(CommandHandler("purchase", purchase))
+application.add_handler(CommandHandler("referral", referral))
+application.add_handler(CommandHandler("kill", kill))
+application.add_handler(CommandHandler("revive", revive))
+application.add_handler(CommandHandler("protect", protect))
+application.add_handler(CommandHandler("rob", robe))
+application.add_handler(CommandHandler("bounty", bounty))
+application.add_handler(CommandHandler("heist", heist))
+application.add_handler(CommandHandler("joinheist", joinheist))
+application.add_handler(CommandHandler("stfast", stfast))
+application.add_handler(CommandHandler("stopheist", stopheist))
+application.add_handler(CommandHandler("on", on))
+application.add_handler(CommandHandler("shot", shot))
+application.add_handler(CommandHandler("out", out))
+application.add_handler(CommandHandler("rullrank", rullrank))
+application.add_handler(CommandHandler("kiss", kiss))
+application.add_handler(CommandHandler("hug", hug))
+application.add_handler(CommandHandler("bite", bite))
+application.add_handler(CommandHandler("slap", slap))
+application.add_handler(CommandHandler("kick", kick))
+application.add_handler(CommandHandler("punch", punch))
+application.add_handler(CommandHandler("murder", murder))
+application.add_handler(CommandHandler("leave", leave_group))
+application.add_handler(CommandHandler("personal", send_personal))
+application.add_handler(CommandHandler("q", quote))
+application.add_handler(CommandHandler("obt", save_sticker))
+application.add_handler(CommandHandler("aniworld", aniworld_command))
+application.add_handler(CommandHandler("broad_gc", broad_gc))
+application.add_handler(CommandHandler("broad_c", broad_c))
+application.add_handler(CommandHandler("stop_b", cancel_broadcast))
+application.add_handler(CommandHandler("ban", ban))
+application.add_handler(CommandHandler("unban", unban))
+application.add_handler(CommandHandler("mute", mute))
+application.add_handler(CommandHandler("unmute", unmute))
+application.add_handler(CommandHandler("promote", promote))
+application.add_handler(CommandHandler("demote", demote))
+application.add_handler(CommandHandler("warn", warn))
+application.add_handler(CommandHandler("unwarn", unwarn))
 
-    # =====================================================
-    # 1. CORE & TRACKING (Group -1 runs before anything else)
-    # =====================================================
-    app.add_handler(MessageHandler(filters.ALL, save_chat_and_user), group=-1)
+# Message Handlers
+application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
+application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, security_guard), group=1)
+application.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, handle_torture_triggers), group=1)
+application.add_handler(MessageHandler(filters.Sticker.ALL, reply_with_random_sticker), group=2)
+application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, auto_reply), group=2)
 
-    # =====================================================
-    # 2. COMMAND HANDLERS
-    # =====================================================
-    # Security & Admin
-    app.add_handler(CommandHandler("void", void_command))
-    app.add_handler(CommandHandler("allow", allow_command))
-    app.add_handler(CommandHandler("stopall", stop_all_torture_cmd))
-    app.add_handler(CommandHandler("ghost", ghost_cmd))
-    app.add_handler(CommandHandler("rain", rain_cmd))
+# Callbacks & Errors
+application.add_handler(CallbackQueryHandler(heist_choice, pattern="^heist_"))
+application.add_handler(CallbackQueryHandler(callback_handler))
+application.add_error_handler(error_handler)
 
-    # General & Stats
-    app.add_handler(CommandHandler("start", start_command))
-    app.add_handler(CommandHandler("status", profile))
-    app.add_handler(CommandHandler("stats", stats))
-    app.add_handler(CommandHandler("rankers", rankers))
-    app.add_handler(CommandHandler("richest", richest))
-    app.add_handler(CommandHandler("id", user_command))
-    app.add_handler(CommandHandler("font", font_converter))
+# --- 3. FASTAPI WEBHOOK LOGIC ---
+from fastapi import FastAPI, Request
+import uvicorn
 
-    # Economy & Daily
-    app.add_handler(CommandHandler("register", register))
-    app.add_handler(CommandHandler("daily", daily))
-    app.add_handler(CommandHandler("givee", givee))
-    app.add_handler(CommandHandler("shop", shop))
-    app.add_handler(CommandHandler("purchase", purchase))
-    app.add_handler(CommandHandler("referral", referral))
+app = FastAPI()
 
-    # Combat & Interaction
-    app.add_handler(CommandHandler("kill", kill))
-    app.add_handler(CommandHandler("revive", revive))
-    app.add_handler(CommandHandler("protect", protect))
-    app.add_handler(CommandHandler("rob", robe))
-    app.add_handler(CommandHandler("bounty", bounty))
+@app.post("/webhook")
+async def webhook(request: Request):
+    """The entry point for Telegram updates"""
+    json_str = await request.json()
+    update = Update.de_json(json_str, application.bot)
+    await application.process_update(update)
+    return {"status": "ok"}
 
-    # Heist System
-    app.add_handler(CommandHandler("heist", heist))
-    app.add_handler(CommandHandler("joinheist", joinheist))
-    app.add_handler(CommandHandler("stfast", stfast))
-    app.add_handler(CommandHandler("stopheist", stopheist))
-
-    # Russian Roulette
-    app.add_handler(CommandHandler("on", on))
-    app.add_handler(CommandHandler("shot", shot))
-    app.add_handler(CommandHandler("out", out))
-    app.add_handler(CommandHandler("rullrank", rullrank))
-
-    # Social & Fun
-    app.add_handler(CommandHandler("kiss", kiss))
-    app.add_handler(CommandHandler("hug", hug))
-    app.add_handler(CommandHandler("bite", bite))
-    app.add_handler(CommandHandler("slap", slap))
-    app.add_handler(CommandHandler("kick", kick))
-    app.add_handler(CommandHandler("punch", punch))
-    app.add_handler(CommandHandler("murder", murder))
-    app.add_handler(CommandHandler("leave", leave_group))
-    app.add_handler(CommandHandler("personal", send_personal))
-
-    # Tools & Admin
-    app.add_handler(CommandHandler("q", quote))
-    app.add_handler(CommandHandler("obt", save_sticker))
-    app.add_handler(CommandHandler("aniworld", aniworld_command))
-    app.add_handler(CommandHandler("broad_gc", broad_gc))
-    app.add_handler(CommandHandler("broad_c", broad_c))
-    app.add_handler(CommandHandler("stop_b", cancel_broadcast))
-
-    # Management
-    app.add_handler(CommandHandler("ban", ban))
-    app.add_handler(CommandHandler("unban", unban))
-    app.add_handler(CommandHandler("mute", mute))
-    app.add_handler(CommandHandler("unmute", unmute))
-    app.add_handler(CommandHandler("promote", promote))
-    app.add_handler(CommandHandler("demote", demote))
-    app.add_handler(CommandHandler("warn", warn))
-    app.add_handler(CommandHandler("unwarn", unwarn))
-
-    # =====================================================
-    # 3. MESSAGE HANDLERS
-    # =====================================================
+@app.on_event("startup")
+async def on_startup():
+    """Setup webhook when Render starts the app"""
+    # RENDER_EXTERNAL_URL is automatically provided by Render
+    base_url = os.getenv("RENDER_EXTERNAL_URL")
+    webhook_url = f"{base_url}/webhook"
     
-    # --- Status updates ---
-    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
+    await application.bot.set_webhook(url=webhook_url, drop_pending_updates=True)
+    await application.initialize()
+    await application.start()
+    print(f"🚀 Webhook set to {webhook_url}")
 
-    # --- Group 1: SECURITY & TORTURE (High Priority) ---
-    # This checks for 18+, links, and torture status BEFORE AI replies.
-    app.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND, security_guard), 
-        group=1
-    )
-    app.add_handler(
-        MessageHandler(filters.ALL & ~filters.COMMAND, handle_torture_triggers), 
-        group=1
-    )
-
-    # --- Group 2: AI & STICKERS (Standard Priority) ---
-    app.add_handler(MessageHandler(filters.Sticker.ALL, reply_with_random_sticker), group=2)
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, auto_reply), group=2)
-
-    # =====================================================
-    # 4. CALLBACKS & ERROR HANDLING
-    # =====================================================
-    app.add_handler(CallbackQueryHandler(heist_choice, pattern="^heist_"))
-    app.add_handler(CallbackQueryHandler(callback_handler))
-    
-    app.add_error_handler(error_handler)
-
-    print("✅ Yᴜᴜʀɪ ɪs Lɪᴠᴇ & Sᴇᴄᴜʀᴇ!")
-    
-    app.run_polling(drop_pending_updates=True)
-
-if __name__ == "__main__":
-    main()
+@app.on_event("shutdown")
+async def on_shutdown():
+    """Stop the bot gracefully"""
+    await application.stop()
+    await application.shutdown()
