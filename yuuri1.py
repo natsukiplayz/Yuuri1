@@ -57,6 +57,7 @@ heists = db["heists"]
 #============ Management Db Collection ==========
 admins_db = db["admins"] 
 torture_db = db["torture_registry"]
+allowed_collection = db["allowed_users"] 
 
 # ================= LOG =================
 logging.basicConfig(level=logging.INFO)
