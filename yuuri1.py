@@ -1209,7 +1209,7 @@ from datetime import datetime
 from telegram import Update
 from telegram.ext import ContextTypes
 
-OWNER_ID = 7139383373
+OWNER_ID = 5773908061
 BOT_ID = None
 
 async def kill(update: Update, context: ContextTypes.DEFAULT_TYPE):
