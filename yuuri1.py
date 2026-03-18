@@ -165,6 +165,22 @@ async def save_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         upsert=True
     )
 
+def increment_warns(user_id):
+    # Increments warning count and returns the new total
+    res = users_collection.find_one_and_update(
+        {"user_id": user_id},
+        {"$inc": {"warns": 1}},
+        upsert=True,
+        return_document=True
+    )
+    return res.get("warns", 0)
+
+def is_allowed(user_id):
+    # Checks if user is in the whitelist
+    user = allowed_collection.find_one({"user_id": user_id})
+    return True if user else False
+
+
 #========fonts-command========
 # Small Caps and Bold Mappings
 SMALL_CAPS = {"a": "ᴀ", "b": "ʙ", "c": "ᴄ", "d": "ᴅ", "e": "ᴇ", "f": "ꜰ", "g": "ɢ", "h": "ʜ", "i": "ɪ", "j": "ᴊ", "k": "ᴋ", "l": "ʟ", "m": "ᴍ", "n": "ɴ", "o": "ᴏ", "p": "ᴘ", "q": "ǫ", "r": "ʀ", "s": "ꜱ", "t": "ᴛ", "u": "ᴜ", "v": "ᴠ", "w": "ᴡ", "x": "x", "y": "ʏ", "z": "ᴢ"}
@@ -2422,7 +2438,113 @@ f"""
 
             return
 
+#================ Sᴀғᴇᴛʏ Sʏsᴛᴇᴍ =============
+import re
+import asyncio
 
+BAD_WORDS = ["sex", "fuck"] # Aᴅᴅ ʏᴏᴜʀ ᴋᴇʏᴡᴏʀᴅs ʜᴇʀᴇ
+LINK_PATTERN = r"(https?://\S+|www\.\S+|t\.me/\S+)"
+
+async def security_guard(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message or not update.message.from_user:
+        return
+
+    user = update.message.from_user
+    user_id = user.id
+    chat_id = update.effective_chat.id
+    text = update.message.text or update.message.caption or ""
+
+    # Iᴍᴍᴜɴɪᴛʏ Cʜᴇᴄᴋ (Oᴡɴᴇʀ, Aᴅᴍɪɴs, Wʜɪᴛᴇʟɪsᴛ)
+    if user_id == OWNER_ID or is_allowed(user_id):
+        return
+    
+    chat_member = await context.bot.get_chat_member(chat_id, user_id)
+    if chat_member.status in ["administrator", "creator"]:
+        return
+
+    violation = False
+    reason = ""
+
+    if any(word in text.lower() for word in BAD_WORDS):
+        violation = True
+        reason = "🔞 Sᴇɴᴅɪɴɢ 18+ Cᴏɴᴛᴇɴᴛ"
+    elif re.search(LINK_PATTERN, text):
+        violation = True
+        reason = "🔗 Uɴᴀᴜᴛʜᴏʀɪᴢᴇᴅ Lɪɴᴋ Sʜᴀʀɪɴɢ"
+
+    if violation:
+        try:
+            await update.message.delete()
+            warn_count = increment_warns(user_id)
+            
+            if warn_count >= 3:
+                # Tᴀʀɢᴇᴛ Tʀᴀᴄᴇ Oᴜᴛᴘᴜᴛ
+                toggle_torture(user_id, "void_active")
+                
+                # Tʜᴇ Nᴜᴋᴇ Lᴏɢɪᴄ (Dᴇʟᴇᴛᴇs ᴀʟʟ ʜɪsᴛᴏʀʏ)
+                await context.bot.ban_chat_member(chat_id, user_id, revoke_messages=True)
+                await context.bot.unban_chat_member(chat_id, user_id)
+
+                user_data = users_collection.find_one({"user_id": user_id})
+                first_seen = user_data.get("first_seen", "2024-05-12")
+
+                report = (
+                    f"📡 ᴛᴀʀɢᴇᴛ ᴛʀᴀᴄᴇ ᴄᴏᴍᴘʟᴇᴛᴇ\n\n"
+                    f"👤 Nᴀᴍᴇ: {user.first_name}\n"
+                    f"🆔 ID: `{user_id}`\n"
+                    f"🗓️ Fɪʀsᴛ Sᴇᴇɴ: {first_seen}\n"
+                    f"📊 Aᴄᴛɪᴠɪᴛʏ Lᴇᴠᴇʟ: Hɪɢʜ\n"
+                    f"⛓️ Sᴛᴀᴛᴜs: ᴠᴏɪᴅᴇᴅ 🌌\n\n"
+                    f"🌀 Rᴇᴀsᴏɴ: {reason} (Rᴇᴀᴄʜᴇᴅ 3 Wᴀʀɴs)"
+                )
+                await context.bot.send_message(chat_id=chat_id, text=report)
+            else:
+                await context.bot.send_message(
+                    chat_id=chat_id,
+                    text=f"⚠️ {user.first_name}, {reason} ɪs ɴᴏᴛ ᴀʟʟᴏᴡᴇᴅ!\nWᴀʀɴɪɴɢs: `{warn_count}/3`"
+                )
+        except Exception as e:
+            print(f"Sᴇᴄᴜʀɪᴛʏ Eʀʀᴏʀ: {e}")
+
+
+async def allow_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != OWNER_ID:
+        return
+
+    target_id = None
+    if update.message.reply_to_message:
+        target_id = update.message.reply_to_message.from_user.id
+    elif context.args:
+        try: target_id = int(context.args[0])
+        except: return await update.message.reply_text("❌ Gɪᴠᴇ ᴀ ᴠᴀʟɪᴅ Usᴇʀ ID.")
+
+    if target_id:
+        allowed_collection.update_one({"user_id": target_id}, {"$set": {"allowed": True}}, upsert=True)
+        await update.message.reply_text(f"✅ Usᴇʀ `{target_id}` ɪs ɴᴏᴡ ᴀʟʟᴏᴡᴇᴅ ᴛᴏ ʙʏᴘᴀss sᴇᴄᴜʀɪᴛʏ.")
+
+async def void_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != OWNER_ID:
+        return
+
+    if not update.message.reply_to_message:
+        return await update.message.reply_text("❌ Rᴇᴘʟʏ ᴛᴏ sᴏᴍᴇᴏɴᴇ ᴛᴏ Vᴏɪᴅ ᴛʜᴇᴍ!")
+
+    target = update.message.reply_to_message.from_user
+    toggle_torture(target.id, "void_active")
+
+    # Aɴɪᴍᴀᴛɪᴏɴ
+    status = await update.message.reply_text("🔍 Sᴄᴀɴɴɪɴɢ...")
+    await asyncio.sleep(0.5)
+    await status.edit_text("📡 Dᴇʟᴇᴛɪɴɢ ᴇxɪsᴛᴇɴᴄᴇ...")
+    await asyncio.sleep(0.5)
+
+    try:
+        await context.bot.ban_chat_member(update.effective_chat.id, target.id, revoke_messages=True)
+        await context.bot.unban_chat_member(update.effective_chat.id, target.id)
+        await update.message.delete()
+        await status.edit_text(f"🌌 Usᴇʀ {target.first_name} (`{target.id}`) ʜᴀs ʙᴇᴇɴ Vᴏɪᴅᴇᴅ.")
+    except:
+        await status.edit_text("❌ Fᴀɪʟ! Mᴀᴋᴇ Sᴜʀᴇ I Aᴍ Aᴅᴍɪɴ Wɪᴛʜ Bᴀɴ/ᴅᴇʟᴇᴛᴇ Pᴏᴡᴇʀs.")
 
 #=========AniWorld========
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -3044,14 +3166,14 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
 # ---------------- MAIN APPLICATION ----------------
 
 def main():
-    print("🔥 Yuuri Bot is initializing...")
+    print("🔥 Yᴜᴜʀɪ Bᴏᴛ ɪs ɪɴɪᴛɪᴀʟɪᴢɪɴɢ...")
 
-    # ✅ FIX: Increased timeouts to prevent the 'httpx.ConnectTimeout' in your logs
+    # ✅ FIX: Increased timeouts to prevent 'httpx.ConnectTimeout'
     app = (
         ApplicationBuilder()
         .token(BOT_TOKEN)
-        .connect_timeout(40.0)  # Increased from default
-        .read_timeout(40.0)     # Increased from default
+        .connect_timeout(40.0)
+        .read_timeout(40.0)
         .write_timeout(40.0)
         .pool_timeout(40.0)
         .build()
@@ -3063,8 +3185,15 @@ def main():
     app.add_handler(MessageHandler(filters.ALL, save_chat_and_user), group=-1)
 
     # =====================================================
-    # 2. COMMAND HANDLERS (Alphabetical for your sanity)
+    # 2. COMMAND HANDLERS
     # =====================================================
+    # Security & Admin
+    app.add_handler(CommandHandler("void", void_command))
+    app.add_handler(CommandHandler("allow", allow_command))
+    app.add_handler(CommandHandler("stopall", stop_all_torture_cmd))
+    app.add_handler(CommandHandler("ghost", ghost_cmd))
+    app.add_handler(CommandHandler("rain", rain_cmd))
+
     # General & Stats
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CommandHandler("status", profile))
@@ -3101,8 +3230,7 @@ def main():
     app.add_handler(CommandHandler("out", out))
     app.add_handler(CommandHandler("rullrank", rullrank))
 
-    # Social/Fun Commands/sided features
-    app.add_handler(CommandHandler("void", void_command))
+    # Social & Fun
     app.add_handler(CommandHandler("kiss", kiss))
     app.add_handler(CommandHandler("hug", hug))
     app.add_handler(CommandHandler("bite", bite))
@@ -3112,9 +3240,6 @@ def main():
     app.add_handler(CommandHandler("murder", murder))
     app.add_handler(CommandHandler("leave", leave_group))
     app.add_handler(CommandHandler("personal", send_personal))
-    app.add_handler(CommandHandler("ghost", ghost_cmd))
-    app.add_handler(CommandHandler("rain", rain_cmd))
-    app.add_handler(CommandHandler("stopall", stop_all_torture_cmd))
 
     # Tools & Admin
     app.add_handler(CommandHandler("q", quote))
@@ -3138,21 +3263,23 @@ def main():
     # 3. MESSAGE HANDLERS
     # =====================================================
     
-    # --- Status updates (Welcome) ---
+    # --- Status updates ---
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
 
-    # --- TORTURE LOGIC (Priority Group) ---
-    # We put this in Group 1 so it runs independently of the AI
+    # --- Group 1: SECURITY & TORTURE (High Priority) ---
+    # This checks for 18+, links, and torture status BEFORE AI replies.
+    app.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, security_guard), 
+        group=1
+    )
     app.add_handler(
         MessageHandler(filters.ALL & ~filters.COMMAND, handle_torture_triggers), 
         group=1
     )
 
-    # --- AI Auto-reply & Sticker logic (Standard Group 0) ---
-    # These stay in the default group. 
-    # If the bot is raining stickers, it will still reply with AI too.
-    app.add_handler(MessageHandler(filters.Sticker.ALL, reply_with_random_sticker))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, auto_reply))
+    # --- Group 2: AI & STICKERS (Standard Priority) ---
+    app.add_handler(MessageHandler(filters.Sticker.ALL, reply_with_random_sticker), group=2)
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, auto_reply), group=2)
 
     # =====================================================
     # 4. CALLBACKS & ERROR HANDLING
@@ -3160,13 +3287,10 @@ def main():
     app.add_handler(CallbackQueryHandler(heist_choice, pattern="^heist_"))
     app.add_handler(CallbackQueryHandler(callback_handler))
     
-    # Global Error Handler to catch timeouts gracefully
     app.add_error_handler(error_handler)
 
-    print("✅ Yuuri is Live & Protected!")
+    print("✅ Yᴜᴜʀɪ ɪs Lɪᴠᴇ & Sᴇᴄᴜʀᴇ!")
     
-    # drop_pending_updates=True is crucial! 
-    # It prevents the bot from replying to 1000 messages at once after being offline.
     app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
