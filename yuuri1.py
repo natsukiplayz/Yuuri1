@@ -2646,7 +2646,7 @@ async def ask_ai_async(chat_id: int, text: str, username: str):
         )
 
         data = {
-            "model": "mixtral-8x7b-32768",
+            "model": "openai/gpt-oss-120b",
             "messages": [
                 {"role": "system", "content": system_content}
             ] + chat_memory[chat_id]
