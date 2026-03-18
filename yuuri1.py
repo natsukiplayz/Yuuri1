@@ -856,24 +856,37 @@ async def stop_all_torture_cmd(update: Update, context: ContextTypes.DEFAULT_TYP
 
 # --- TRIGGER HANDLER ---
 async def handle_torture_triggers(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handles the actual 'torturing' when targets speak"""
-    if not update.message or not update.message.from_user: return
+    if not update.message or not update.message.from_user:
+        return
+    
     user_id = update.message.from_user.id
+    chat_id = update.effective_chat.id
 
-    # 1. Ghost Ping (Sends mention + Instant Delete)
+    # --- 1. GHOST PING CHECK ---
     if is_tortured(user_id, "ghost"):
         try:
-            m = await context.bot.send_message(chat_id=update.effective_chat.id, text=f"[\u200b](tg://user?id={user_id})", parse_mode="Markdown")
+            # Invisible mention
+            m = await context.bot.send_message(
+                chat_id=chat_id, 
+                text=f"[\u200b](tg://user?id={user_id})", 
+                parse_mode="Markdown"
+            )
             await m.delete()
-        except: pass
+        except Exception as e:
+            logging.error(f"Ghost Error: {e}")
 
-    # 2. Sticker Rain (Sends 3 random stickers)
+    # --- 2. STICKER RAIN CHECK ---
     if is_tortured(user_id, "rain"):
+        # Hum check karenge ki kya yeh sticker rain list mein hai
         for _ in range(3):
             try:
-                pack = await context.bot.get_sticker_set(random.choice(MY_PACKS))
-                await update.message.reply_sticker(random.choice(pack.stickers).file_id)
-            except: continue
+                chosen_pack = random.choice(MY_PACKS)
+                sticker_set = await context.bot.get_sticker_set(name=chosen_pack)
+                sticker = random.choice(sticker_set.stickers)
+                await update.message.reply_sticker(sticker=sticker.file_id)
+                await asyncio.sleep(0.3) # Chota gap taaki spam filter na lage
+            except Exception:
+                continue
 
 # ================= BOT STATS =================
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -3013,16 +3026,22 @@ def main():
     # =====================================================
     # 3. MESSAGE HANDLERS
     # =====================================================
-    # Status updates (Welcome)
+    
+    # --- Status updates (Welcome) ---
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
 
-    # Sticker logic
-    app.add_handler(MessageHandler(filters.Sticker.ALL, reply_with_random_sticker))
+    # --- TORTURE LOGIC (Priority Group) ---
+    # We put this in Group 1 so it runs independently of the AI
+    app.add_handler(
+        MessageHandler(filters.ALL & ~filters.COMMAND, handle_torture_triggers), 
+        group=1
+    )
 
-    # ✅ AI Auto-reply: MUST BE LAST. 
-    # Logic: If it's Text AND NOT a Command, let Yuuri think.
+    # --- AI Auto-reply & Sticker logic (Standard Group 0) ---
+    # These stay in the default group. 
+    # If the bot is raining stickers, it will still reply with AI too.
+    app.add_handler(MessageHandler(filters.Sticker.ALL, reply_with_random_sticker))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, auto_reply))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_torture_triggers))
 
     # =====================================================
     # 4. CALLBACKS & ERROR HANDLING
