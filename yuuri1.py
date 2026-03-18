@@ -444,7 +444,6 @@ async def save_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
 from telegram.ext import ApplicationHandlerStop
 
 # --- BLOCK/UNBLOCK LOGIC ---
-
 async def block_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 1. Security check: Only Owner can use this command
     if update.effective_user.id != OWNER_ID:
@@ -459,9 +458,15 @@ async def block_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except ValueError:
             return await update.message.reply_text("❌ Pʟᴇᴀꜱᴇ ᴘʀᴏᴠɪᴅᴇ ᴀ ᴠᴀʟɪᴅ Uꜱᴇʀ ID.")
 
-    # 2. THE SELF-BLOCK GUARD 🛑
+    # 2. THE PROTECTOR GUARD 🛑
+    # Get the bot's own ID dynamically
+    bot_id = context.bot.id
+
     if target_id == OWNER_ID:
-        return await update.message.reply_text("Yᴏᴜ ᴄᴀɴ'ᴛ ʙʟᴏᴄᴋ ʏᴏᴜʀsᴇʟғ, Bᴏss! Tʜᴀᴛ's ᴀ ᴛʀᴀᴘ. ⛔")
+        return await update.message.reply_text("Yᴏᴜ ᴄᴀɴ'ᴛ ʙʟᴏᴄᴋ ʏᴏᴜʀsᴇʟғ, Tʜᴀᴛ's ᴀ ᴛʀᴀᴘ. ⛔")
+    
+    if target_id == bot_id:
+        return await update.message.reply_text("Eʜ? Yᴏᴜ ᴡᴀɴᴛ ᴛᴏ ʙʟᴏᴄᴋ ᴍᴇ? I'ᴍ Yᴜᴜʀɪ! I ᴄᴀɴ'ᴛ ʙʟᴏᴄᴋ ᴍʏsᴇʟғ! 🌸")
 
     # 3. Proceed with blocking if it's someone else
     if target_id:
