@@ -717,6 +717,52 @@ async def font_converter(update: Update, context: ContextTypes.DEFAULT_TYPE):
     converted_text = get_fancy_text(target_text, font_choice)
     await update.message.reply_text(converted_text)
 
+#============ personal and leave ==========
+from telegram import Update
+from telegram.ext import ContextTypes, CommandHandler
+
+# Replace this with your actual ID from your summary
+OWNER_ID = 5773908061 
+
+async def leave_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Bot leaves the group with a goodbye message."""
+    # Security check: Only the owner (you) can trigger this
+    if update.effective_user.id != OWNER_ID:
+        return 
+
+    chat = update.effective_chat
+    
+    # Check if we are actually in a group
+    if chat.type in ["group", "supergroup"]:
+        group_name = chat.title
+        await update.message.reply_text(f"🚪 Lᴇᴀᴠɪɴɢ **{group_name}** ... Bʏᴇ! 💥")
+        
+        # The 'Boom' action
+        await context.bot.leave_chat(chat_id=chat.id)
+    else:
+        await update.message.reply_text("❌ This command only works in groups, boss.")
+
+async def send_personal(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Sends a message to any ID (User or GC) from the bot."""
+    # Security check: Only you can use this
+    if update.effective_user.id != OWNER_ID:
+        return
+
+    # Usage: /personal <id> <message>
+    if len(context.args) < 2:
+        await update.message.reply_text("❌ Usage: `/personal <id> <message>`")
+        return
+
+    target_id = context.args[0]
+    # Join everything after the ID as the message
+    personal_msg = " ".join(context.args[1:])
+
+    try:
+        await context.bot.send_message(chat_id=target_id, text=personal_msg)
+        await update.message.reply_text(f"✅ Message sent to `{target_id}`")
+    except Exception as e:
+        await update.message.reply_text(f"❌ Failed to send: {e}")
+
 # ================= BOT STATS =================
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -2820,7 +2866,7 @@ def main():
     app.add_handler(CommandHandler("out", out))
     app.add_handler(CommandHandler("rullrank", rullrank))
 
-    # Social/Fun Commands
+    # Social/Fun Commands/sided features
     app.add_handler(CommandHandler("kiss", kiss))
     app.add_handler(CommandHandler("hug", hug))
     app.add_handler(CommandHandler("bite", bite))
@@ -2828,6 +2874,9 @@ def main():
     app.add_handler(CommandHandler("kick", kick))
     app.add_handler(CommandHandler("punch", punch))
     app.add_handler(CommandHandler("murder", murder))
+    app.add_handler(CommandHandler("leave", leave_group))
+    app.add_handler(CommandHandler("personal", send_personal))
+
 
     # Tools & Admin
     app.add_handler(CommandHandler("q", quote))
