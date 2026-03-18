@@ -54,6 +54,14 @@ guilds = db["guilds"]
 sticker_packs = db["sticker_packs"]
 heists = db["heists"]
 
+    user = update.effective_user
+    user_data = get_user(user)
+
+    # --- BLOCK CHECK ---
+    if user_data.get("blocked", False):
+        return await update.message.reply_text("Sᴏʀʀʏ Bᴜᴛ Yᴏᴜʀ Bʟᴏᴄᴋᴇᴅ 😒")
+    # -------------------
+
 #============ Management Db Collection ==========
 admins_db = db["admins"] 
 torture_db = db["torture_registry"]
@@ -80,6 +88,7 @@ def get_user(user):
         "dead": False,
         "inventory": [],
         "referred_by": None
+        "blocked": False
     }
         users.insert_one(data)
 
@@ -439,6 +448,61 @@ async def save_sticker(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await saving_msg.edit_text("⚠️ Sᴛᴀʀᴛ ᴍᴇ ɪɴ Private Chat (PM) ꜰɪʀꜱᴛ!")
         else:
             await saving_msg.edit_text(f"❌ Cᴀɴ'ᴛ Sᴀᴠᴇ: {error_msg[:50]}")
+
+#==========block_user=========
+async def block_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Non-Owner Check
+    if update.effective_user.id != OWNER_ID:
+        return await update.message.reply_text("Oᴏᴘꜱ! Tʜɪꜱ Cᴏᴍᴍᴀɴᴅ Iꜱ Fᴏʀ Mʏ Oᴡɴᴇʀ Oɴʟʏ 😊")
+
+    target_id = None
+    target_name = "Uꜱᴇʀ"
+
+    # Check if replied to a user or provided an ID
+    if update.message.reply_to_message:
+        target_id = update.message.reply_to_message.from_user.id
+        target_name = update.message.reply_to_message.from_user.first_name
+    elif context.args:
+        try:
+            target_id = int(context.args[0])
+        except ValueError:
+            return await update.message.reply_text("❌ Pʟᴇᴀꜱᴇ ᴘʀᴏᴠɪᴅᴇ a valid User ID.")
+
+    if not target_id:
+        return await update.message.reply_text("❌ Rᴇᴘʟʏ ᴛᴏ ᴀ ᴜꜱᴇʀ ᴏʀ ᴘʀᴏᴠɪᴅᴇ ᴛʜᴇɪʀ ID.")
+
+    # Update Database (Setting blocked: True increases your /stats counter!)
+    db["chats"].update_one({"id": target_id}, {"$set": {"blocked": True}}, upsert=True)
+    db["users"].update_one({"user_id": target_id}, {"$set": {"blocked": True}}, upsert=True)
+
+    await update.message.reply_text(f"{target_name} Bʟᴏᴄᴋᴇᴅ Sᴜᴄᴄᴇꜱꜱꜰᴜʟʟʏ ✅")
+
+
+async def unblock_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Non-Owner Check
+    if update.effective_user.id != OWNER_ID:
+        return await update.message.reply_text("Oᴏᴘꜱ! Tʜɪꜱ Cᴏᴍᴍᴀɴᴅ Iꜱ Fᴏʀ Mʏ Oᴡɴᴇʀ Oɴʟʏ 😊")
+
+    target_id = None
+    target_name = "Uꜱᴇʀ"
+
+    if update.message.reply_to_message:
+        target_id = update.message.reply_to_message.from_user.id
+        target_name = update.message.reply_to_message.from_user.first_name
+    elif context.args:
+        try:
+            target_id = int(context.args[0])
+        except ValueError:
+            return await update.message.reply_text("❌ Pʟᴇᴀꜱᴇ ᴘʀᴏᴠɪᴅᴇ a valid User ID.")
+
+    if not target_id:
+        return await update.message.reply_text("❌ Rᴇᴘʟʏ ᴛᴏ ᴀ ᴜꜱᴇʀ ᴏʀ ᴘʀᴏᴠɪᴅᴇ ᴛʜᴇɪʀ ID.")
+
+    # Update Database (Removes the block flag)
+    db["chats"].update_one({"id": target_id}, {"$set": {"blocked": False}}, upsert=True)
+    db["users"].update_one({"user_id": target_id}, {"$set": {"blocked": False}}, upsert=True)
+
+    await update.message.reply_text(f"{target_name} Uɴʙʟᴏᴄᴋᴇᴅ Sᴜᴄᴄᴇꜱꜱꜰᴜʟʟʏ ✅")
 
 #==========welcome_message======
 import random
@@ -3102,6 +3166,8 @@ application.add_handler(CommandHandler("groups", aniworld_command))
 application.add_handler(CommandHandler("broad_gc", broad_gc))
 application.add_handler(CommandHandler("broad_c", broad_c))
 application.add_handler(CommandHandler("stop_b", cancel_broadcast))
+application.add_handler(CommandHandler("block", block_cmd))
+application.add_handler(CommandHandler("unblock", unblock_cmd))
 application.add_handler(CommandHandler("ban", ban))
 application.add_handler(CommandHandler("unban", unban))
 application.add_handler(CommandHandler("mute", mute))
