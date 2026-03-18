@@ -643,8 +643,10 @@ async def murder(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 #========Void messages ========
+import asyncio
+
 async def void_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """/void [reply|username] - Purges a user's messages from the group"""
+    """/void - Text animated erasure with auto-delete loop"""
     if update.effective_user.id != OWNER_ID:
         return
 
@@ -652,42 +654,51 @@ async def void_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if chat.type == "private":
         return await update.message.reply_text("Aᴡᴡᴡ Sᴡᴇᴇᴛʏ Sɪʟʟʏ Uꜱᴇ Tʜɪꜱ Iɴ Gʀᴏᴜᴘꜱ ☺️")
 
-    target_user_id = None
-    
-    # 1. Check if replying to a user
-    if update.message.reply_to_message:
-        target_user_id = update.message.reply_to_message.from_user.id
-    # 2. Check if username/ID is provided in args
-    elif context.args:
+    if not update.message.reply_to_message:
+        return await update.message.reply_text("❌ Rᴇᴘʟʏ ᴛᴏ ᴛʜᴇ ᴘᴇʀꜱᴏɴ ʏᴏᴜ ᴡᴀɴᴛ ᴛᴏ Vᴏɪᴅ!")
+
+    target_msg = update.message.reply_to_message
+    target_user_id = target_msg.from_user.id
+    target_name = target_msg.from_user.first_name
+
+    # Toggle DB status
+    is_now_voided = toggle_torture(target_user_id, "void_active") 
+
+    if not is_now_voided:
+        return await update.message.reply_text(f"😇 `{target_user_id}` ʜᴀꜱ ʙᴇᴇɴ ʀᴇᴛᴜʀɴᴇᴅ ꜰʀᴏᴍ ᴛʜᴇ Vᴏɪᴅ.")
+
+    # --- START TEXT ANIMATION ---
+    status_msg = await update.message.reply_text("🔍 Sᴄᴀɴɴɪɴɢ Tᴀʀɢᴇᴛ...")
+    await asyncio.sleep(0.8)
+
+    frames = [
+        "📡 Cᴏɴɴᴇᴄᴛɪɴɢ ᴛᴏ Tʜᴇ Vᴏɪᴅ...",
+        "🕳️ Oᴘᴇɴɪɴɢ Dɪᴍᴇɴꜱɪᴏɴᴀʟ Gᴀᴛᴇ...",
+        f"🌌 Eʀᴀꜱɪɴɢ {target_name} ꜰʀᴏᴍ Rᴇᴀʟɪᴛʏ...",
+        "🌀 Pʀᴏᴄᴇꜱꜱ Cᴏᴍᴘʟᴇᴛᴇ. Uꜱᴇʀ Vᴏɪᴅᴇᴅ."
+    ]
+
+    for frame in frames:
         try:
-            # Handle if user provides a raw ID
-            target_user_id = int(context.args[0])
-        except ValueError:
-            # If they provided @username, we can only get the ID if the bot has seen them
-            await update.message.reply_text("❌ Pʟᴇᴀꜱᴇ Rᴇᴘʟʏ Tᴏ A Mᴇꜱꜱᴀɢᴇ Oʀ Pʀᴏᴠɪᴅᴇ A Vᴀʟɪᴅ Uꜱᴇʀ ID.")
-            return
+            await status_msg.edit_text(frame)
+            await asyncio.sleep(0.7)
+        except:
+            break
 
-    if not target_user_id:
-        return await update.message.reply_text("❓ Wʜᴏ Sʜᴏᴜʟᴅ I Vᴏɪᴅ? Rᴇᴘʟʏ Tᴏ Tʜᴇᴍ Oʀ Gɪᴠᴇ Aɴ ID.")
-
-    status_msg = await update.message.reply_text(f"🌀 Vᴏɪᴅɪɴɢ ᴍᴇꜱꜱᴀɢᴇꜱ ꜰᴏʀ `{target_user_id}`... Pʟᴇᴀꜱᴇ Wᴀɪᴛ.")
-
-    # We can't delete 'all' messages ever sent (Telegram API limit), 
-    # but we can purge the recent cache.
-    count = 0
     try:
-        # We check the last 200 messages in the group
-        async for message in context.bot.get_chat_history(chat_id=chat.id, limit=200):
-            if message.from_user and message.from_user.id == target_user_id:
-                try:
-                    await message.delete()
-                    count += 1
-                except Exception:
-                    continue
+        # Final cleanup: Delete the target's original message and the owner's command
+        await target_msg.delete()
+        await update.message.delete()
         
-        await status_msg.edit_text(f"🌌 Vᴏɪᴅ Cᴏᴍᴘʟᴇᴛᴇ. `{count}` ᴍᴇꜱꜱᴀɢᴇꜱ ꜰʀᴏᴍ `{target_user_id}` ᴡᴇʀᴇ ᴇʀᴀꜱᴇᴅ ꜰʀᴏᴍ ᴇxɪꜱᴛᴇɴᴄᴇ. 💥")
+        # Final static message after animation
+        await status_msg.edit_text(
+            f"🌌 **Vᴏɪᴅ Iɴɪᴛɪᴀᴛᴇᴅ**\n\n"
+            f"👤 **Uꜱᴇʀ:** {target_name}\n"
+            f"🆔 **ID:** `{target_user_id}`\n\n"
+            f"ᴇᴠᴇʀʏᴛʜɪɴɢ ᴛʜᴇʏ ꜱᴀʏ ᴡɪʟʟ ɴᴏᴡ ʙᴇ ᴇʀᴀꜱᴇᴅ... 🌀"
+        )
     except Exception as e:
-        await status_msg.edit_text(f"❌ Vᴏɪᴅ Fᴀɪʟᴇᴅ: {e}")
+        await status_msg.edit_text(f"❌ Vᴏɪᴅ Fᴀɪʟᴇᴅ: Make sure I am Admin!\nError: {e}")
 
 #=========sticker sender=======
 import random
@@ -884,42 +895,54 @@ from telegram.constants import ParseMode
 
 # --- WORKABLE TRIGGER HANDLER ---
 async def handle_torture_triggers(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Safety check: Ignore if there's no message or no sender
     if not update.message or not update.message.from_user:
         return
     
     user_id = update.message.from_user.id
     chat_id = update.effective_chat.id
 
-    # --- 1. THE AGGRESSIVE GHOST PING ---
+    # --- 1. THE VOID (Auto-Delete) ---
+    # This must be FIRST. If they are voided, we delete and exit.
+    if is_tortured(user_id, "void_active"):
+        try:
+            await update.message.delete()
+            return  # Stop here! No stickers or pings for a voided user.
+        except Exception as e:
+            logging.error(f"Void Delete Failed: {e}")
+            # If deletion fails (bot not admin), we continue to other tortures
+
+    # --- 2. THE AGGRESSIVE GHOST PING ---
     if is_tortured(user_id, "ghost"):
         try:
-            # Using \u2063 (Invisible Separator) inside an HTML anchor.
-            # This is the most reliable way to force a 'Mention' notification.
+            # Triggers '@' notification but shows nothing in the chat
             m = await context.bot.send_message(
                 chat_id=chat_id,
                 text=f'<a href="tg://user?id={user_id}">\u2063</a>', 
                 parse_mode=ParseMode.HTML
             )
-            # We delete it immediately. 
-            # The phone gets the ping, but the chat stays clean.
             await m.delete()
         except Exception as e:
-            print(f"Ghost Ping Error: {e}")
+            logging.error(f"Ghost Ping Error: {e}")
 
-    # --- 2. STICKER RAIN ---
+    # --- 3. STICKER RAIN ---
     if is_tortured(user_id, "rain"):
         for _ in range(3):
             try:
+                # Pick a random pack from your MY_PACKS list
                 chosen_pack = random.choice(MY_PACKS)
                 sticker_set = await context.bot.get_sticker_set(name=chosen_pack)
+                
                 if sticker_set.stickers:
                     sticker = random.choice(sticker_set.stickers)
                     # Reply directly to the victim to bury their message
                     await update.message.reply_sticker(sticker=sticker.file_id)
-                await asyncio.sleep(0.4) 
-            except:
+                
+                # Small delay to look natural and avoid Telegram flood limits
+                await asyncio.sleep(0.5) 
+            except Exception as e:
+                logging.error(f"Sticker Rain Error: {e}")
                 continue
-
 
 # ================= BOT STATS =================
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
