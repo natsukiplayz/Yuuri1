@@ -450,28 +450,39 @@ async def block_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await update.message.reply_text("Oᴏᴘꜱ! Tʜɪꜱ Cᴏᴍᴍᴀɴᴅ Iꜱ Fᴏʀ Mʏ Oᴡɴᴇʀ Oɴʟʏ 😊")
 
     target_id = None
+    target_name = "Uꜱᴇʀ" # Default fallback name
+
+    # 2. Extract ID and Name
     if update.message.reply_to_message:
-        target_id = update.message.reply_to_message.from_user.id
+        target_user = update.message.reply_to_message.from_user
+        target_id = target_user.id
+        target_name = target_user.first_name
     elif context.args:
         try:
             target_id = int(context.args[0])
+            # Optional: Try to find their name in your database since we only have an ID
+            user_data = users.find_one({"id": target_id})
+            if user_data:
+                target_name = user_data.get("name", f"Uꜱᴇʀ ({target_id})")
+            else:
+                target_name = f"Uꜱᴇʀ ({target_id})"
         except ValueError:
             return await update.message.reply_text("❌ Pʟᴇᴀꜱᴇ ᴘʀᴏᴠɪᴅᴇ ᴀ ᴠᴀʟɪᴅ Uꜱᴇʀ ID.")
 
-    # 2. THE PROTECTOR GUARD 🛑
-    # Get the bot's own ID dynamically
+    # 3. THE PROTECTOR GUARD 🛑
     bot_id = context.bot.id
 
     if target_id == OWNER_ID:
-        return await update.message.reply_text("Yᴏᴜ ᴄᴀɴ'ᴛ ʙʟᴏᴄᴋ ʏᴏᴜʀsᴇʟғ, Tʜᴀᴛ's ᴀ ᴛʀᴀᴘ. ⛔")
+        return await update.message.reply_text("Yᴏᴜ ᴄᴀɴ'ᴛ ʙʟᴏᴄᴋ ʏᴏᴜʀsᴇʟғ, Bᴏss! Tʜᴀᴛ's ᴀ ᴛʀᴀᴘ. ⛔")
     
     if target_id == bot_id:
         return await update.message.reply_text("Eʜ? Yᴏᴜ ᴡᴀɴᴛ ᴛᴏ ʙʟᴏᴄᴋ ᴍᴇ? I'ᴍ Yᴜᴜʀɪ! I ᴄᴀɴ'ᴛ ʙʟᴏᴄᴋ ᴍʏsᴇʟғ! 🌸")
 
-    # 3. Proceed with blocking if it's someone else
+    # 4. Proceed with blocking
     if target_id:
         users.update_one({"id": target_id}, {"$set": {"blocked": True}}, upsert=True)
-        await update.message.reply_text(f"Uꜱᴇʀ `{target_id}` Bʟᴏᴄᴋᴇᴅ Sᴜᴄᴄᴇꜱꜱꜰᴜʟʟʏ ✅")
+        # Using the specific font style for the success message
+        await update.message.reply_text(f"{target_name} Bʟᴏᴄᴋᴇᴅ Sᴜᴄᴄᴇꜱꜱꜰᴜʟʟʏ ✅")
 
 async def unblock_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != OWNER_ID:
