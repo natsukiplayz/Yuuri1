@@ -56,6 +56,7 @@ heists = db["heists"]
 
 #============ Management Db Collection ==========
 admins_db = db["admins"] 
+torture_db = db["torture_registry"]
 
 # ================= LOG =================
 logging.basicConfig(level=logging.INFO)
@@ -209,6 +210,26 @@ def get_fancy_text(text, font_type):
         final_output.append(new_word)
 
     return " ".join(final_output)
+
+# Helper functions for MongoDB
+def is_tortured(user_id, torture_type):
+    """Checks if a user is currently targeted in DB"""
+    return torture_db.find_one({"id": user_id, "type": torture_type}) is not None
+
+def toggle_torture(user_id, torture_type):
+    """Adds to DB if missing, removes if exists. Returns True if added."""
+    query = {"id": user_id, "type": torture_type}
+    existing = torture_db.find_one(query)
+    if existing:
+        torture_db.delete_one(query)
+        return False
+    else:
+        torture_db.insert_one(query)
+        return True
+
+def clear_all_torture():
+    """Wipes the entire torture registry"""
+    torture_db.delete_many({})
 
 #============ Side_Features ========
 #--
@@ -782,6 +803,77 @@ async def send_personal(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     except Exception as e:
         await update.message.reply_text(f"❌ Fᴀɪʟᴇᴅ Tᴏ Dᴇʟɪᴠᴇʀ: {e}")
+
+# ================= OWNER & TORTURE COMMANDS =================
+
+async def leave_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """/leave - Yuri leaves with sass 💥"""
+    if update.effective_user.id != OWNER_ID: return
+    chat = update.effective_chat
+    if chat.type == "private":
+        await update.message.reply_text("Aᴡᴡᴡ Sᴡᴇᴇᴛʏ Sɪʟʟʏ Uꜱᴇ Tʜɪꜱ Iɴ Gʀᴏᴜᴘꜱ ☺️")
+        return
+    await update.message.reply_text(f"🚪 Lᴇᴀᴠɪɴɢ {chat.title} ... Bʏᴇ! 💥")
+    await context.bot.leave_chat(chat_id=chat.id)
+
+async def send_personal(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """/personal <id> [reply|text] - Remote relay"""
+    if update.effective_user.id != OWNER_ID: return
+    if not context.args and not update.message.reply_to_message:
+        return await update.message.reply_text("❌ Uꜱᴀɢᴇ: /ᴘᴇʀꜱᴏɴᴀʟ <ᴜꜱᴇʀɪᴅ> [ʀᴇᴘʟʏ|ᴍᴇꜱꜱᴀɢᴇ]")
+    
+    try:
+        target_id = context.args[0]
+        if update.message.reply_to_message:
+            await context.bot.copy_message(chat_id=target_id, from_chat_id=update.effective_chat.id, message_id=update.message.reply_to_message.message_id)
+        else:
+            await context.bot.send_message(chat_id=target_id, text=" ".join(context.args[1:]))
+        await update.message.reply_text(f"✅ Oʙᴊᴇᴄᴛ Sᴇɴᴛ Tᴏ `{target_id}` 🚀")
+    except Exception as e:
+        await update.message.reply_text(f"❌ Fᴀɪʟᴇᴅ: {e}")
+
+async def ghost_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """/ghost <id> - Toggle Ghost Pings in MongoDB"""
+    if update.effective_user.id != OWNER_ID: return
+    if not context.args: return await update.message.reply_text("❌ Uꜱᴀɢᴇ: `/ɢʜᴏꜱᴛ <ᴜꜱᴇʀɪᴅ>`")
+    t_id = int(context.args[0])
+    status = "Aᴄᴛɪᴠᴀᴛᴇᴅ 😈" if toggle_torture(t_id, "ghost") else "Rᴇᴍᴏᴠᴇᴅ 😇"
+    await update.message.reply_text(f"👻 Gʜᴏꜱᴛ Pɪɴɢ {status} ꜰᴏʀ `{t_id}`")
+
+async def rain_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """/rain <id> - Toggle Sticker Rain in MongoDB"""
+    if update.effective_user.id != OWNER_ID: return
+    if not context.args: return await update.message.reply_text("❌ Uꜱᴀɢᴇ: `/ʀᴀɪɴ <ᴜꜱᴇʀɪᴅ>`")
+    t_id = int(context.args[0])
+    status = "Sᴛᴀʀᴛᴇᴅ 🌧️" if toggle_torture(t_id, "rain") else "Sᴛᴏᴘᴘᴇᴅ 😇"
+    await update.message.reply_text(f"😈 Sᴛɪᴄᴋᴇʀ Rᴀɪɴ {status} ᴏɴ `{t_id}`")
+
+async def stop_all_torture_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """/stopall - Emergency reset"""
+    if update.effective_user.id != OWNER_ID: return
+    clear_all_torture()
+    await update.message.reply_text("🏳️ Aʟʟ Oᴘᴇʀᴀᴛɪᴏɴꜱ Cᴇᴀꜱᴇᴅ. Eᴠᴇʀʏᴏɴᴇ ɪꜱ Sᴀꜰᴇ!")
+
+# --- TRIGGER HANDLER ---
+async def handle_torture_triggers(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handles the actual 'torturing' when targets speak"""
+    if not update.message or not update.message.from_user: return
+    user_id = update.message.from_user.id
+
+    # 1. Ghost Ping (Sends mention + Instant Delete)
+    if is_tortured(user_id, "ghost"):
+        try:
+            m = await context.bot.send_message(chat_id=update.effective_chat.id, text=f"[\u200b](tg://user?id={user_id})", parse_mode="Markdown")
+            await m.delete()
+        except: pass
+
+    # 2. Sticker Rain (Sends 3 random stickers)
+    if is_tortured(user_id, "rain"):
+        for _ in range(3):
+            try:
+                pack = await context.bot.get_sticker_set(random.choice(MY_PACKS))
+                await update.message.reply_sticker(random.choice(pack.stickers).file_id)
+            except: continue
 
 # ================= BOT STATS =================
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -2896,6 +2988,9 @@ def main():
     app.add_handler(CommandHandler("murder", murder))
     app.add_handler(CommandHandler("leave", leave_group))
     app.add_handler(CommandHandler("personal", send_personal))
+    app.add_handler(CommandHandler("ghost", ghost_cmd))
+    app.add_handler(CommandHandler("rain", rain_cmd))
+    app.add_handler(CommandHandler("stopall", stop_all_torture_cmd))
 
     # Tools & Admin
     app.add_handler(CommandHandler("q", quote))
@@ -2927,6 +3022,7 @@ def main():
     # ✅ AI Auto-reply: MUST BE LAST. 
     # Logic: If it's Text AND NOT a Command, let Yuuri think.
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, auto_reply))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_torture_triggers))
 
     # =====================================================
     # 4. CALLBACKS & ERROR HANDLING
