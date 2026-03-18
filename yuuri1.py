@@ -2903,7 +2903,6 @@ def main():
     app.add_handler(CommandHandler("leave", leave_group))
     app.add_handler(CommandHandler("personal", send_personal))
 
-
     # Tools & Admin
     app.add_handler(CommandHandler("q", quote))
     app.add_handler(CommandHandler("obt", save_sticker))
