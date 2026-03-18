@@ -738,7 +738,6 @@ async def font_converter(update: Update, context: ContextTypes.DEFAULT_TYPE):
     converted_text = get_fancy_text(target_text, font_choice)
     await update.message.reply_text(converted_text)
 
-#============ personal and leave ==========
 # ================= OWNER COMMANDS =================
 
 async def leave_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -806,32 +805,6 @@ async def send_personal(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ================= OWNER & TORTURE COMMANDS =================
 
-async def leave_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """/leave - Yuri leaves with sass 💥"""
-    if update.effective_user.id != OWNER_ID: return
-    chat = update.effective_chat
-    if chat.type == "private":
-        await update.message.reply_text("Aᴡᴡᴡ Sᴡᴇᴇᴛʏ Sɪʟʟʏ Uꜱᴇ Tʜɪꜱ Iɴ Gʀᴏᴜᴘꜱ ☺️")
-        return
-    await update.message.reply_text(f"🚪 Lᴇᴀᴠɪɴɢ {chat.title} ... Bʏᴇ! 💥")
-    await context.bot.leave_chat(chat_id=chat.id)
-
-async def send_personal(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """/personal <id> [reply|text] - Remote relay"""
-    if update.effective_user.id != OWNER_ID: return
-    if not context.args and not update.message.reply_to_message:
-        return await update.message.reply_text("❌ Uꜱᴀɢᴇ: /ᴘᴇʀꜱᴏɴᴀʟ <ᴜꜱᴇʀɪᴅ> [ʀᴇᴘʟʏ|ᴍᴇꜱꜱᴀɢᴇ]")
-    
-    try:
-        target_id = context.args[0]
-        if update.message.reply_to_message:
-            await context.bot.copy_message(chat_id=target_id, from_chat_id=update.effective_chat.id, message_id=update.message.reply_to_message.message_id)
-        else:
-            await context.bot.send_message(chat_id=target_id, text=" ".join(context.args[1:]))
-        await update.message.reply_text(f"✅ Oʙᴊᴇᴄᴛ Sᴇɴᴛ Tᴏ `{target_id}` 🚀")
-    except Exception as e:
-        await update.message.reply_text(f"❌ Fᴀɪʟᴇᴅ: {e}")
-
 async def ghost_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """/ghost <id> - Toggle Ghost Pings in MongoDB"""
     if update.effective_user.id != OWNER_ID: return
@@ -864,46 +837,42 @@ from telegram.constants import ParseMode
 
 # --- WORKABLE TRIGGER HANDLER ---
 async def handle_torture_triggers(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Basic safety checks
     if not update.message or not update.message.from_user:
         return
     
     user_id = update.message.from_user.id
     chat_id = update.effective_chat.id
 
-    # --- 1. GHOST PING CHECK (Notification Troll) ---
+    # --- 1. THE AGGRESSIVE GHOST PING ---
     if is_tortured(user_id, "ghost"):
         try:
-            # We use a zero-width non-joiner link. 
-            # This triggers the '@' notification icon but shows "empty" text.
+            # Using \u2063 (Invisible Separator) inside an HTML anchor.
+            # This is the most reliable way to force a 'Mention' notification.
             m = await context.bot.send_message(
                 chat_id=chat_id,
-                text=f'<a href="tg://user?id={user_id}">\u200c</a>', 
+                text=f'<a href="tg://user?id={user_id}">\u2063</a>', 
                 parse_mode=ParseMode.HTML
             )
-            # Delete instantly so the user sees the '1' notification but no message
+            # We delete it immediately. 
+            # The phone gets the ping, but the chat stays clean.
             await m.delete()
         except Exception as e:
-            logging.error(f"Ghost Ping Failed: {e}")
+            print(f"Ghost Ping Error: {e}")
 
-    # --- 2. STICKER RAIN CHECK (Screen Filler) ---
+    # --- 2. STICKER RAIN ---
     if is_tortured(user_id, "rain"):
-        # We send 3 stickers from your MY_PACKS list
         for _ in range(3):
             try:
-                chosen_pack_name = random.choice(MY_PACKS)
-                sticker_set = await context.bot.get_sticker_set(name=chosen_pack_name)
-                
+                chosen_pack = random.choice(MY_PACKS)
+                sticker_set = await context.bot.get_sticker_set(name=chosen_pack)
                 if sticker_set.stickers:
-                    random_sticker = random.choice(sticker_set.stickers)
-                    # Reply directly to their message to bury it
-                    await update.message.reply_sticker(sticker=random_sticker.file_id)
-                    
-                # Essential: Tiny sleep to avoid Telegram's Flood Control (429 Error)
-                await asyncio.sleep(0.5) 
-            except Exception as e:
-                logging.error(f"Sticker Rain Error: {e}")
+                    sticker = random.choice(sticker_set.stickers)
+                    # Reply directly to the victim to bury their message
+                    await update.message.reply_sticker(sticker=sticker.file_id)
+                await asyncio.sleep(0.4) 
+            except:
                 continue
+
 
 # ================= BOT STATS =================
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
