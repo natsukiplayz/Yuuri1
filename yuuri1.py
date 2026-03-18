@@ -659,104 +659,6 @@ async def murder(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="HTML"
     )
 
-#========Void messages ========
-import asyncio
-from telegram import Update
-from telegram.constants import ParseMode
-from telegram.ext import ContextTypes
-
-async def void_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """/void - Nukes user's entire message history and activates auto-delete"""
-    if update.effective_user.id != OWNER_ID:
-        return
-
-    chat = update.effective_chat
-    if chat.type == "private":
-        return await update.message.reply_text("Aᴡᴡᴡ Sᴡᴇᴇᴛʏ Sɪʟʟʏ Uꜱᴇ Tʜɪꜱ Iɴ Gʀᴏᴜᴘꜱ ☺️")
-
-    target_user_id = None
-    target_name = "Unknown"
-
-    # --- 1. ID / USERNAME LOGIC ---
-    if update.message.reply_to_message:
-        target_user_id = update.message.reply_to_message.from_user.id
-        target_name = update.message.reply_to_message.from_user.first_name
-    elif context.args:
-        arg = context.args[0]
-        if arg.startswith("@"):
-            username = arg.replace("@", "")
-            # Assuming 'users_collection' is your MongoDB collection
-            user_data = users_collection.find_one({"username": username})
-            if user_data:
-                target_user_id = user_data["user_id"]
-                target_name = user_data.get("first_name", username)
-            else:
-                return await update.message.reply_text("❌ I ᴅᴏɴ'ᴛ ᴋɴᴏᴡ ᴛʜɪꜱ ᴜꜱᴇʀ ʏᴇᴛ. Tʜᴇʏ ɴᴇᴇᴅ ᴛᴏ ꜱᴘᴇᴀᴋ ꜰɪʀꜱᴛ!")
-        else:
-            try:
-                target_user_id = int(arg)
-                target_name = f"User {target_user_id}"
-            except ValueError:
-                return await update.message.reply_text("❌ Uꜱᴀɢᴇ: /ᴠᴏɪᴅ @ᴜꜱᴇʀɴᴀᴍᴇ ᴏʀ /ᴠᴏɪᴅ <ɪᴅ>")
-
-    if not target_user_id:
-        return await update.message.reply_text("❌ Wʜᴏ ᴀʀᴇ ᴡᴇ ᴠᴏɪᴅɪɴɢ?")
-
-    # --- 2. DATABASE TOGGLE ---
-    is_now_voided = toggle_torture(target_user_id, "void_active") 
-
-    if not is_now_voided:
-        return await update.message.reply_text(f"😇 {target_user_id} ʜᴀꜱ ʙᴇᴇɴ ʀᴇᴛᴜʀɴᴇᴅ ꜰʀᴏᴍ ᴛʜᴇ Vᴏɪᴅ.")
-
-    # --- 3. START TEXT ANIMATION ---
-    status_msg = await update.message.reply_text("🔍 Sᴄᴀɴɴɪɴɢ Rᴇᴀʟɪᴛʏ...")
-    await asyncio.sleep(0.6)
-
-    frames = [
-        "📡 Cᴏɴɴᴇᴄᴛɪɴɢ ᴛᴏ Vᴏɪᴅ...",
-        f"🌌 Eʀᴀꜱɪɴɢ {target_name}'ꜱ Eɴᴛɪʀᴇ Exɪꜱᴛᴇɴᴄᴇ...",
-        "🌀 Pʀᴏᴄᴇꜱꜱ Cᴏᴍᴘʟᴇᴛᴇ. Uꜱᴇʀ Vᴏɪᴅᴇᴅ."
-    ]
-
-    for frame in frames:
-        try:
-            await status_msg.edit_text(frame)
-            await asyncio.sleep(0.7)
-        except: 
-            break
-
-    # --- 4. THE NUKE TRICK ---
-    try:
-        # Ban user and revoke ALL their past messages
-        await context.bot.ban_chat_member(
-            chat_id=chat.id, 
-            user_id=target_user_id, 
-            revoke_messages=True
-        )
-        
-        # Immediately unban so they aren't permanently blacklisted (they can rejoin)
-        await context.bot.unban_chat_member(
-            chat_id=chat.id, 
-            user_id=target_user_id
-        )
-
-        # Cleanup the command message
-        await update.message.delete()
-        
-        # Final static message
-        final_text = (
-            f"🌌 Vᴏɪᴅ Iɴɪᴛɪᴀᴛᴇᴅ\n\n"
-            f"👤 Uꜱᴇʀ: {target_name}\n"
-            f"🆔 ID: {target_user_id}\n\n"
-            f"⚠️ Aʟʟ ᴘᴀꜱᴛ ᴍᴇꜱꜱᴀɢᴇꜱ ʜᴀᴠᴇ ʙᴇᴇɴ ᴡɪᴘᴇᴅ.\n"
-            f"ᴀʟʟ ꜰᴜᴛᴜʀᴇ ᴍᴇꜱꜱᴀɢᴇꜱ ᴡɪʟʟ ʙᴇ ɪɴꜱᴛᴀɴᴛʟʏ ᴇʀᴀꜱᴇᴅ ɪꜰ ᴛʜᴇʏ ʀᴇᴛᴜʀɴ. 🌀"
-        )
-        
-        await status_msg.edit_text(text=final_text)
-        
-    except Exception as e:
-        await status_msg.edit_text(f"❌ Vᴏɪᴅ Fᴀɪʟᴇᴅ: I ɴᴇᴇᴅ 'Bᴀɴ Uꜱᴇʀꜱ' & 'Dᴇʟᴇᴛᴇ Mᴇꜱꜱᴀɢᴇꜱ' Aᴅᴍɪɴ Pᴏᴡᴇʀꜱ!\nError: {e}")
-
 #=========sticker sender=======
 import random
 import logging
@@ -919,28 +821,28 @@ async def send_personal(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"❌ Fᴀɪʟᴇᴅ Tᴏ Dᴇʟɪᴠᴇʀ: {e}")
 
 # ================= OWNER & TORTURE COMMANDS =================
-
-async def ghost_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """/ghost <id> - Toggle Ghost Pings in MongoDB"""
-    if update.effective_user.id != OWNER_ID: return
-    if not context.args: return await update.message.reply_text("❌ Uꜱᴀɢᴇ: `/ɢʜᴏꜱᴛ <ᴜꜱᴇʀɪᴅ>`")
-    t_id = int(context.args[0])
-    status = "Aᴄᴛɪᴠᴀᴛᴇᴅ 😈" if toggle_torture(t_id, "ghost") else "Rᴇᴍᴏᴠᴇᴅ 😇"
-    await update.message.reply_text(f"👻 Gʜᴏꜱᴛ Pɪɴɢ {status} ꜰᴏʀ `{t_id}`")
-
 async def rain_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """/rain <id> - Toggle Sticker Rain in MongoDB"""
-    if update.effective_user.id != OWNER_ID: return
-    if not context.args: return await update.message.reply_text("❌ Uꜱᴀɢᴇ: `/ʀᴀɪɴ <ᴜꜱᴇʀɪᴅ>`")
-    t_id = int(context.args[0])
-    status = "Sᴛᴀʀᴛᴇᴅ 🌧️" if toggle_torture(t_id, "rain") else "Sᴛᴏᴘᴘᴇᴅ 😇"
-    await update.message.reply_text(f"😈 Sᴛɪᴄᴋᴇʀ Rᴀɪɴ {status} ᴏɴ `{t_id}`")
+    if update.effective_user.id != OWNER_ID: 
+        return
+    
+    if not context.args: 
+        return await update.message.reply_text("❌ Uꜱᴀɢᴇ: `/ʀᴀɪɴ <ᴜꜱᴇʀɪᴅ>`")
+    
+    try:
+        t_id = int(context.args[0])
+        # This calls your database function to toggle the 'rain' status
+        status = "Sᴛᴀʀᴛᴇᴅ 🌧️" if toggle_torture(t_id, "rain") else "Sᴛᴏᴘᴘᴇᴅ 😇"
+        await update.message.reply_text(f"😈 Sᴛɪᴄᴋᴇʀ Rᴀɪɴ {status} ᴏɴ `{t_id}`")
+    except ValueError:
+        await update.message.reply_text("❌ Pʟᴇᴀꜱᴇ ᴘʀᴏᴠɪᴅᴇ a valid numerical User ID.")
 
 async def stop_all_torture_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """/stopall - Emergency reset"""
-    if update.effective_user.id != OWNER_ID: return
+    """/stopall - Emergency reset for all users"""
+    if update.effective_user.id != OWNER_ID: 
+        return
     clear_all_torture()
-    await update.message.reply_text("🏳️ Aʟʟ Oᴘᴇʀᴀᴛɪᴏɴꜱ Cᴇᴀꜱᴇᴅ. Eᴠᴇʀʏᴏɴᴇ ɪꜱ Sᴀꜰᴇ!")
+    await update.message.reply_text("🏳️ Sᴛɪᴄᴋᴇʀ Rᴀɪɴ Hᴀꜱ Cᴇᴀꜱᴇᴅ Gʟᴏʙᴀʟʟʏ!")
 
 # --- TRIGGER HANDLER ---
 import asyncio
@@ -952,48 +854,19 @@ from telegram.constants import ParseMode
 from telegram.error import BadRequest, RetryAfter
 
 async def handle_torture_triggers(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Highly optimized torture handler.
-    Priority: 1. Void (Delete) | 2. Ghost Ping | 3. Sticker Rain
-    """
-    # 1. Basic Validation
+    """Triggers a burst of stickers whenever a 'tortured' user sends anything."""
     if not update.effective_message or not update.effective_user:
         return
     
     user_id = update.effective_user.id
-    chat_id = update.effective_chat.id
     message = update.effective_message
 
-    # --- 1. THE VOID (Instant Deletion) ---
-    if is_tortured(user_id, "void_active"):
-        try:
-            await message.delete()
-            return  # Exit immediately; message is gone.
-        except BadRequest:
-            logging.error(f"Void Failed: Bot is not Admin in {chat_id}")
-        except Exception as e:
-            logging.error(f"Void Error: {e}")
-
-    # --- 2. THE GHOST PING (Notification Troll) ---
-    if is_tortured(user_id, "ghost"):
-        try:
-            # \u2063 is an invisible separator that forces a mention notification
-            ghost_ping = await context.bot.send_message(
-                chat_id=chat_id,
-                text=f'<a href="tg://user?id={user_id}">\u2063</a>',
-                parse_mode=ParseMode.HTML
-            )
-            await ghost_ping.delete()
-        except Exception as e:
-            logging.error(f"Ghost Ping Error: {e}")
-
-    # --- 3. STICKER RAIN (Visual Flood) ---
+    # Only run if 'rain' is active for this user in MongoDB
     if is_tortured(user_id, "rain"):
-        # Check if MY_PACKS actually has content to avoid crashes
         if not MY_PACKS:
-            logging.warning("MY_PACKS is empty! Cannot perform Sticker Rain.")
             return
 
+        # Rain Intensity: Sends 3 random stickers
         for _ in range(3):
             try:
                 chosen_pack = random.choice(MY_PACKS)
@@ -1001,18 +874,19 @@ async def handle_torture_triggers(update: Update, context: ContextTypes.DEFAULT_
                 
                 if sticker_set and sticker_set.stickers:
                     sticker = random.choice(sticker_set.stickers)
-                    # We reply to the original message to 'bury' it
-                    await message.reply_sticker(sticker=sticker.file_id)
+                    # Use reply_to_message_id to ensure stickers 'bury' the user's message
+                    await context.bot.send_sticker(
+                        chat_id=update.effective_chat.id,
+                        sticker=sticker.file_id,
+                        reply_to_message_id=message.message_id
+                    )
                 
-                # Crucial: Sleep prevents "429: Too Many Requests"
-                await asyncio.sleep(0.4) 
+                await asyncio.sleep(0.3) # Short delay to prevent Telegram flood kicks
                 
             except RetryAfter as e:
-                # If Telegram says slow down, we stop the loop
                 await asyncio.sleep(e.retry_after)
                 break
             except Exception as e:
-                logging.error(f"Sticker Rain Loop Error: {e}")
                 continue
 
 # ================= BOT STATS =================
