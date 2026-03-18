@@ -2315,7 +2315,6 @@ f"""
 
 #================ Sᴀғᴇᴛʏ Sʏsᴛᴇᴍ =============
 import re
-import asyncio
 
 BAD_WORDS = ["sex", "fuck"] # Aᴅᴅ ʏᴏᴜʀ ᴋᴇʏᴡᴏʀᴅs ʜᴇʀᴇ
 LINK_PATTERN = r"(https?://\S+|www\.\S+|t\.me/\S+)"
@@ -2333,56 +2332,58 @@ async def security_guard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_id == OWNER_ID or is_allowed(user_id):
         return
     
-    chat_member = await context.bot.get_chat_member(chat_id, user_id)
-    if chat_member.status in ["administrator", "creator"]:
-        return
+    try:
+        chat_member = await context.bot.get_chat_member(chat_id, user_id)
+        if chat_member.status in ["administrator", "creator"]:
+            return
+    except Exception:
+        pass # Ignore errors if bot can't fetch member status
 
     violation = False
     reason = ""
 
+    # Check for rule breaks
     if any(word in text.lower() for word in BAD_WORDS):
         violation = True
-        reason = "🔞 Sᴇɴᴅɪɴɢ 18+ Cᴏɴᴛᴇɴᴛ"
+        reason = "🔞 Iɴᴀᴘᴘʀᴏᴘʀɪᴀᴛᴇ Cᴏɴᴛᴇɴᴛ"
     elif re.search(LINK_PATTERN, text):
         violation = True
-        reason = "🔗 Uɴᴀᴜᴛʜᴏʀɪᴢᴇᴅ Lɪɴᴋ Sʜᴀʀɪɴɢ"
+        reason = "🔗 Uɴᴀᴜᴛʜᴏʀɪᴢᴇᴅ Lɪɴᴋ"
 
     if violation:
         try:
+            # 1. Auto-Delete the bad message
             await update.message.delete()
+            
+            # 2. Auto-Warn the user
             warn_count = increment_warns(user_id)
             
+            # 3. Action if they hit the limit
             if warn_count >= 3:
-                # Tᴀʀɢᴇᴛ Tʀᴀᴄᴇ Oᴜᴛᴘᴜᴛ
-                toggle_torture(user_id, "void_active")
-                
-                # Tʜᴇ Nᴜᴋᴇ Lᴏɢɪᴄ (Dᴇʟᴇᴛᴇs ᴀʟʟ ʜɪsᴛᴏʀʏ)
-                await context.bot.ban_chat_member(chat_id, user_id, revoke_messages=True)
-                await context.bot.unban_chat_member(chat_id, user_id)
-
-                user_data = users_collection.find_one({"user_id": user_id})
-                first_seen = user_data.get("first_seen", "2024-05-12")
+                # Standard Ban (Does NOT delete their past history)
+                await context.bot.ban_chat_member(chat_id, user_id)
 
                 report = (
-                    f"📡 ᴛᴀʀɢᴇᴛ ᴛʀᴀᴄᴇ ᴄᴏᴍᴘʟᴇᴛᴇ\n\n"
+                    f"🚫 **Sᴇᴄᴜʀɪᴛʏ Aᴄᴛɪᴏɴ**\n\n"
                     f"👤 Nᴀᴍᴇ: {user.first_name}\n"
                     f"🆔 ID: `{user_id}`\n"
-                    f"🗓️ Fɪʀsᴛ Sᴇᴇɴ: {first_seen}\n"
-                    f"📊 Aᴄᴛɪᴠɪᴛʏ Lᴇᴠᴇʟ: Hɪɢʜ\n"
-                    f"⛓️ Sᴛᴀᴛᴜs: ᴠᴏɪᴅᴇᴅ 🌌\n\n"
+                    f"⚖️ Aᴄᴛɪᴏɴ: Bᴀɴɴᴇᴅ 🔨\n"
                     f"🌀 Rᴇᴀsᴏɴ: {reason} (Rᴇᴀᴄʜᴇᴅ 3 Wᴀʀɴs)"
                 )
                 await context.bot.send_message(chat_id=chat_id, text=report)
             else:
+                # Just send a warning
                 await context.bot.send_message(
                     chat_id=chat_id,
-                    text=f"⚠️ {user.first_name}, {reason} ɪs ɴᴏᴛ ᴀʟʟᴏᴡᴇᴅ!\nWᴀʀɴɪɴɢs: `{warn_count}/3`"
+                    text=f"⚠️ {user.first_name}, {reason} ɪs ɴᴏᴛ ᴀʟʟᴏᴡᴇᴅ!\n"
+                         f"Aᴄᴛɪᴏɴ: Mᴇssᴀɢᴇ Dᴇʟᴇᴛᴇᴅ 🗑️\n"
+                         f"Wᴀʀɴɪɴɢs: `{warn_count}/3`"
                 )
         except Exception as e:
             print(f"Sᴇᴄᴜʀɪᴛʏ Eʀʀᴏʀ: {e}")
 
-
 async def allow_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """/allow <id> - Whitelist a user from security checks"""
     if update.effective_user.id != OWNER_ID:
         return
 
@@ -2391,35 +2392,11 @@ async def allow_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         target_id = update.message.reply_to_message.from_user.id
     elif context.args:
         try: target_id = int(context.args[0])
-        except: return await update.message.reply_text("❌ Gɪᴠᴇ ᴀ ᴠᴀʟɪᴅ Usᴇʀ ID.")
+        except ValueError: return await update.message.reply_text("❌ Gɪᴠᴇ ᴀ ᴠᴀʟɪᴅ Usᴇʀ ID.")
 
     if target_id:
         allowed_collection.update_one({"user_id": target_id}, {"$set": {"allowed": True}}, upsert=True)
         await update.message.reply_text(f"✅ Usᴇʀ `{target_id}` ɪs ɴᴏᴡ ᴀʟʟᴏᴡᴇᴅ ᴛᴏ ʙʏᴘᴀss sᴇᴄᴜʀɪᴛʏ.")
-
-async def void_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != OWNER_ID:
-        return
-
-    if not update.message.reply_to_message:
-        return await update.message.reply_text("❌ Rᴇᴘʟʏ ᴛᴏ sᴏᴍᴇᴏɴᴇ ᴛᴏ Vᴏɪᴅ ᴛʜᴇᴍ!")
-
-    target = update.message.reply_to_message.from_user
-    toggle_torture(target.id, "void_active")
-
-    # Aɴɪᴍᴀᴛɪᴏɴ
-    status = await update.message.reply_text("🔍 Sᴄᴀɴɴɪɴɢ...")
-    await asyncio.sleep(0.5)
-    await status.edit_text("📡 Dᴇʟᴇᴛɪɴɢ ᴇxɪsᴛᴇɴᴄᴇ...")
-    await asyncio.sleep(0.5)
-
-    try:
-        await context.bot.ban_chat_member(update.effective_chat.id, target.id, revoke_messages=True)
-        await context.bot.unban_chat_member(update.effective_chat.id, target.id)
-        await update.message.delete()
-        await status.edit_text(f"🌌 Usᴇʀ {target.first_name} (`{target.id}`) ʜᴀs ʙᴇᴇɴ Vᴏɪᴅᴇᴅ.")
-    except:
-        await status.edit_text("❌ Fᴀɪʟ! Mᴀᴋᴇ Sᴜʀᴇ I Aᴍ Aᴅᴍɪɴ Wɪᴛʜ Bᴀɴ/ᴅᴇʟᴇᴛᴇ Pᴏᴡᴇʀs.")
 
 #=========AniWorld========
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -3055,10 +3032,8 @@ application = (
 application.add_handler(MessageHandler(filters.ALL, save_chat_and_user), group=-1)
 
 # Command Handlers
-application.add_handler(CommandHandler("void", void_command))
 application.add_handler(CommandHandler("allow", allow_command))
 application.add_handler(CommandHandler("stopall", stop_all_torture_cmd))
-application.add_handler(CommandHandler("ghost", ghost_cmd))
 application.add_handler(CommandHandler("rain", rain_cmd))
 application.add_handler(CommandHandler("start", start_command))
 application.add_handler(CommandHandler("status", profile))
@@ -3076,7 +3051,7 @@ application.add_handler(CommandHandler("referral", referral))
 application.add_handler(CommandHandler("kill", kill))
 application.add_handler(CommandHandler("revive", revive))
 application.add_handler(CommandHandler("protect", protect))
-application.add_handler(CommandHandler("rob", robe))
+application.add_handler(CommandHandler("steal", robe))
 application.add_handler(CommandHandler("bounty", bounty))
 application.add_handler(CommandHandler("heist", heist))
 application.add_handler(CommandHandler("joinheist", joinheist))
@@ -3097,7 +3072,7 @@ application.add_handler(CommandHandler("leave", leave_group))
 application.add_handler(CommandHandler("personal", send_personal))
 application.add_handler(CommandHandler("q", quote))
 application.add_handler(CommandHandler("obt", save_sticker))
-application.add_handler(CommandHandler("aniworld", aniworld_command))
+application.add_handler(CommandHandler("groups", aniworld_command))
 application.add_handler(CommandHandler("broad_gc", broad_gc))
 application.add_handler(CommandHandler("broad_c", broad_c))
 application.add_handler(CommandHandler("stop_b", cancel_broadcast))
