@@ -2646,7 +2646,7 @@ async def ask_ai_async(chat_id: int, text: str, username: str):
         )
 
         data = {
-            "model": "gemma2-9b-it",
+            "model": "mixtral-8x7b-32768",
             "messages": [
                 {"role": "system", "content": system_content}
             ] + chat_memory[chat_id]
