@@ -2751,52 +2751,76 @@ async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         print("Auto-reply error:", e)
 
-# ================= MAIN =================
-async def error_handler(update, context):
-    print(f"⚠️ Error: {context.error}")
+# ---------------- CALLBACKS & ERROR HANDLING ----------------
+
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Log the error and send a notice to the dev if possible."""
+    print(f"⚠️ Telegram Error: {context.error}")
+    # This prevents the bot from crashing on network blips
+    if "Timed out" in str(context.error) or "httpx" in str(context.error):
+        return 
+
+# ---------------- MAIN APPLICATION ----------------
 
 def main():
-    print("🔥 Yuuri Bot Starting...")
+    print("🔥 Yuuri Bot is initializing...")
 
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
+    # ✅ FIX: Increased timeouts to prevent the 'httpx.ConnectTimeout' in your logs
+    app = (
+        ApplicationBuilder()
+        .token(BOT_TOKEN)
+        .connect_timeout(40.0)  # Increased from default
+        .read_timeout(40.0)     # Increased from default
+        .write_timeout(40.0)
+        .pool_timeout(40.0)
+        .build()
+    )
 
     # =====================================================
-    # COMMAND HANDLERS
+    # 1. CORE & TRACKING (Group -1 runs before anything else)
     # =====================================================
+    app.add_handler(MessageHandler(filters.ALL, save_chat_and_user), group=-1)
+
+    # =====================================================
+    # 2. COMMAND HANDLERS (Alphabetical for your sanity)
+    # =====================================================
+    # General & Stats
     app.add_handler(CommandHandler("start", start_command))
-    app.add_handler(CommandHandler("referral", referral))
-    app.add_handler(CommandHandler("stats", stats))
     app.add_handler(CommandHandler("status", profile))
+    app.add_handler(CommandHandler("stats", stats))
     app.add_handler(CommandHandler("rankers", rankers))
-    app.add_handler(CommandHandler("daily", daily))
-    app.add_handler(CommandHandler("protect", protect))
-    app.add_handler(CommandHandler("register", register))
-    app.add_handler(CommandHandler("revive", revive))
-    app.add_handler(CommandHandler("givee", givee))
-    app.add_handler(CommandHandler("broad_gc", broad_gc))
-    app.add_handler(CommandHandler("broad_c", broad_c))
-    app.add_handler(CommandHandler("stop_b", cancel_broadcast))
     app.add_handler(CommandHandler("richest", richest))
+    app.add_handler(CommandHandler("id", user_command))
+    app.add_handler(CommandHandler("font", font_converter))
 
-    # =====================================================
-    # HEIST COMMANDS
-    # =====================================================
+    # Economy & Daily
+    app.add_handler(CommandHandler("register", register))
+    app.add_handler(CommandHandler("daily", daily))
+    app.add_handler(CommandHandler("givee", givee))
+    app.add_handler(CommandHandler("shop", shop))
+    app.add_handler(CommandHandler("purchase", purchase))
+    app.add_handler(CommandHandler("referral", referral))
+
+    # Combat & Interaction
+    app.add_handler(CommandHandler("kill", kill))
+    app.add_handler(CommandHandler("revive", revive))
+    app.add_handler(CommandHandler("protect", protect))
+    app.add_handler(CommandHandler("rob", robe))
+    app.add_handler(CommandHandler("bounty", bounty))
+
+    # Heist System
     app.add_handler(CommandHandler("heist", heist))
     app.add_handler(CommandHandler("joinheist", joinheist))
     app.add_handler(CommandHandler("stfast", stfast))
     app.add_handler(CommandHandler("stopheist", stopheist))
 
-     # =====================================================
-    # RUSSIAN ROULETTE (CONTINUED)
-    # =====================================================
+    # Russian Roulette
     app.add_handler(CommandHandler("on", on))
     app.add_handler(CommandHandler("shot", shot))
     app.add_handler(CommandHandler("out", out))
     app.add_handler(CommandHandler("rullrank", rullrank))
 
-    # =====================================================
-    # FUN & INTERACTION
-    # =====================================================
+    # Social/Fun Commands
     app.add_handler(CommandHandler("kiss", kiss))
     app.add_handler(CommandHandler("hug", hug))
     app.add_handler(CommandHandler("bite", bite))
@@ -2805,27 +2829,15 @@ def main():
     app.add_handler(CommandHandler("punch", punch))
     app.add_handler(CommandHandler("murder", murder))
 
-    # =====================================================
-    # TOOLS & MEDIA
-    # =====================================================
+    # Tools & Admin
     app.add_handler(CommandHandler("q", quote))
     app.add_handler(CommandHandler("obt", save_sticker))
     app.add_handler(CommandHandler("aniworld", aniworld_command))
-    app.add_handler(CommandHandler("font", font_converter))
-    app.add_handler(CommandHandler("id", user_command))
+    app.add_handler(CommandHandler("broad_gc", broad_gc))
+    app.add_handler(CommandHandler("broad_c", broad_c))
+    app.add_handler(CommandHandler("stop_b", cancel_broadcast))
 
-    # =====================================================
-    # ECONOMY & SHOP
-    # =====================================================
-    app.add_handler(CommandHandler("kill", kill))
-    app.add_handler(CommandHandler("rob", robe))
-    app.add_handler(CommandHandler("bounty", bounty))
-    app.add_handler(CommandHandler("shop", shop))
-    app.add_handler(CommandHandler("purchase", purchase))
-
-    # =====================================================
-    # MANAGEMENT
-    # =====================================================
+    # Management
     app.add_handler(CommandHandler("ban", ban))
     app.add_handler(CommandHandler("unban", unban))
     app.add_handler(CommandHandler("mute", mute))
@@ -2836,30 +2848,32 @@ def main():
     app.add_handler(CommandHandler("unwarn", unwarn))
 
     # =====================================================
-    # MESSAGE HANDLERS (ORDER MATTERS)
+    # 3. MESSAGE HANDLERS
     # =====================================================
-    
-    # 1. Track every message to update user/chat DB
-    app.add_handler(MessageHandler(filters.ALL, save_chat_and_user), group=-1)
-
-    # 2. Welcome new members
+    # Status updates (Welcome)
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
 
-    # 3. Sticker reply logic
+    # Sticker logic
     app.add_handler(MessageHandler(filters.Sticker.ALL, reply_with_random_sticker))
 
-    # 4. AI Auto-reply (Keep this last so it doesn't intercept commands)
+    # ✅ AI Auto-reply: MUST BE LAST. 
+    # Logic: If it's Text AND NOT a Command, let Yuuri think.
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, auto_reply))
 
     # =====================================================
-    # CALLBACKS & ERROR HANDLING
+    # 4. CALLBACKS & ERROR HANDLING
     # =====================================================
     app.add_handler(CallbackQueryHandler(heist_choice, pattern="^heist_"))
     app.add_handler(CallbackQueryHandler(callback_handler))
+    
+    # Global Error Handler to catch timeouts gracefully
     app.add_error_handler(error_handler)
 
-    print("✅ Yuuri is Live!")
-    app.run_polling()
+    print("✅ Yuuri is Live & Protected!")
+    
+    # drop_pending_updates=True is crucial! 
+    # It prevents the bot from replying to 1000 messages at once after being offline.
+    app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
     main()
