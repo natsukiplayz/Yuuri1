@@ -902,56 +902,70 @@ import logging
 from telegram import Update
 from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
+from telegram.error import BadRequest, RetryAfter
 
-# --- WORKABLE TRIGGER HANDLER ---
 async def handle_torture_triggers(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Safety check: Ignore if there's no message or no sender
-    if not update.message or not update.message.from_user:
+    """
+    Highly optimized torture handler.
+    Priority: 1. Void (Delete) | 2. Ghost Ping | 3. Sticker Rain
+    """
+    # 1. Basic Validation
+    if not update.effective_message or not update.effective_user:
         return
     
-    user_id = update.message.from_user.id
+    user_id = update.effective_user.id
     chat_id = update.effective_chat.id
+    message = update.effective_message
 
-    # --- 1. THE VOID (Auto-Delete) ---
-    # This must be FIRST. If they are voided, we delete and exit.
+    # --- 1. THE VOID (Instant Deletion) ---
     if is_tortured(user_id, "void_active"):
         try:
-            await update.message.delete()
-            return  # Stop here! No stickers or pings for a voided user.
+            await message.delete()
+            return  # Exit immediately; message is gone.
+        except BadRequest:
+            logging.error(f"Void Failed: Bot is not Admin in {chat_id}")
         except Exception as e:
-            logging.error(f"Void Delete Failed: {e}")
-            # If deletion fails (bot not admin), we continue to other tortures
+            logging.error(f"Void Error: {e}")
 
-    # --- 2. THE AGGRESSIVE GHOST PING ---
+    # --- 2. THE GHOST PING (Notification Troll) ---
     if is_tortured(user_id, "ghost"):
         try:
-            # Triggers '@' notification but shows nothing in the chat
-            m = await context.bot.send_message(
+            # \u2063 is an invisible separator that forces a mention notification
+            ghost_ping = await context.bot.send_message(
                 chat_id=chat_id,
-                text=f'<a href="tg://user?id={user_id}">\u2063</a>', 
+                text=f'<a href="tg://user?id={user_id}">\u2063</a>',
                 parse_mode=ParseMode.HTML
             )
-            await m.delete()
+            await ghost_ping.delete()
         except Exception as e:
             logging.error(f"Ghost Ping Error: {e}")
 
-    # --- 3. STICKER RAIN ---
+    # --- 3. STICKER RAIN (Visual Flood) ---
     if is_tortured(user_id, "rain"):
+        # Check if MY_PACKS actually has content to avoid crashes
+        if not MY_PACKS:
+            logging.warning("MY_PACKS is empty! Cannot perform Sticker Rain.")
+            return
+
         for _ in range(3):
             try:
-                # Pick a random pack from your MY_PACKS list
                 chosen_pack = random.choice(MY_PACKS)
                 sticker_set = await context.bot.get_sticker_set(name=chosen_pack)
                 
-                if sticker_set.stickers:
+                if sticker_set and sticker_set.stickers:
                     sticker = random.choice(sticker_set.stickers)
-                    # Reply directly to the victim to bury their message
-                    await update.message.reply_sticker(sticker=sticker.file_id)
+                    # We reply to the original message to 'bury' it
+                    await message.reply_sticker(sticker=sticker.file_id)
                 
-                # Small delay to look natural and avoid Telegram flood limits
-                await asyncio.sleep(0.5) 
+                # Crucial: Sleep prevents "429: Too Many Requests"
+                await asyncio.sleep(0.4) 
+                
+            except RetryAfter as e:
+                # If Telegram says slow down, we stop the loop
+                await asyncio.sleep(e.retry_after)
+                break
             except Exception as e:
-                logging.error(f"Sticker Rain Error: {e}")
+                logging.error(f"Sticker Rain Loop Error: {e}")
                 continue
 
 # ================= BOT STATS =================
