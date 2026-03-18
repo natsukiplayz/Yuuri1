@@ -2888,35 +2888,43 @@ async def unwarn(update: Update, context: ContextTypes.DEFAULT_TYPE):
     admins_db.update_one({"chat_id": update.effective_chat.id, "user_id": user_id}, {"$set": {"warns": 0}})
     await update.message.reply_text(get_fancy_text(f"✅ Warns for {name} have been reset.", "2"))
 
-# ================= AUTO-UPDATE USER CACHE & BLOCK CHECK =================
+# ================= AUTO UPDATE CHAT =================
 
 async def save_chat_and_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Updates database cache and stops blocked users from using the bot."""
-    chat = update.effective_chat
     user = update.effective_user
-    if not chat or not user: 
+    message = update.effective_message
+    if not user or not message: 
         return
 
-    # 1. BLOCK CHECK (Crucial: Runs before anything else)
+    # 1. FETCH USER DATA
     user_db = users.find_one({"id": user.id})
-    if user_db and user_db.get("blocked"):
-        # Send the rejection message
-        await update.message.reply_text("Sᴏʀʀʏ Bᴜᴛ Yᴏᴜʀ Bʟᴏᴄᴋᴇᴅ 😒")
-        # Stop all other handlers (group 1, group 2, etc.) from running
+
+    # 2. THE SMART BLOCK GUARD
+    if user.id == OWNER_ID:
+        pass # Boss is always allowed
+    elif user_db and user_db.get("blocked"):
+        # Check if the user is TRYING to talk to the bot:
+        # - Is it a Private Chat?
+        # - Or is the message a Command (starts with /)?
+        is_private = update.effective_chat.type == "private"
+        is_command = message.text.startswith("/") if message.text else False
+
+        if is_private or is_command:
+            await message.reply_text("Sᴏʀʀʏ Bᴜᴛ Yᴏᴜʀ Bʟᴏᴄᴋᴇᴅ 😒")
+        
+        # In all cases (even if we didn't reply), we stop the bot here
         raise ApplicationHandlerStop
 
-    # 2. Update Chat
+    # 3. SAVE LOGIC (Only runs if user is NOT blocked)
+    # Update Chat
+    chat = update.effective_chat
     db["chats"].update_one(
         {"id": chat.id}, 
-        {"$set": {
-            "id": chat.id, 
-            "type": chat.type, 
-            "title": getattr(chat, "title", None)
-        }}, 
+        {"$set": {"id": chat.id, "type": chat.type, "title": getattr(chat, "title", None)}}, 
         upsert=True
     )
 
-    # 3. Update User (Crucial for Baka-style username lookup)
+    # Update User
     users.update_one(
         {"id": user.id},
         {"$set": {
