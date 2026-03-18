@@ -649,7 +649,7 @@ from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
 async def void_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """/void - Text animated erasure with history purge"""
+    """/void - Nukes user's entire message history and activates auto-delete"""
     if update.effective_user.id != OWNER_ID:
         return
 
@@ -657,58 +657,88 @@ async def void_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if chat.type == "private":
         return await update.message.reply_text("Aᴡᴡᴡ Sᴡᴇᴇᴛʏ Sɪʟʟʏ Uꜱᴇ Tʜɪꜱ Iɴ Gʀᴏᴜᴘꜱ ☺️")
 
-    if not update.message.reply_to_message:
-        return await update.message.reply_text("❌ Rᴇᴘʟʏ ᴛᴏ ᴛʜᴇ ᴘᴇʀꜱᴏɴ ʏᴏᴜ ᴡᴀɴᴛ ᴛᴏ Vᴏɪᴅ!")
+    target_user_id = None
+    target_name = "Unknown"
 
-    target_msg = update.message.reply_to_message
-    target_user_id = target_msg.from_user.id
-    target_name = target_msg.from_user.first_name
+    # --- 1. ID / USERNAME LOGIC ---
+    if update.message.reply_to_message:
+        target_user_id = update.message.reply_to_message.from_user.id
+        target_name = update.message.reply_to_message.from_user.first_name
+    elif context.args:
+        arg = context.args[0]
+        if arg.startswith("@"):
+            username = arg.replace("@", "")
+            # Assuming 'users_collection' is your MongoDB collection
+            user_data = users_collection.find_one({"username": username})
+            if user_data:
+                target_user_id = user_data["user_id"]
+                target_name = user_data.get("first_name", username)
+            else:
+                return await update.message.reply_text("❌ I ᴅᴏɴ'ᴛ ᴋɴᴏᴡ ᴛʜɪꜱ ᴜꜱᴇʀ ʏᴇᴛ. Tʜᴇʏ ɴᴇᴇᴅ ᴛᴏ ꜱᴘᴇᴀᴋ ꜰɪʀꜱᴛ!")
+        else:
+            try:
+                target_user_id = int(arg)
+                target_name = f"User {target_user_id}"
+            except ValueError:
+                return await update.message.reply_text("❌ Uꜱᴀɢᴇ: /ᴠᴏɪᴅ @ᴜꜱᴇʀɴᴀᴍᴇ ᴏʀ /ᴠᴏɪᴅ <ɪᴅ>")
 
-    # Toggle DB status
+    if not target_user_id:
+        return await update.message.reply_text("❌ Wʜᴏ ᴀʀᴇ ᴡᴇ ᴠᴏɪᴅɪɴɢ?")
+
+    # --- 2. DATABASE TOGGLE ---
     is_now_voided = toggle_torture(target_user_id, "void_active") 
 
     if not is_now_voided:
         return await update.message.reply_text(f"😇 {target_user_id} ʜᴀꜱ ʙᴇᴇɴ ʀᴇᴛᴜʀɴᴇᴅ ꜰʀᴏᴍ ᴛʜᴇ Vᴏɪᴅ.")
 
-    # --- TEXT ANIMATION ---
+    # --- 3. START TEXT ANIMATION ---
     status_msg = await update.message.reply_text("🔍 Sᴄᴀɴɴɪɴɢ Rᴇᴀʟɪᴛʏ...")
-    await asyncio.sleep(0.5)
+    await asyncio.sleep(0.6)
 
     frames = [
         "📡 Cᴏɴɴᴇᴄᴛɪɴɢ ᴛᴏ Vᴏɪᴅ...",
-        f"🌌 Eʀᴀꜱɪɴɢ {target_name}...",
-        "🌀 Pᴜʀɢɪɴɢ Hɪꜱᴛᴏʀʏ..."
+        f"🌌 Eʀᴀꜱɪɴɢ {target_name}'ꜱ Eɴᴛɪʀᴇ Exɪꜱᴛᴇɴᴄᴇ...",
+        "🌀 Pʀᴏᴄᴇꜱꜱ Cᴏᴍᴘʟᴇᴛᴇ. Uꜱᴇʀ Vᴏɪᴅᴇᴅ."
     ]
 
     for frame in frames:
         try:
             await status_msg.edit_text(frame)
-            await asyncio.sleep(0.6)
-        except: break
+            await asyncio.sleep(0.7)
+        except: 
+            break
 
-    # --- THE PURGE LOGIC ---
-    # This tries to delete recent messages from this user in the chat
-    deleted_count = 0
+    # --- 4. THE NUKE TRICK ---
     try:
-        # We manually delete the reply target and the command first
-        await target_msg.delete()
+        # Ban user and revoke ALL their past messages
+        await context.bot.ban_chat_member(
+            chat_id=chat.id, 
+            user_id=target_user_id, 
+            revoke_messages=True
+        )
+        
+        # Immediately unban so they aren't permanently blacklisted (they can rejoin)
+        await context.bot.unban_chat_member(
+            chat_id=chat.id, 
+            user_id=target_user_id
+        )
+
+        # Cleanup the command message
         await update.message.delete()
         
-        # Note: Standard bots can't easily 'search' history, 
-        # but we can try to clear messages if we have the IDs.
-        # Since we can't scroll history, we rely on the handle_torture_triggers 
-        # to delete every NEW message they send.
-        
+        # Final static message
         final_text = (
             f"🌌 Vᴏɪᴅ Iɴɪᴛɪᴀᴛᴇᴅ\n\n"
             f"👤 Uꜱᴇʀ: {target_name}\n"
             f"🆔 ID: {target_user_id}\n\n"
-            f"ᴀʟʟ ꜰᴜᴛᴜʀᴇ ᴍᴇꜱꜱᴀɢᴇꜱ ᴡɪʟʟ ʙᴇ ɪɴꜱᴛᴀɴᴛʟʏ ᴇʀᴀꜱᴇᴅ. 🌀"
+            f"⚠️ Aʟʟ ᴘᴀꜱᴛ ᴍᴇꜱꜱᴀɢᴇꜱ ʜᴀᴠᴇ ʙᴇᴇɴ ᴡɪᴘᴇᴅ.\n"
+            f"ᴀʟʟ ꜰᴜᴛᴜʀᴇ ᴍᴇꜱꜱᴀɢᴇꜱ ᴡɪʟʟ ʙᴇ ɪɴꜱᴛᴀɴᴛʟʏ ᴇʀᴀꜱᴇᴅ ɪꜰ ᴛʜᴇʏ ʀᴇᴛᴜʀɴ. 🌀"
         )
+        
         await status_msg.edit_text(text=final_text)
-
+        
     except Exception as e:
-        await status_msg.edit_text(f"❌ Vᴏɪᴅ Pᴀʀᴛɪᴀʟ: Make sure I am Admin!\nError: {e}")
+        await status_msg.edit_text(f"❌ Vᴏɪᴅ Fᴀɪʟᴇᴅ: I ɴᴇᴇᴅ 'Bᴀɴ Uꜱᴇʀꜱ' & 'Dᴇʟᴇᴛᴇ Mᴇꜱꜱᴀɢᴇꜱ' Aᴅᴍɪɴ Pᴏᴡᴇʀꜱ!\nError: {e}")
 
 #=========sticker sender=======
 import random
