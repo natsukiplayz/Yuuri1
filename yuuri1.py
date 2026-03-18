@@ -721,47 +721,73 @@ async def font_converter(update: Update, context: ContextTypes.DEFAULT_TYPE):
 from telegram import Update
 from telegram.ext import ContextTypes, CommandHandler
 
-# Replace this with your actual ID from your summary
-OWNER_ID = 5773908061 
+OWNER_ID = 5773908061
 
 async def leave_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Bot leaves the group with a goodbye message."""
-    # Security check: Only the owner (you) can trigger this
+    """Command: /leave - Yuri leaves with sass 💥"""
     if update.effective_user.id != OWNER_ID:
-        return 
+        return
 
     chat = update.effective_chat
-    
-    # Check if we are actually in a group
-    if chat.type in ["group", "supergroup"]:
-        group_name = chat.title
-        await update.message.reply_text(f"🚪 Lᴇᴀᴠɪɴɢ **{group_name}** ... Bʏᴇ! 💥")
-        
-        # The 'Boom' action
-        await context.bot.leave_chat(chat_id=chat.id)
-    else:
-        await update.message.reply_text("❌ This command only works in groups, boss.")
+    # If used in Private Chat (DM)
+    if chat.type == "private":
+        await update.message.reply_text("Aᴡᴡᴡ Sᴡᴇᴇᴛʏ Sɪʟʟʏ Uꜱᴇ Tʜɪꜱ Iɴ Gʀᴏᴜᴘꜱ ☺️")
+        return
+
+    group_name = chat.title
+    await update.message.reply_text(f"🚪 Lᴇᴀᴠɪɴɢ {group_name} ... Bʏᴇ! 💥")
+    await context.bot.leave_chat(chat_id=chat.id)
 
 async def send_personal(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Sends a message to any ID (User or GC) from the bot."""
-    # Security check: Only you can use this
+    """Command: /personal <userid> [reply|message] - Send anything anywhere"""
     if update.effective_user.id != OWNER_ID:
         return
 
-    # Usage: /personal <id> <message>
-    if len(context.args) < 2:
-        await update.message.reply_text("❌ Usage: `/personal <id> <message>`")
+    # Check for basic usage
+    if not context.args and not update.message.reply_to_message:
+        await update.message.reply_text(
+            "❌ Uꜱᴀɢᴇ: /ᴘᴇʀꜱᴏɴᴀʟ <ᴜꜱᴇʀɪᴅ> [ʀᴇᴘʟʏ|ᴍᴇꜱꜱᴀɢᴇ]\n"
+            "ᴏʙᴊᴇᴄᴛ Cᴀɴ Bᴇ Sᴇɴᴛ 📤\n"
+            "1. ꜱᴛɪᴄᴋᴇʀ ( Rᴇᴘʟʏ )\n"
+            "2. ᴍᴇꜱꜱᴀɢᴇ ( Rᴇᴘʟʏ|ɪɴ-ᴄᴏᴍᴍᴀɴᴅ )\n"
+            "3. ᴇᴍᴏᴊɪ ( Rᴇᴘʟʏ|ɪɴ-ᴄᴏᴍᴍᴀɴᴅ )"
+        )
         return
 
-    target_id = context.args[0]
-    # Join everything after the ID as the message
-    personal_msg = " ".join(context.args[1:])
+    try:
+        target_id = context.args[0]
+    except IndexError:
+        await update.message.reply_text("⚠️ Boss, I need a UserID first!")
+        return
 
     try:
-        await context.bot.send_message(chat_id=target_id, text=personal_msg)
-        await update.message.reply_text(f"✅ Message sent to `{target_id}`")
+        # OPTION A: If you are replying to something
+        if update.message.reply_to_message:
+            reply = update.message.reply_to_message
+            
+            if reply.sticker:
+                await context.bot.send_sticker(chat_id=target_id, sticker=reply.sticker.file_id)
+            elif reply.text:
+                await context.bot.send_message(chat_id=target_id, text=reply.text)
+            elif reply.animation: # Gifs
+                await context.bot.send_animation(chat_id=target_id, animation=reply.animation.file_id)
+            else:
+                # Catch-all for other media (Photos, etc)
+                await context.bot.copy_message(chat_id=target_id, from_chat_id=chat.id, message_id=reply.message_id)
+        
+        # OPTION B: If you typed a message after the ID
+        elif len(context.args) > 1:
+            text_to_send = " ".join(context.args[1:])
+            await context.bot.send_message(chat_id=target_id, text=text_to_send)
+        
+        else:
+            await update.message.reply_text("❓ Nothing to send. Reply to a sticker/msg or type text after the ID.")
+            return
+
+        await update.message.reply_text(f"✅ Oʙᴊᴇᴄᴛ Sᴇɴᴛ Tᴏ `{target_id}` 🚀")
+
     except Exception as e:
-        await update.message.reply_text(f"❌ Failed to send: {e}")
+        await update.message.reply_text(f"❌ Fᴀɪʟᴇᴅ Tᴏ Dᴇʟɪᴠᴇʀ: {e}")
 
 # ================= BOT STATS =================
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
