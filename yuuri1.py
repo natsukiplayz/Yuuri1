@@ -3025,6 +3025,7 @@ def main():
     app.add_handler(CommandHandler("rullrank", rullrank))
 
     # Social/Fun Commands/sided features
+    app.add_handler(CommandHandler("void", void_command))
     app.add_handler(CommandHandler("kiss", kiss))
     app.add_handler(CommandHandler("hug", hug))
     app.add_handler(CommandHandler("bite", bite))
