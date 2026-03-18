@@ -958,45 +958,41 @@ import os
 from datetime import datetime, timezone
 
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # 1. Security check: Only Owner can use this
+    # 1. Security check
     if update.effective_user.id != OWNER_ID:
         return
 
     # 2. Calculate Uptime
     now = datetime.now(timezone.utc)
     uptime_delta = now - BOT_START_TIME
-    days = uptime_delta.days
     hours, remainder = divmod(uptime_delta.seconds, 3600)
     minutes, seconds = divmod(remainder, 60)
-    
-    if days > 0:
-        uptime_str = f"{days}ᴅ {hours}ʜ {minutes}ᴍ"
-    else:
-        uptime_str = f"{hours}ʜ {minutes}ᴍ {seconds}ꜱ"
+    uptime_str = f"{hours}ʜ {minutes}ᴍ {seconds}ꜱ"
 
-    # 3. Calculate REAL RAM (Bot's specific usage)
+    # 3. Calculate REAL RAM (Bot only)
     process = psutil.Process(os.getpid())
-    # rss is the Resident Set Size (the actual RAM the bot is using)
-    ram_bytes = process.memory_info().rss 
-    ram_mb = round(ram_bytes / (1024 ** 2), 1) 
-    ram_str = f"{ram_mb} MB"
+    ram_mb = round(process.memory_info().rss / (1024 ** 2), 1)
+    
+    # Getting system percentage for the look, but using Real MB for the value
+    sys_ram = psutil.virtual_memory()
+    ram_str = f"{sys_ram.percent}% ({ram_mb} MB)"
 
     # 4. Database Queries
     chats_col = db["chats"]
-    groups_count = chats_col.count_documents({"type": {"$in": ["group", "supergroup"]}})
-    private_count = chats_col.count_documents({"type": "private"})
-    blocked_count = users.count_documents({"blocked": True})
-    total_users_count = users.count_documents({})
+    groups = chats_col.count_documents({"type": {"$in": ["group", "supergroup"]}})
+    private = chats_col.count_documents({"type": "private"})
+    blocked = users.count_documents({"blocked": True})
+    total_users = users.count_documents({})
 
-    # 5. UI - Spacious & Clean Style
+    # 5. UI - Compact & Fixed
     text = (
-        "📊 **𝗬𝘂𝘂𝗿𝗶 𝗕𝗼𝘁 𝗦𝘁𝗮𝘁𝘀**\n\n\n"
-        f"👥  Gʀᴏᴜᴘꜱ  :  `{groups_count}`\n\n"
-        f"💬  Cʜᴀᴛꜱ  :  `{private_count}`\n\n"
-        f"🧑‍💻  Tᴏᴛᴀʟ Uꜱᴇʀꜱ  :  `{total_users_count}`\n\n"
-        f"🚫  Bʟᴏᴄᴋᴇᴅ Uꜱᴇʀꜱ  :  `{blocked_count}`\n\n\n"
-        f"⏱  Uᴘᴛɪᴍᴇ  :  `{uptime_str}`\n\n"
-        f"💾  Rᴀᴍ Uꜱᴀɢᴇ  :  `{ram_str}`"
+        "📊 **𝗬𝘂𝘂𝗿𝗶 𝗕𝗼𝘁 𝗦𝘁𝗮𝘁𝘀**\n\n"
+        f"👥 Gʀᴏᴜᴘꜱ : `{groups}`\n"
+        f"💬 Cʜᴀᴛꜱ : `{private}`\n"
+        f"🧑‍💻 Tᴏᴛᴀʟ Uꜱᴇʀꜱ : `{total_users}`\n"
+        f"⏱ Uᴘᴛɪᴍᴇ : `{uptime_str}`\n"
+        f"💾 Rᴀᴍ : `{ram_str}`\n\n"
+        f"🚫 Bʟᴏᴄᴋᴇᴅ Uꜱᴇʀꜱ : `{blocked}`"
     )
 
     await update.message.reply_text(text, parse_mode="Markdown")
