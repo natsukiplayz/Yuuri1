@@ -890,25 +890,51 @@ async def handle_torture_triggers(update: Update, context: ContextTypes.DEFAULT_
                 continue
 
 # ================= BOT STATS =================
-async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+import psutil
+from datetime import datetime, timezone
 
+async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Security check: Only Owner can see this
     if update.effective_user.id != OWNER_ID:
         return
 
+    # Calculate Uptime
+    now = datetime.now(timezone.utc)
+    uptime_delta = now - BOT_START_TIME
+    days = uptime_delta.days
+    hours, remainder = divmod(uptime_delta.seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    
+    if days > 0:
+        uptime_str = f"{days}ᴅ {hours}ʜ {minutes}ᴍ"
+    else:
+        uptime_str = f"{hours}ʜ {minutes}ᴍ {seconds}ꜱ"
+
+    # Calculate RAM Usage
+    ram = psutil.virtual_memory()
+    ram_used = round(ram.used / (1024 ** 2), 2) # Converts bytes to Megabytes
+    ram_str = f"{ram.percent}% ({ram_used} MB)"
+
+    # Database Queries
     chats_col = db["chats"]
     users_col = db["users"]
 
+    # If you use async mongo (Motor), these need to be 'await chats_col.count_documents(...)'
+    # If using synchronous PyMongo, keep it exactly as it is:
     groups = chats_col.count_documents({"type": {"$in": ["group", "supergroup"]}})
     private = chats_col.count_documents({"type": "private"})
     blocked = chats_col.count_documents({"blocked": True})
     total_users = users_col.count_documents({})
 
+    # Format the message exactly as you requested
     text = (
         "📊 𝗬𝘂𝘂𝗿𝗶 𝗕𝗼𝘁 𝗦𝘁𝗮𝘁𝘀\n\n"
-        f"👥 Gʀᴏᴜᴘs : `{groups}`\n"
-        f"💬 Cʜᴀᴛs : `{private}`\n"
-        f"🧑‍💻 Tᴏᴛᴀʟ Usᴇʀs : `{total_users}`\n"
-        f"🚫 Bʟᴏᴄᴋᴇᴅ Usᴇʀs : `{blocked}`\n"
+        f"👥 Gʀᴏᴜᴘꜱ : `{groups}`\n"
+        f"💬 Cʜᴀᴛꜱ : `{private}`\n"
+        f"🧑‍💻 Tᴏᴛᴀʟ Uꜱᴇʀꜱ : `{total_users}`\n"
+        f"⏱ Uᴘᴛɪᴍᴇ : `{uptime_str}`\n"
+        f"💾 Rᴀᴍ : `{ram_str}`\n\n"
+        f"🚫 Bʟᴏᴄᴋᴇᴅ Uꜱᴇʀꜱ : `{blocked}`\n"
     )
 
     await update.message.reply_text(text, parse_mode="Markdown")
