@@ -644,6 +644,9 @@ async def murder(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 #========Void messages ========
 import asyncio
+from telegram import Update
+from telegram.constants import ParseMode
+from telegram.ext import ContextTypes
 
 async def void_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """/void - Text animated erasure with auto-delete loop"""
@@ -661,11 +664,11 @@ async def void_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     target_user_id = target_msg.from_user.id
     target_name = target_msg.from_user.first_name
 
-    # Toggle DB status
+    # Toggle DB status (True if added, False if removed)
     is_now_voided = toggle_torture(target_user_id, "void_active") 
 
     if not is_now_voided:
-        return await update.message.reply_text(f"😇 `{target_user_id}` ʜᴀꜱ ʙᴇᴇɴ ʀᴇᴛᴜʀɴᴇᴅ ꜰʀᴏᴍ ᴛʜᴇ Vᴏɪᴅ.")
+        return await update.message.reply_text(f"😇 {target_user_id} ʜᴀꜱ ʙᴇᴇɴ ʀᴇᴛᴜʀɴᴇᴅ ꜰʀᴏᴍ ᴛʜᴇ Vᴏɪᴅ.")
 
     # --- START TEXT ANIMATION ---
     status_msg = await update.message.reply_text("🔍 Sᴄᴀɴɴɪɴɢ Tᴀʀɢᴇᴛ...")
@@ -686,17 +689,20 @@ async def void_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             break
 
     try:
-        # Final cleanup: Delete the target's original message and the owner's command
+        # Final cleanup: Delete the victim's message and your command
         await target_msg.delete()
         await update.message.delete()
         
-        # Final static message after animation
-        await status_msg.edit_text(
-            f"🌌 **Vᴏɪᴅ Iɴɪᴛɪᴀᴛᴇᴅ**\n\n"
-            f"👤 **Uꜱᴇʀ:** {target_name}\n"
-            f"🆔 **ID:** `{target_user_id}`\n\n"
+        # Final static message - No asterisks, clean display
+        final_text = (
+            f"🌌 Vᴏɪᴅ Iɴɪᴛɪᴀᴛᴇᴅ\n\n"
+            f"👤 Uꜱᴇʀ: {target_name}\n"
+            f"🆔 ID: {target_user_id}\n\n"
             f"ᴇᴠᴇʀʏᴛʜɪɴɢ ᴛʜᴇʏ ꜱᴀʏ ᴡɪʟʟ ɴᴏᴡ ʙᴇ ᴇʀᴀꜱᴇᴅ... 🌀"
         )
+        
+        await status_msg.edit_text(text=final_text)
+        
     except Exception as e:
         await status_msg.edit_text(f"❌ Vᴏɪᴅ Fᴀɪʟᴇᴅ: Make sure I am Admin!\nError: {e}")
 
