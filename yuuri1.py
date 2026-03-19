@@ -335,16 +335,15 @@ async def create_redeem(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def redeem(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """/redeem <code> - For Users"""
     user = update.effective_user
-    
-    # --- ADDED USAGE FOR REDEEM ---
+
     if not context.args:
         usage = (
-            "🎫 𝗥𝗲𝗱𝗲𝗲𝗺 𝗖𝗼𝗱𝗲\n\n"
-            "Usage: `/redeem <code>`\n\n"
+            "🎫 <b>𝗥𝗲𝗱𝗲𝗲𝗺 𝗖𝗼𝗱𝗲</b>\n\n"
+            "Usage: <code>/redeem <code></code>\n\n"
             "Example:\n"
-            "• `/redeem GIFT10`"
+            "• <code>/redeem GIFT10</code>"
         )
-        return await update.message.reply_text(usage, parse_mode="Markdown")
+        return await update.message.reply_text(usage, parse_mode="HTML")
 
     code_input = context.args[0].upper()
     data = redeem_col.find_one({"code": code_input})
@@ -359,39 +358,51 @@ async def redeem(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(data.get("used_by", [])) >= data["limit"]:
         return await update.message.reply_text("😔 Sᴏʀʀʏ! Tʜɪs ᴄᴏᴅᴇ ʜᴀs ʀᴇᴀᴄʜᴇᴅ ɪᴛs ᴜsᴀɢᴇ ʟɪᴍɪᴛ.")
 
-    # 2. Process Reward Integration
+    # 2. Process Reward
     reward_type, reward_val = data["reward"].split(":", 1)
     user_data = get_user(user)
+    level_msg = ""
 
-    if reward_type == "coins":
-        try:
+    try:
+        if reward_type == "coins":
             val = int(reward_val)
             user_data["coins"] += val
-            display_reward = f"💰 {val} Cᴏɪɴs"
-        except ValueError:
-            return await update.message.reply_text("❌ Error in code reward value.")
+            display_reward = f"💰 {val:,} Cᴏɪɴs"
+            save_user(user_data)
 
-    elif reward_type == "item":
-        if "inventory" not in user_data:
-            user_data["inventory"] = []
-        user_data["inventory"].append(reward_val)
-        display_reward = f"🎁 {reward_val}"
+        elif reward_type == "xp":
+            val = int(reward_val)
+            # Use your existing add_xp function to handle leveling logic
+            leveled_up = add_xp(user_data, val)
+            display_reward = f"✨ {val:,} XP"
+            if leveled_up:
+                level_msg = f"\n\n🎊 <b>Lᴇᴠᴇʟ Uᴘ!</b> Yᴏᴜ ᴀʀᴇ ɴᴏᴡ Lᴇᴠᴇʟ <code>{user_data['level']}</code>!"
 
-    else:
-        return await update.message.reply_text("❌ Uɴᴋɴᴏᴡɴ ʀᴇᴡᴀʀᴅ ᴛʏᴘᴇ!")
+        elif reward_type == "item":
+            if "inventory" not in user_data:
+                user_data["inventory"] = []
+            user_data["inventory"].append(reward_val)
+            display_reward = f"🎁 {reward_val}"
+            save_user(user_data)
 
-    # 3. Save to DB
-    save_user(user_data)
+        else:
+            return await update.message.reply_text("❌ Uɴᴋɴᴏᴡɴ ʀᴇᴡᴀʀᴅ ᴛʏᴘᴇ!")
+
+    except ValueError:
+        return await update.message.reply_text("❌ Error in code reward numerical value.")
+
+    # 3. Mark as used
     redeem_col.update_one(
         {"code": code_input},
         {"$push": {"used_by": user.id}}
     )
 
     await update.message.reply_text(
-        f"🎉 𝗖𝗼𝗻𝗴𝗿𝗮𝘁𝘂𝗹𝗮𝘁𝗶𝗼𝗻𝘀 {user.first_name}!\n\n"
-        f"Yᴏᴜ sᴜᴄᴄᴇssғᴜʟʟʏ ʀᴇᴅᴇᴇᴍᴇᴅ: `{display_reward}`\n"
-        "Cʜᴇᴄᴋ ʏᴏᴜʀ /profile ᴛᴏ sᴇᴇ ɪᴛ! ✨",
-        parse_mode="Markdown"
+        f"🎉 <b>𝗖𝗼𝗻𝗴𝗿𝗮𝘁𝘂𝗹𝗮𝘁𝗶𝗼𝗻𝘀 {user.first_name}!</b>\n\n"
+        f"Yᴏᴜ sᴜᴄᴄᴇssғᴜʟʟʏ ʀᴇᴅᴇᴇᴍᴇᴅ: <code>{display_reward}</code>"
+        f"{level_msg}\n\n"
+        "Cʜᴇᴄᴋ ʏᴏᴜʀ /status ᴛᴏ sᴇᴇ ʏᴏᴜʀ ɢʀᴏᴡᴛʜ! 🚀",
+        parse_mode="HTML"
     )
 
 #=== Quote_transformer =======
