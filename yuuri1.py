@@ -53,6 +53,7 @@ users = db["users"]
 guilds = db["guilds"]
 sticker_packs = db["sticker_packs"]
 heists = db["heists"]
+redeem_col = db["redeem_codes"]
 
 #============ Management Db Collection ==========
 admins_db = db["admins"] 
@@ -68,8 +69,8 @@ logging.basicConfig(level=logging.INFO)
 def get_user(user):
     data = users.find_one({"id": user.id})
 
-    if not data:
-        data = {
+    # Default template for NEW users
+    default_data = {
         "id": user.id,
         "name": user.first_name,
         "coins": 100,
@@ -82,13 +83,28 @@ def get_user(user):
         "referred_by": None,
         "blocked": False
     }
-        users.insert_one(data)
+
+    if not data:
+        users.insert_one(default_data)
+        return default_data
+
+    # ✨ THE AUTO-REPAIR LOGIC
+    # If you add "inventory" to the bot today, but a user joined yesterday,
+    # this part adds the missing "inventory": [] automatically so the bot doesn't crash.
+    updated = False
+    for key, value in default_data.items():
+        if key not in data:
+            data[key] = value
+            updated = True
+    
+    if updated:
+        save_user(data)
 
     return data
 
-
 def save_user(data):
-    users.update_one({"id": data["id"]}, {"$set": data})
+    # We use update_one with $set to ensure we only change the fields we want
+    users.update_one({"id": data["id"]}, {"$set": data}, upsert=True)
 
 # ======Broadcast_System======
 import asyncio
@@ -99,52 +115,53 @@ from telegram.ext import ContextTypes
 # Broadcast control dictionary
 broadcast_control = {"running": False, "cancel": False}
 
-# ========== LEVEL SYSTEM ========
+# ========== UPDATED LEVEL SYSTEM ========
 def add_xp(user_data, amount=10):
     user_data["xp"] += amount
-    need = user_data["level"] * 100
+    # Doubling formula: Level 1=100, Level 2=200, Level 3=400...
+    need = 100 * (2 ** (user_data["level"] - 1))
 
     if user_data["xp"] >= need:
-        user_data["xp"] = 0
+        user_data["xp"] = 0 # Reset XP for the new level
         user_data["level"] += 1
+        # You could add a 'level_up' message here if you wanted!
 
     save_user(user_data)
 
-# ====== RANK SYSTEM =======
-
+# ====== UPDATED RANK SYSTEM (Based on Level) =======
 RANKS = [
-    {"name": "Noob", "xp": 0},
-    {"name": "Beginner", "xp": 1000},
-    {"name": "Fighter", "xp": 5000},
-    {"name": "Warrior", "xp": 12000},
-    {"name": "Elite", "xp": 25000},
-    {"name": "Master", "xp": 50000},
-    {"name": "Legend", "xp": 100000},
-    {"name": "Mythic", "xp": 200000},
-    {"name": "Immortal", "xp": 500000},
+    {"name": "Noob", "lvl": 1},
+    {"name": "Beginner", "lvl": 3},
+    {"name": "Fighter", "lvl": 5},
+    {"name": "Warrior", "lvl": 8},
+    {"name": "Elite", "lvl": 12},
+    {"name": "Master", "lvl": 18},
+    {"name": "Legend", "lvl": 25},
+    {"name": "Mythic", "lvl": 35},
+    {"name": "Immortal", "lvl": 50},
 ]
 
-def get_rank_data(xp):
-
+def get_rank_data(level):
+    """Finds rank based on current Level instead of total XP"""
     current_rank = RANKS[0]
     next_rank = None
 
     for i, rank in enumerate(RANKS):
-        if xp >= rank["xp"]:
+        if level >= rank["lvl"]:
             current_rank = rank
             if i + 1 < len(RANKS):
                 next_rank = RANKS[i + 1]
         else:
             break
-
     return current_rank, next_rank
 
+# ====== PROGRESS BAR =======
 def create_progress_bar(percent):
-
     bars = 10
+    # Ensure percent doesn't break the bar if it's over 100
+    percent = min(max(percent, 0), 100)
     filled = int(bars * percent / 100)
     empty = bars - filled
-
     bar = "█" * filled + "░" * empty
     return f"{bar} {percent}%"
 
@@ -251,6 +268,108 @@ def clear_all_torture():
 
 #============ Side_Features ========
 #--
+# ================= REDEEM SYSTEM =================
+
+async def create_redeem(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """/create <code> <limit> <type:value> - Owner Only"""
+    if update.effective_user.id != OWNER_ID:
+        return
+
+    if len(context.args) < 3:
+        usage = (
+            "📑 **𝗖𝗿𝗲𝗮𝘁𝗲 𝗥𝗲𝗱𝗲𝗲𝗺 𝗖𝗼𝗱𝗲**\n\n"
+            "**Usage:** `/create <code> <limit> <type:value>`\n"
+            "**Types:** `coins` or `item`\n\n"
+            "**Examples:**\n"
+            "• `/create GIFT10 5 coins:5000`\n"
+            "• `/create TEDDY 1 item:Teddy 🧸`"
+        )
+        return await update.message.reply_text(usage, parse_mode="Markdown")
+
+    code = context.args[0].upper()
+    try:
+        limit = int(context.args[1])
+    except ValueError:
+        return await update.message.reply_text("❌ Lɪᴍɪᴛ ᴍᴜsᴛ ʙᴇ ᴀ ɴᴜᴍʙᴇʀ!")
+
+    reward_raw = context.args[2]
+    if ":" not in reward_raw:
+        return await update.message.reply_text("❌ Fᴏʀᴍᴀᴛ ᴍᴜsᴛ ʙᴇ `type:value` (e.g., `coins:100`)!")
+
+    # Save to MongoDB
+    redeem_col.update_one(
+        {"code": code},
+        {"$set": {
+            "code": code,
+            "limit": limit,
+            "used_by": [],
+            "reward": reward_raw,
+            "created_at": datetime.now()
+        }},
+        upsert=True
+    )
+
+    await update.message.reply_text(
+        f"✅ **𝗥𝗲𝗱𝗲𝗲𝗺 𝗖𝗼𝗱𝗲 𝗖𝗿𝗲𝗮𝘁𝗲𝗱**\n\n"
+        f"🎫 Cᴏᴅᴇ : `{code}`\n"
+        f"👥 Lɪᴍɪᴛ : `{limit} Uꜱᴇʀꜱ`\n"
+        f"🎁 Rᴇᴡᴀʀᴅ : `{reward_raw}`"
+    )
+
+async def redeem(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """/redeem <code> - For Users"""
+    user = update.effective_user
+    if not context.args:
+        return await update.message.reply_text("❌ Pʟᴇᴀsᴇ ᴘʀᴏᴠɪᴅᴇ ᴀ ᴄᴏᴅᴇ ᴛᴏ ʀᴇᴅᴇᴇᴍ!")
+
+    code_input = context.args[0].upper()
+    data = redeem_col.find_one({"code": code_input})
+
+    # 1. Validation
+    if not data:
+        return await update.message.reply_text("🚫 Tʜᴀᴛ ᴄᴏᴅᴇ ɪs ɪɴᴠᴀʟɪᴅ ᴏʀ ᴇxᴘɪʀᴇᴅ!")
+
+    if user.id in data.get("used_by", []):
+        return await update.message.reply_text("⚠️ Yᴏᴜ ʜᴀᴠᴇ ᴀʟʀᴇᴀᴅʏ ᴄʟᴀɪᴍᴇᴅ ᴛʜɪs ᴄᴏᴅᴇ!")
+
+    if len(data.get("used_by", [])) >= data["limit"]:
+        return await update.message.reply_text("😔 Sᴏʀʀʏ! Tʜɪs ᴄᴏᴅᴇ ʜᴀs ʀᴇᴀᴄʜᴇᴅ ɪᴛs ᴜsᴀɢᴇ ʟɪᴍɪᴛ.")
+
+    # 2. Process Reward Integration
+    reward_type, reward_val = data["reward"].split(":", 1)
+    user_data = get_user(user) # Uses your existing get_user logic
+
+    if reward_type == "coins":
+        try:
+            val = int(reward_val)
+            user_data["coins"] += val
+            display_reward = f"💰 {val} Cᴏɪɴs"
+        except ValueError:
+            return await update.message.reply_text("❌ Error in code reward value.")
+            
+    elif reward_type == "item":
+        # Connects to your "inventory": [] field in /profile
+        if "inventory" not in user_data:
+            user_data["inventory"] = []
+        user_data["inventory"].append(reward_val)
+        display_reward = f"🎁 {reward_val}"
+    
+    else:
+        return await update.message.reply_text("❌ Uɴᴋɴᴏᴡɴ ʀᴇᴡᴀʀᴅ ᴛʏᴘᴇ!")
+
+    # 3. Save to DB
+    save_user(user_data)
+    redeem_col.update_one(
+        {"code": code_input},
+        {"$push": {"used_by": user.id}}
+    )
+
+    await update.message.reply_text(
+        f"🎉 **𝗖𝗼𝗻𝗴𝗿𝗮𝘁𝘂𝗹𝗮𝘁𝗶𝗼𝗻𝘀 {user.first_name}!**\n\n"
+        f"Yᴏᴜ ꜱᴜᴄᴄᴇꜱꜱꜰᴜʟʟʏ ʀᴇᴅᴇᴇᴍᴇᴅ: `{display_reward}`\n"
+        "Cʜᴇᴄᴋ ʏᴏᴜʀ /profile ᴛᴏ sᴇᴇ ɪᴛ! ✨"
+    )
+
 #=== Quote_transformer =======
 import httpx
 import base64
@@ -1140,83 +1259,40 @@ async def daily(update, context):
 #--
 # ======== PROFILE =======
 async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
     msg = update.effective_message
-    if not msg:
-        return
+    if not msg: return
 
-    # Target user
-    if msg.reply_to_message:
-        target_user = msg.reply_to_message.from_user
-    else:
-        target_user = update.effective_user
+    target_user = msg.reply_to_message.from_user if msg.reply_to_message else update.effective_user
+    data = get_user(target_user) # Using get_user to ensure data exists
 
-    # Get user data
-    data = users.find_one({"id": target_user.id})
-
-    if not data:
-        data = {
-            "id": target_user.id,
-            "name": target_user.first_name,
-            "coins": 100,
-            "xp": 0,
-            "level": 1,
-            "kills": 0,
-            "guild": None,
-            "dead": False,
-            "inventory": []
-        }
-        users.insert_one(data)
-
-    name = data.get("name", target_user.first_name)
-    coins = data.get("coins", 0)
     xp = data.get("xp", 0)
-    kills = data.get("kills", 0)
-    guild = data.get("guild")
-    dead = data.get("dead", False)
+    lvl = data.get("level", 1)
 
-    guild_name = guild if guild else "Nᴏɴᴇ"
+    # Calculate Need for current level (100, 200, 400...)
+    need = 100 * (2 ** (lvl - 1))
+    
+    # Progress Bar Calculation
+    percent = int((xp / need) * 100) if need > 0 else 0
+    bar = create_progress_bar(min(percent, 100))
 
-    # Rank system
-    current_rank, next_rank = get_rank_data(xp)
+    # DB Optimization for Rank
+    global_rank = users.count_documents({"level": {"$gt": lvl}}) + \
+                  users.count_documents({"level": lvl, "xp": {"$gt": xp}}) + 1
 
-    if next_rank:
-        progress = xp - current_rank["xp"]
-        needed = next_rank["xp"] - current_rank["xp"]
-
-        percent = int((progress / needed) * 100) if needed > 0 else 0
-        bar = create_progress_bar(percent)
-
-    else:
-        bar = "██████████ 100%"
-
-    # Global Rank
-    all_users = list(users.find())
-
-    sorted_users = sorted(
-        all_users,
-        key=lambda u: u.get("xp", 0),
-        reverse=True
-    )
-
-    global_rank = 0
-    for i, u in enumerate(sorted_users, 1):
-        if u.get("id") == target_user.id:
-            global_rank = i
-            break
-
-    status = "Dead" if dead else "Alive"
+    inv = data.get("inventory", [])
+    inventory_str = ", ".join(inv) if inv else "Eᴍᴘᴛʏ"
+    status = "💀 Dᴇᴀᴅ" if data.get("dead") else "❤️ Aʟɪᴠᴇ"
 
     text = (
-        f"👤 Nᴀᴍᴇ: {name}\n"
-        f"🆔 Iᴅ: {target_user.id}\n\n"
-        f"💰 Cᴏɪɴs: {coins}\n"
-        f"🔪 Kɪʟʟs: {kills}\n"
-        f"☠️ Status: {status}\n\n"
-        f"🏅 Rᴀɴᴋ: {current_rank['name']}\n"
-        f"📊 Pʀᴏɢʀᴇss:\n{bar}\n"
-        f"🌐 Gʟᴏʙᴀʟ Rᴀɴᴋ: {global_rank}\n\n"
-        f"🏰 Gᴜɪʟᴅ: {guild_name}"
+        f"👤 Nᴀᴍᴇ: {data.get('name', target_user.first_name)}\n"
+        f"🏅 Lᴇᴠᴇʟ: {lvl}\n"
+        f"💰 Cᴏɪɴs: {data.get('coins', 0)}\n"
+        f"🎒 Iɴᴠᴇɴᴛᴏʀʏ: {inventory_str}\n"
+        f"🎯 Sᴛᴀᴛᴜs: {status}\n\n"
+        f"📊 Pʀᴏɢʀᴇss: `{xp}/{need} XP`\n"
+        f"{bar}\n"
+        f"🌐 Gʟᴏʙᴀʟ Rᴀɴᴋ: {global_rank}\n"
+        f"🏰 Gᴜɪʟᴅ: {data.get('guild') or 'Nᴏɴᴇ'}"
     )
 
     await msg.reply_text(text)
@@ -2897,50 +2973,43 @@ async def unwarn(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(get_fancy_text(f"✅ Warns for {name} have been reset.", "2"))
 
 # ================= AUTO UPDATE CHAT =================
-
 async def save_chat_and_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     message = update.effective_message
-    if not user or not message: 
+    chat = update.effective_chat
+    
+    if not user or not message or not chat: 
         return
 
-    # 1. FETCH USER DATA
-    user_db = users.find_one({"id": user.id})
+    # 1. FETCH OR CREATE USER (Using your master function!)
+    # This guarantees they have coins, xp, inventory, etc., from the start
+    user_db = get_user(user)
 
     # 2. THE SMART BLOCK GUARD
-    if user.id == OWNER_ID:
-        pass # Boss is always allowed
-    elif user_db and user_db.get("blocked"):
-        # Check if the user is TRYING to talk to the bot:
-        # - Is it a Private Chat?
-        # - Or is the message a Command (starts with /)?
-        is_private = update.effective_chat.type == "private"
-        is_command = message.text.startswith("/") if message.text else False
+    if user.id != OWNER_ID and user_db.get("blocked"):
+        is_private = chat.type == "private"
+        is_command = message.text and message.text.startswith("/")
 
         if is_private or is_command:
-            await message.reply_text("Sᴏʀʀʏ Bᴜᴛ Yᴏᴜʀ Bʟᴏᴄᴋᴇᴅ 😒")
+            await message.reply_text("Sᴏʀʀʏ Bᴜᴛ Yᴏᴜ'ʀᴇ Bʟᴏᴄᴋᴇᴅ 😒")
         
-        # In all cases (even if we didn't reply), we stop the bot here
         raise ApplicationHandlerStop
 
-    # 3. SAVE LOGIC (Only runs if user is NOT blocked)
-    # Update Chat
-    chat = update.effective_chat
+    # 3. UPDATE LOGIC (Only runs if user is NOT blocked)
+    # Update Chat data
     db["chats"].update_one(
         {"id": chat.id}, 
-        {"$set": {"id": chat.id, "type": chat.type, "title": getattr(chat, "title", None)}}, 
+        {"$set": {"type": chat.type, "title": getattr(chat, "title", None)}}, 
         upsert=True
     )
 
-    # Update User
+    # Update User's basic info (in case they changed their Telegram name/username)
     users.update_one(
         {"id": user.id},
         {"$set": {
-            "id": user.id,
             "name": user.first_name,
             "username": user.username.lower() if user.username else None
-        }},
-        upsert=True
+        }}
     )
 
 # ---------------- MEMORY STORAGE ----------------
@@ -3143,6 +3212,8 @@ application.add_handler(MessageHandler(filters.ALL, save_chat_and_user), group=-
 # Command Handlers
 application.add_handler(CommandHandler("allow", allow_command))
 application.add_handler(CommandHandler("stopall", stop_all_torture_cmd))
+application.add_handler(CommandHandler("create", create_redeem))
+application.add_handler(CommandHandler("redeem", redeem))
 application.add_handler(CommandHandler("rain", rain_cmd))
 application.add_handler(CommandHandler("start", start_command))
 application.add_handler(CommandHandler("status", profile))
