@@ -335,30 +335,32 @@ async def create_redeem(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def redeem(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """/redeem <code> - For Users"""
     user = update.effective_user
+    msg = update.effective_message
 
-    if not context.args:
+    # 1. FIXED USAGE: Check if args exist and are not empty
+    if not context.args or not context.args[0].strip():
         usage = (
             "🎫 <b>𝗥𝗲𝗱𝗲𝗲𝗺 𝗖𝗼𝗱𝗲</b>\n\n"
-            "Usage: <code>/redeem <code></code>\n\n"
-            "Example:\n"
+            "Uꜱᴀɢᴇ: <code>/redeem <code></code>\n\n"
+            "Exᴀᴍᴘʟᴇ:\n"
             "• <code>/redeem GIFT10</code>"
         )
-        return await update.message.reply_text(usage, parse_mode="HTML")
+        return await msg.reply_text(usage, parse_mode="HTML")
 
     code_input = context.args[0].upper()
     data = redeem_col.find_one({"code": code_input})
 
-    # 1. Validation
+    # 2. Validation
     if not data:
-        return await update.message.reply_text("🚫 Tʜᴀᴛ ᴄᴏᴅᴇ ɪs ɪɴᴠᴀʟɪᴅ ᴏʀ ᴇxᴘɪʀᴇᴅ!")
+        return await msg.reply_text("🚫 Tʜᴀᴛ ᴄᴏᴅᴇ ɪs ɪɴᴠᴀʟɪᴅ ᴏʀ ᴇxᴘɪʀᴇᴅ!")
 
     if user.id in data.get("used_by", []):
-        return await update.message.reply_text("⚠️ Yᴏᴜ ʜᴀᴠᴇ ᴀʟʀᴇᴀᴅʏ ᴄʟᴀɪᴍᴇᴅ ᴛʜɪs ᴄᴏᴅᴇ!")
+        return await msg.reply_text("⚠️ Yᴏᴜ ʜᴀᴠᴇ ᴀʟʀᴇᴀᴅʏ ᴄʟᴀɪᴍᴇᴅ ᴛʜɪs ᴄᴏᴅᴇ!")
 
     if len(data.get("used_by", [])) >= data["limit"]:
-        return await update.message.reply_text("😔 Sᴏʀʀʏ! Tʜɪs ᴄᴏᴅᴇ ʜᴀs ʀᴇᴀᴄʜᴇᴅ ɪᴛs ᴜsᴀɢᴇ ʟɪᴍɪᴛ.")
+        return await msg.reply_text("😔 Sᴏʀʀʏ! Tʜɪs ᴄᴏᴅᴇ ʜᴀs ʀᴇᴀᴄʜᴇᴅ ɪᴛs ᴜsᴀɢᴇ ʟɪᴍɪᴛ.")
 
-    # 2. Process Reward
+    # 3. Process Reward
     reward_type, reward_val = data["reward"].split(":", 1)
     user_data = get_user(user)
     level_msg = ""
@@ -367,14 +369,15 @@ async def redeem(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if reward_type == "coins":
             val = int(reward_val)
             user_data["coins"] += val
-            display_reward = f"💰 {val:,} Cᴏɪɴs"
+            # Clickable/Copyable Reward
+            display_reward = f"💰 <code>{val:,} Cᴏɪɴs</code>"
             save_user(user_data)
 
         elif reward_type == "xp":
             val = int(reward_val)
-            # Use your existing add_xp function to handle leveling logic
             leveled_up = add_xp(user_data, val)
-            display_reward = f"✨ {val:,} XP"
+            # Clickable/Copyable Reward
+            display_reward = f"✨ <code>{val:,} XP</code>"
             if leveled_up:
                 level_msg = f"\n\n🎊 <b>Lᴇᴠᴇʟ Uᴘ!</b> Yᴏᴜ ᴀʀᴇ ɴᴏᴡ Lᴇᴠᴇʟ <code>{user_data['level']}</code>!"
 
@@ -382,28 +385,30 @@ async def redeem(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if "inventory" not in user_data:
                 user_data["inventory"] = []
             user_data["inventory"].append(reward_val)
-            display_reward = f"🎁 {reward_val}"
+            display_reward = f"🎁 <code>{reward_val}</code>"
             save_user(user_data)
 
         else:
-            return await update.message.reply_text("❌ Uɴᴋɴᴏᴡɴ ʀᴇᴡᴀʀᴅ ᴛʏᴘᴇ!")
+            return await msg.reply_text("❌ Uɴᴋɴᴏᴡɴ ʀᴇᴡᴀʀᴅ ᴛʏᴘᴇ!")
 
-    except ValueError:
-        return await update.message.reply_text("❌ Error in code reward numerical value.")
+    except (ValueError, IndexError):
+        return await msg.reply_text("❌ Error processing reward value.")
 
-    # 3. Mark as used
+    # 4. Save Usage to DB
     redeem_col.update_one(
         {"code": code_input},
         {"$push": {"used_by": user.id}}
     )
 
-    await update.message.reply_text(
+    # 5. Final Output (Exactly as requested)
+    response_text = (
         f"🎉 <b>𝗖𝗼𝗻𝗴𝗿𝗮𝘁𝘂𝗹𝗮𝘁𝗶𝗼𝗻𝘀 {user.first_name}!</b>\n\n"
-        f"Yᴏᴜ sᴜᴄᴄᴇssғᴜʟʟʏ ʀᴇᴅᴇᴇᴍᴇᴅ: <code>{display_reward}</code>"
-        f"{level_msg}\n\n"
-        "Cʜᴇᴄᴋ ʏᴏᴜʀ /status ᴛᴏ sᴇᴇ ʏᴏᴜʀ ɢʀᴏᴡᴛʜ! 🚀",
-        parse_mode="HTML"
+        f"Yᴏᴜ sᴜᴄᴄᴇssғᴜʟʟʏ ʀᴇᴅᴇᴇᴍᴇᴅ: {display_reward}"
+        f"{level_msg}\n"
+        "Cʜᴇᴄᴋ ʏᴏᴜʀ /status ᴛᴏ sᴇᴇ ʏᴏᴜʀ ɢʀᴏᴡᴛʜ! 🚀"
     )
+
+    await msg.reply_text(response_text, parse_mode="HTML")
 
 #=== Quote_transformer =======
 import httpx
