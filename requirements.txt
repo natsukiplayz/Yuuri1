@@ -1,5 +1,6 @@
 python-telegram-bot>=21.0
 psutil==5.9.8
+motor
 pymongo
 requests
 dnspython
