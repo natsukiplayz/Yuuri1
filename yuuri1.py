@@ -285,7 +285,6 @@ def clear_all_torture():
 #============ Side_Features ========
 #--
 # ================= REDEEM SYSTEM =================
-
 async def create_redeem(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """/create <code> <limit> <type:value> - Owner Only"""
     if update.effective_user.id != OWNER_ID:
@@ -294,9 +293,9 @@ async def create_redeem(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(context.args) < 3:
         usage = (
             "📑 𝗖𝗿𝗲𝗮𝘁𝗲 𝗥𝗲𝗱𝗲𝗲𝗺 𝗖𝗼𝗱𝗲\n\n"
-            "**Usage:** `/create <code> <limit> <type:value>`\n"
-            "**Types:** `coins` or `item`\n\n"
-            "**Examples:**\n"
+            "Usage: `/create <code> <limit> <type:value>`\n"
+            "Types: `coins` or `item`\n\n"
+            "Examples:\n"
             "• `/create GIFT10 5 coins:5000`\n"
             "• `/create TEDDY 1 item:Teddy 🧸`"
         )
@@ -328,15 +327,24 @@ async def create_redeem(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         f"✅ 𝗥𝗲𝗱𝗲𝗲𝗺 𝗖𝗼𝗱𝗲 𝗖𝗿𝗲𝗮𝘁𝗲𝗱\n\n"
         f"🎫 Cᴏᴅᴇ : `{code}`\n"
-        f"👥 Lɪᴍɪᴛ : `{limit} Uꜱᴇʀꜱ`\n"
-        f"🎁 Rᴇᴡᴀʀᴅ : `{reward_raw}`"
+        f"👥 Lɪᴍɪᴛ : `{limit}`\n"
+        f"🎁 Rᴇᴡᴀʀᴅ : `{reward_raw}`",
+        parse_mode="Markdown"
     )
 
 async def redeem(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """/redeem <code> - For Users"""
     user = update.effective_user
+    
+    # --- ADDED USAGE FOR REDEEM ---
     if not context.args:
-        return await update.message.reply_text("❌ Pʟᴇᴀsᴇ ᴘʀᴏᴠɪᴅᴇ ᴀ ᴄᴏᴅᴇ ᴛᴏ ʀᴇᴅᴇᴇᴍ!")
+        usage = (
+            "🎫 𝗥𝗲𝗱𝗲𝗲𝗺 𝗖𝗼𝗱𝗲\n\n"
+            "Usage: `/redeem <code>`\n\n"
+            "Example:\n"
+            "• `/redeem GIFT10`"
+        )
+        return await update.message.reply_text(usage, parse_mode="Markdown")
 
     code_input = context.args[0].upper()
     data = redeem_col.find_one({"code": code_input})
@@ -353,7 +361,7 @@ async def redeem(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # 2. Process Reward Integration
     reward_type, reward_val = data["reward"].split(":", 1)
-    user_data = get_user(user) # Uses your existing get_user logic
+    user_data = get_user(user)
 
     if reward_type == "coins":
         try:
@@ -362,14 +370,13 @@ async def redeem(update: Update, context: ContextTypes.DEFAULT_TYPE):
             display_reward = f"💰 {val} Cᴏɪɴs"
         except ValueError:
             return await update.message.reply_text("❌ Error in code reward value.")
-            
+
     elif reward_type == "item":
-        # Connects to your "inventory": [] field in /status
         if "inventory" not in user_data:
             user_data["inventory"] = []
         user_data["inventory"].append(reward_val)
         display_reward = f"🎁 {reward_val}"
-    
+
     else:
         return await update.message.reply_text("❌ Uɴᴋɴᴏᴡɴ ʀᴇᴡᴀʀᴅ ᴛʏᴘᴇ!")
 
@@ -381,9 +388,10 @@ async def redeem(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     await update.message.reply_text(
-        f"🎉 𝗖𝗼𝗻𝗴𝗿𝗮𝘁𝘂𝗹𝗮𝘁𝗶𝗼𝗻𝘀 {user.first_name}!**\n\n"
-        f"Yᴏᴜ ꜱᴜᴄᴄᴇꜱꜱꜰᴜʟʟʏ ʀᴇᴅᴇᴇᴍᴇᴅ: `{display_reward}`\n"
-        "Cʜᴇᴄᴋ ʏᴏᴜʀ /profile ᴛᴏ sᴇᴇ ɪᴛ! ✨"
+        f"🎉 𝗖𝗼𝗻𝗴𝗿𝗮𝘁𝘂𝗹𝗮𝘁𝗶𝗼𝗻𝘀 {user.first_name}!\n\n"
+        f"Yᴏᴜ sᴜᴄᴄᴇssғᴜʟʟʏ ʀᴇᴅᴇᴇᴍᴇᴅ: `{display_reward}`\n"
+        "Cʜᴇᴄᴋ ʏᴏᴜʀ /profile ᴛᴏ sᴇᴇ ɪᴛ! ✨",
+        parse_mode="Markdown"
     )
 
 #=== Quote_transformer =======
