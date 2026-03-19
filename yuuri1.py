@@ -337,8 +337,8 @@ async def redeem(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     msg = update.effective_message
 
-    # 1. FIXED USAGE: Check if args exist and are not empty
-    if not context.args or not context.args[0].strip():
+    # 1. FIXED USAGE: Correct check for empty arguments
+    if not context.args:
         usage = (
             "🎫 <b>𝗥𝗲𝗱𝗲𝗲𝗺 𝗖𝗼𝗱𝗲</b>\n\n"
             "Uꜱᴀɢᴇ: <code>/redeem <code></code>\n\n"
@@ -348,35 +348,48 @@ async def redeem(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await msg.reply_text(usage, parse_mode="HTML")
 
     code_input = context.args[0].upper()
-    data = redeem_col.find_one({"code": code_input})
+    
+    # 2. ATOMIC CHECK AND UPDATE
+    # This finds the code ONLY if the user hasn't used it AND the limit isn't reached
+    result = redeem_col.find_one_and_update(
+        {
+            "code": code_input,
+            "used_by": {"$ne": user.id},  # User hasn't used it
+            "$expr": {"$lt": [{"$size": "$used_by"}, "$limit"]} # Current uses < limit
+        },
+        {"$push": {"used_by": user.id}}
+    )
 
-    # 2. Validation
-    if not data:
-        return await msg.reply_text("🚫 Tʜᴀᴛ ᴄᴏᴅᴇ ɪs ɪɴᴠᴀʟɪᴅ ᴏʀ ᴇxᴘɪʀᴇᴅ!")
+    # 3. IF NO RESULT: Determine why it failed
+    if not result:
+        # Check if the code exists at all
+        data = redeem_col.find_one({"code": code_input})
+        if not data:
+            return await msg.reply_text("🚫 Tʜᴀᴛ ᴄᴏᴅᴇ ɪs ɪɴᴠᴀʟɪᴅ ᴏʀ ᴇxᴘɪʀᴇᴅ!")
+        
+        if user.id in data.get("used_by", []):
+            return await msg.reply_text("⚠️ Yᴏᴜ ʜᴀᴠᴇ ᴀʟʀᴇᴀᴅʏ ᴄʟᴀɪᴍᴇᴅ ᴛʜɪs ᴄᴏᴅᴇ!")
+        
+        if len(data.get("used_by", [])) >= data["limit"]:
+            return await msg.reply_text("😔 Sᴏʀʀʏ! Tʜɪs ᴄᴏᴅᴇ ʜᴀs ʀᴇᴀᴄʜᴇᴅ ɪᴛs ᴜsᴀɢᴇ ʟɪᴍɪᴛ.")
+        
+        return await msg.reply_text("❌ Sᴏᴍᴇᴛʜɪɴɢ ᴡᴇɴᴛ ᴡʀᴏɴɢ. Tʀʏ ᴀɢᴀɪɴ.")
 
-    if user.id in data.get("used_by", []):
-        return await msg.reply_text("⚠️ Yᴏᴜ ʜᴀᴠᴇ ᴀʟʀᴇᴀᴅʏ ᴄʟᴀɪᴍᴇᴅ ᴛʜɪs ᴄᴏᴅᴇ!")
-
-    if len(data.get("used_by", [])) >= data["limit"]:
-        return await msg.reply_text("😔 Sᴏʀʀʏ! Tʜɪs ᴄᴏᴅᴇ ʜᴀs ʀᴇᴀᴄʜᴇᴅ ɪᴛs ᴜsᴀɢᴇ ʟɪᴍɪᴛ.")
-
-    # 3. Process Reward
-    reward_type, reward_val = data["reward"].split(":", 1)
-    user_data = get_user(user)
+    # 4. PROCESS REWARD (Using 'result' which is the data before the push)
+    reward_type, reward_val = result["reward"].split(":", 1)
+    user_data = get_user(user) # Assuming this fetches user from DB
     level_msg = ""
+    display_reward = ""
 
     try:
         if reward_type == "coins":
             val = int(reward_val)
-            user_data["coins"] += val
-            # Clickable/Copyable Reward
+            user_data["coins"] = user_data.get("coins", 0) + val
             display_reward = f"💰 <code>{val:,} Cᴏɪɴs</code>"
-            save_user(user_data)
 
         elif reward_type == "xp":
             val = int(reward_val)
-            leveled_up = add_xp(user_data, val)
-            # Clickable/Copyable Reward
+            leveled_up = add_xp(user_data, val) # Assuming this modifies user_data
             display_reward = f"✨ <code>{val:,} XP</code>"
             if leveled_up:
                 level_msg = f"\n\n🎊 <b>Lᴇᴠᴇʟ Uᴘ!</b> Yᴏᴜ ᴀʀᴇ ɴᴏᴡ Lᴇᴠᴇʟ <code>{user_data['level']}</code>!"
@@ -386,25 +399,21 @@ async def redeem(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 user_data["inventory"] = []
             user_data["inventory"].append(reward_val)
             display_reward = f"🎁 <code>{reward_val}</code>"
-            save_user(user_data)
 
         else:
             return await msg.reply_text("❌ Uɴᴋɴᴏᴡɴ ʀᴇᴡᴀʀᴅ ᴛʏᴘᴇ!")
 
+        # CRITICAL: Save user data after any reward type
+        save_user(user_data)
+
     except (ValueError, IndexError):
         return await msg.reply_text("❌ Error processing reward value.")
 
-    # 4. Save Usage to DB
-    redeem_col.update_one(
-        {"code": code_input},
-        {"$push": {"used_by": user.id}}
-    )
-
-    # 5. Final Output (Exactly as requested)
+    # 5. Final Output
     response_text = (
         f"🎉 <b>𝗖𝗼𝗻𝗴𝗿𝗮𝘁𝘂𝗹𝗮𝘁𝗶𝗼𝗻𝘀 {user.first_name}!</b>\n\n"
         f"Yᴏᴜ sᴜᴄᴄᴇssғᴜʟʟʏ ʀᴇᴅᴇᴇᴍᴇᴅ: {display_reward}"
-        f"{level_msg}\n"
+        f"{level_msg}\n\n"
         "Cʜᴇᴄᴋ ʏᴏᴜʀ /status ᴛᴏ sᴇᴇ ʏᴏᴜʀ ɢʀᴏᴡᴛʜ! 🚀"
     )
 
