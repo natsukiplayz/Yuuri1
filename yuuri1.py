@@ -67,6 +67,7 @@ logging.basicConfig(level=logging.INFO)
 #--
 # ===== USER SYSTEM =====
 def get_user(user):
+    # 1. Try to find the user
     data = users.find_one({"id": user.id})
 
     # Default template for NEW users
@@ -81,29 +82,37 @@ def get_user(user):
         "dead": False,
         "inventory": [],
         "referred_by": None,
-        "blocked": False
+        "blocked": False,
+        "premium": False  # Added this since we used it in Richest/Profile!
     }
 
     if not data:
         users.insert_one(default_data)
         return default_data
 
-    # ✨ THE AUTO-REPAIR LOGIC
-    # If you add "inventory" to the bot today, but a user joined yesterday,
-    # this part adds the missing "inventory": [] automatically so the bot doesn't crash.
-    updated = False
+    # 2. ✨ THE IMPROVED AUTO-REPAIR & NAME SYNC
+    updated_fields = {}
+    
+    # Sync Name: If the user changed their name on Telegram, update it in DB
+    if data.get("name") != user.first_name:
+        data["name"] = user.first_name
+        updated_fields["name"] = user.first_name
+
+    # Check for missing keys (Schema Evolution)
     for key, value in default_data.items():
         if key not in data:
             data[key] = value
-            updated = True
+            updated_fields[key] = value
     
-    if updated:
-        save_user(data)
+    # 3. Optimized Save: Only write to DB if something actually changed
+    if updated_fields:
+        users.update_one({"id": user.id}, {"$set": updated_fields})
 
     return data
 
 def save_user(data):
-    # We use update_one with $set to ensure we only change the fields we want
+    # Using 'id' as the filter is correct. 
+    # Ensure 'id' is indexed in your MongoDB for lightning-fast lookups.
     users.update_one({"id": data["id"]}, {"$set": data}, upsert=True)
 
 # ======Broadcast_System======
@@ -116,29 +125,31 @@ from telegram.ext import ContextTypes
 broadcast_control = {"running": False, "cancel": False}
 
 # ========== UPDATED LEVEL SYSTEM ========
+# Updated Leveling Config
 def add_xp(user_data, amount=10):
     user_data["xp"] += amount
-    # Doubling formula: Level 1=100, Level 2=200, Level 3=400...
-    need = 100 * (2 ** (user_data["level"] - 1))
+    # Balanced formula: Level 1=100, 2=150, 3=225, 4=337...
+    # This prevents players from becoming "Overpowered" too quickly.
+    need = int(100 * (1.5 ** (user_data["level"] - 1)))
 
     if user_data["xp"] >= need:
-        user_data["xp"] = 0 # Reset XP for the new level
+        user_data["xp"] = 0 
         user_data["level"] += 1
-        # You could add a 'level_up' message here if you wanted!
-
+        return True # Level up occurred
     save_user(user_data)
+    return False
 
-# ====== UPDATED RANK SYSTEM (Based on Level) =======
+# Re-balanced Ranks (Harder to reach "Immortal")
 RANKS = [
-    {"name": "Noob", "lvl": 1},
-    {"name": "Beginner", "lvl": 3},
-    {"name": "Fighter", "lvl": 5},
-    {"name": "Warrior", "lvl": 8},
-    {"name": "Elite", "lvl": 12},
-    {"name": "Master", "lvl": 18},
-    {"name": "Legend", "lvl": 25},
-    {"name": "Mythic", "lvl": 35},
-    {"name": "Immortal", "lvl": 50},
+    {"name": "Nᴏᴏʙ", "lvl": 1},
+    {"name": "Bᴇɢɪɴɴᴇʀ", "lvl": 5},
+    {"name": "Fɪɢʜᴛᴇʀ", "lvl": 10},
+    {"name": "Wᴀʀʀɪᴏʀ", "lvl": 20},
+    {"name": "Eʟɪᴛᴇ", "lvl": 35},
+    {"name": "Mᴀsᴛᴇʀ", "lvl": 55},
+    {"name": "Lᴇɢᴇɴᴅ", "lvl": 80},
+    {"name": "Mʏᴛʜɪᴄ", "lvl": 110},
+    {"name": "Iᴍᴍᴏʀᴛᴀʟ", "lvl": 150},
 ]
 
 def get_rank_data(level):
@@ -277,7 +288,7 @@ async def create_redeem(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if len(context.args) < 3:
         usage = (
-            "📑 **𝗖𝗿𝗲𝗮𝘁𝗲 𝗥𝗲𝗱𝗲𝗲𝗺 𝗖𝗼𝗱𝗲**\n\n"
+            "📑 𝗖𝗿𝗲𝗮𝘁𝗲 𝗥𝗲𝗱𝗲𝗲𝗺 𝗖𝗼𝗱𝗲\n\n"
             "**Usage:** `/create <code> <limit> <type:value>`\n"
             "**Types:** `coins` or `item`\n\n"
             "**Examples:**\n"
@@ -310,7 +321,7 @@ async def create_redeem(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     await update.message.reply_text(
-        f"✅ **𝗥𝗲𝗱𝗲𝗲𝗺 𝗖𝗼𝗱𝗲 𝗖𝗿𝗲𝗮𝘁𝗲𝗱**\n\n"
+        f"✅ 𝗥𝗲𝗱𝗲𝗲𝗺 𝗖𝗼𝗱𝗲 𝗖𝗿𝗲𝗮𝘁𝗲𝗱\n\n"
         f"🎫 Cᴏᴅᴇ : `{code}`\n"
         f"👥 Lɪᴍɪᴛ : `{limit} Uꜱᴇʀꜱ`\n"
         f"🎁 Rᴇᴡᴀʀᴅ : `{reward_raw}`"
@@ -365,7 +376,7 @@ async def redeem(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     await update.message.reply_text(
-        f"🎉 **𝗖𝗼𝗻𝗴𝗿𝗮𝘁𝘂𝗹𝗮𝘁𝗶𝗼𝗻𝘀 {user.first_name}!**\n\n"
+        f"🎉 𝗖𝗼𝗻𝗴𝗿𝗮𝘁𝘂𝗹𝗮𝘁𝗶𝗼𝗻𝘀 {user.first_name}!**\n\n"
         f"Yᴏᴜ ꜱᴜᴄᴄᴇꜱꜱꜰᴜʟʟʏ ʀᴇᴅᴇᴇᴍᴇᴅ: `{display_reward}`\n"
         "Cʜᴇᴄᴋ ʏᴏᴜʀ /profile ᴛᴏ sᴇᴇ ɪᴛ! ✨"
     )
@@ -1263,36 +1274,46 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not msg: return
 
     target_user = msg.reply_to_message.from_user if msg.reply_to_message else update.effective_user
-    data = get_user(target_user) # Using get_user to ensure data exists
+    data = get_user(target_user) 
 
     xp = data.get("xp", 0)
     lvl = data.get("level", 1)
-
-    # Calculate Need for current level (100, 200, 400...)
-    need = 100 * (2 ** (lvl - 1))
+    coins = data.get("coins", 0)
+    premium = data.get("premium", False)
     
-    # Progress Bar Calculation
+    icon = "💓" if premium else "👤"
+
+    # Balanced Level Formula
+    need = int(100 * (1.5 ** (lvl - 1)))
+    
+    # Progress Bar
     percent = int((xp / need) * 100) if need > 0 else 0
     bar = create_progress_bar(min(percent, 100))
 
-    # DB Optimization for Rank
-    global_rank = users.count_documents({"level": {"$gt": lvl}}) + \
-                  users.count_documents({"level": lvl, "xp": {"$gt": xp}}) + 1
+    # 1. Calculate XP Rank (Workable with 'Rankers' leaderboard)
+    higher_lvl = users.count_documents({"id": {"$ne": context.bot.id}, "level": {"$gt": lvl}})
+    same_lvl_more_xp = users.count_documents({"id": {"$ne": context.bot.id}, "level": lvl, "xp": {"$gt": xp}})
+    xp_rank = 1 + higher_lvl + same_lvl_more_xp
+
+    # 2. Calculate Wealth Rank (Workable with 'Richest' leaderboard)
+    richer_people = users.count_documents({"id": {"$ne": context.bot.id}, "coins": {"$gt": coins}})
+    wealth_rank = 1 + richer_people
 
     inv = data.get("inventory", [])
     inventory_str = ", ".join(inv) if inv else "Eᴍᴘᴛʏ"
     status = "💀 Dᴇᴀᴅ" if data.get("dead") else "❤️ Aʟɪᴠᴇ"
 
     text = (
-        f"👤 Nᴀᴍᴇ: {data.get('name', target_user.first_name)}\n"
+        f"{icon} Nᴀᴍᴇ: {data.get('name', target_user.first_name)}\n"
         f"🏅 Lᴇᴠᴇʟ: {lvl}\n"
-        f"💰 Cᴏɪɴs: {data.get('coins', 0)}\n"
+        f"💰 Cᴏɪɴꜱ: {coins:,}\n"
         f"🎒 Iɴᴠᴇɴᴛᴏʀʏ: {inventory_str}\n"
-        f"🎯 Sᴛᴀᴛᴜs: {status}\n\n"
-        f"📊 Pʀᴏɢʀᴇss: `{xp}/{need} XP`\n"
-        f"{bar}\n"
-        f"🌐 Gʟᴏʙᴀʟ Rᴀɴᴋ: {global_rank}\n"
-        f"🏰 Gᴜɪʟᴅ: {data.get('guild') or 'Nᴏɴᴇ'}"
+        f"🎯 Sᴛᴀᴛᴜꜱ: {status}\n\n"
+        f"📊 Pʀᴏɢʀᴇꜱꜱ: {xp:,} / {need:,} XP\n"
+        f"{bar} ({percent}%)\n\n"
+        f"🌐 Gʟᴏʙᴀʟ Rᴀɴᴋ (XP):  {xp_rank}\n"
+        f"💸 Wᴇᴀʟᴛʜ Rᴀɴᴋ:  {wealth_rank}\n"
+        f"🏰 Gᴜɪʟᴅ: {data.get('guild') or 'Nᴏɴᴇ'}\n"
     )
 
     await msg.reply_text(text)
@@ -1865,66 +1886,44 @@ async def purchase(update: Update, context: ContextTypes.DEFAULT_TYPE):
 #--
 #=====Top_rhichest=====
 async def richest(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Fetch all users except removed ones and the bot itself
-    all_users = list(
-        users.find(  # <-- changed from users_col to users
-            {"removed_from_rank": {"$ne": True}, "id": {"$ne": context.bot.id}}
-        )
-    )
-
-    if not all_users:
-        return await update.message.reply_text("ɴᴏ ᴘʟᴀʏᴇʀꜱ ꜰᴏᴜɴᴅ.")
-
-    # Sort users by coins descending
-    sorted_users = sorted(
-        all_users,
-        key=lambda u: u.get("coins", 0),
-        reverse=True
-    )
-
-    top = sorted_users[:10]  # top 10
-
+    # Sort by coins (descending)
+    top_list = users.find({"id": {"$ne": context.bot.id}}).sort("coins", -1).limit(10)
+    
     text = "🏆 Tᴏᴘ 10 Rɪᴄʜᴇꜱᴛ Uꜱᴇʀꜱ:\n\n"
-
-    for i, user in enumerate(top, start=1):
-        name = user.get("name", "Unknown")
-        coins = f"${user.get('coins', 0):,}"  # format coins
+    
+    for i, user in enumerate(top_list, start=1):
+        name = user.get("name", "Uɴᴋɴᴏᴡɴ")
+        coins = user.get("coins", 0)
+        # Use 💓 for premium, 👤 for normal
         icon = "💓" if user.get("premium") else "👤"
-
-        text += f"{icon} {i}. {name}: {coins}\n"
-
+        
+        # Display: Icon Index. Name: $Amount
+        text += f"{icon} {i}. {name}: ${coins:,}\n"
+    
     text += "\n💓 = Pʀᴇᴍɪᴜᴍ • 👤 = Nᴏʀᴍᴀʟ\n\n"
     text += "✅ Uᴘɢʀᴀᴅᴇ Tᴏ Pʀᴇᴍɪᴜᴍ : ᴄᴏᴍɪɴɢ ꜱᴏᴏɴ 🔜"
-
+    
     await update.message.reply_text(text)
 
 #=====rankers====
 async def rankers(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    all_users = list(
-        users.find({"id": {"$ne": context.bot.id}})
-        .sort("xp", -1)
-        .limit(10)
-    )
-
-    if not all_users:
-        return await update.message.reply_text("ɴᴏ ᴘʟᴀʏᴇʀꜱ ꜰᴏᴜɴᴅ.")
-
-    text = "🏆 Tᴏᴘ 10 Rᴀɴᴋᴇʀs:\n\n"
-
-    for i, user in enumerate(all_users, start=1):
-
-        name = user.get("name", "Unknown")
+    # Sort by Level first, then XP tie-breaker
+    top_list = users.find({"id": {"$ne": context.bot.id}}).sort([("level", -1), ("xp", -1)]).limit(10)
+    
+    text = "🎖️ Tᴏᴘ 10 Gʟᴏʙᴀʟ Rᴀɴᴋᴇʀꜱ:\n\n"
+    
+    for i, user in enumerate(top_list, start=1):
+        name = user.get("name", "Uɴᴋɴᴏᴡɴ")
+        lvl = user.get("level", 1)
         xp = user.get("xp", 0)
-
-        rank, _ = get_rank_data(xp)
-
         icon = "💓" if user.get("premium") else "👤"
-
-        text += f"{icon} {i}. {name} — {rank['name']} ({xp} XP)\n"
-
-    text += "\n💓 = Pʀᴇᴍɪᴜᴍ • 👤 = Nᴏʀᴍᴀʟ"
-
+        
+        # Display: Icon Index. Name: Lᴠʟ 10 (500 XP)
+        text += f"{icon} {i}. {name}: Lᴠʟ {lvl} ({xp:,} XP)\n"
+    
+    text += "\n💓 = Pʀᴇᴍɪᴜᴍ • 👤 = Nᴏʀᴍᴀʟ\n\n"
+    text += "🏆 Kᴇᴇᴘ Gʀɪɴᴅɪɴɢ Tᴏ Rᴇᴀᴄʜ Tʜᴇ Tᴏᴘ!"
+    
     await update.message.reply_text(text)
 
 #=======mini_games_topplayers=======
