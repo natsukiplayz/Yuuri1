@@ -126,18 +126,23 @@ broadcast_control = {"running": False, "cancel": False}
 
 # ========== UPDATED LEVEL SYSTEM ========
 # Updated Leveling Config
-def add_xp(user_data, amount=10):
+def add_xp(user_data, amount):
     user_data["xp"] += amount
-    # Balanced formula: Level 1=100, 2=150, 3=225, 4=337...
-    # This prevents players from becoming "Overpowered" too quickly.
-    need = int(100 * (1.5 ** (user_data["level"] - 1)))
+    leveled_up = False
 
-    if user_data["xp"] >= need:
-        user_data["xp"] = 0 
-        user_data["level"] += 1
-        return True # Level up occurred
+    # Use a 'while' loop instead of 'if' 
+    # This catches users who gain 1000 XP at once!
+    while True:
+        need = int(100 * (1.5 ** (user_data["level"] - 1)))
+        if user_data["xp"] >= need:
+            user_data["xp"] -= need # Subtract the 'cost' of the level
+            user_data["level"] += 1
+            leveled_up = True
+        else:
+            break # User doesn't have enough XP for the next level
+            
     save_user(user_data)
-    return False
+    return leveled_up
 
 # Re-balanced Ranks (Harder to reach "Immortal")
 RANKS = [
