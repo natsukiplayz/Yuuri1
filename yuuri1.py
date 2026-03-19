@@ -1274,34 +1274,43 @@ async def daily(update, context):
 #====economy commands=======
 #--
 # ======== PROFILE =======
-# ======== PROFILE =======
 async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     if not msg: return
 
-    # 1. Identify Target & Get Data
     target_user = msg.reply_to_message.from_user if msg.reply_to_message else update.effective_user
     data = get_user(target_user) 
+
+    # --- ✨ AUTO-FIX LOGIC ---
+    # This checks if the user is "overdue" for a level up
+    updated = False
+    while True:
+        need = int(100 * (1.5 ** (data["level"] - 1)))
+        if data["xp"] >= need:
+            data["xp"] -= need
+            data["level"] += 1
+            updated = True
+        else:
+            break
+    
+    if updated:
+        save_user(data) # Sync the fix back to MongoDB
+    # -------------------------
 
     xp = data.get("xp", 0)
     lvl = data.get("level", 1)
     coins = data.get("coins", 0)
     premium = data.get("premium", False)
     
-    # 2. Get Rank Title (Using your RANKS list)
-    current_rank, _ = get_rank_data(lvl)
-    rank_title = current_rank["name"]
+    current_rank_data, _ = get_rank_data(lvl)
+    rank_title = current_rank_data["name"]
 
-    # 3. Dynamic XP Progress Calculation
-    # This prevents the "890%" bug by ensuring we show progress toward the CURRENT level
     need = int(100 * (1.5 ** (lvl - 1)))
-    
-    # Cap the display XP so the bar doesn't break if they haven't leveled up yet
-    display_xp = min(xp, need) 
-    percent = int((display_xp / need) * 100) if need > 0 else 0
-    bar = create_progress_bar(percent)
+    percent = int((xp / need) * 100) if need > 0 else 0
+    bar = create_progress_bar(min(percent, 100))
 
-    # 4. Ranks Logic (Matches Richest/Rankers)
+    # Calculate Global Ranks (Excluding the bot)
+    # Note: Make sure context.bot.id is correct here
     higher_lvl = users.count_documents({"id": {"$ne": context.bot.id}, "level": {"$gt": lvl}})
     same_lvl_more_xp = users.count_documents({"id": {"$ne": context.bot.id}, "level": lvl, "xp": {"$gt": xp}})
     xp_rank = 1 + higher_lvl + same_lvl_more_xp
@@ -1309,12 +1318,9 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     richer_people = users.count_documents({"id": {"$ne": context.bot.id}, "coins": {"$gt": coins}})
     wealth_rank = 1 + richer_people
 
-    # 5. Inventory & Status
     inv = data.get("inventory", [])
     inventory_str = ", ".join(inv) if inv else "Eᴍᴘᴛʏ"
-    
-    # Improved Status: Shows Life status + Rank Title
-    life_status = "💀 Dᴇᴀᴅ" if data.get("dead") else "❤️ Aʟɪᴠᴇ"
+    status = "💀 Dᴇᴀᴅ" if data.get("dead") else "❤️ Aʟɪᴠᴇ"
     icon = "💓" if premium else "👤"
 
     text = (
@@ -1323,9 +1329,9 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"🏅 Lᴇᴠᴇʟ: {lvl}\n"
         f"💰 Cᴏɪɴꜱ: {coins:,}\n"
         f"🎒 Iɴᴠᴇɴᴛᴏʀʏ: {inventory_str}\n"
-        f"🎯 Sᴛᴀᴛᴜꜱ: {life_status}\n\n"
-        f"📊 Pʀᴏɢʀᴇꜱꜱ: {display_xp:,} / {need:,} XP\n"
-        f"{bar}\n\n"
+        f"🎯 Sᴛᴀᴛᴜꜱ: {status}\n\n"
+        f"📊 Pʀᴏɢʀᴇꜱꜱ: {xp:,} / {need:,} XP\n"
+        f"{bar} ({percent}%)\n\n"
         f"🌐 Gʟᴏʙᴀʟ Rᴀɴᴋ (XP): {xp_rank}\n"
         f"💸 Wᴇᴀʟᴛʜ Rᴀɴᴋ: {wealth_rank}\n"
         f"🏰 Gᴜɪʟᴅ: {data.get('guild') or 'Nᴏɴᴇ'}"
