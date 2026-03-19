@@ -24,6 +24,7 @@ from telegram.ext import (
     ContextTypes,
     filters
 )
+from motor.motor_asyncio import AsyncIOMotorClient
 
 from datetime import datetime, timezone
 
