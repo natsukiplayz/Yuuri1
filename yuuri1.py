@@ -3067,23 +3067,36 @@ async def promote(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await update.message.reply_text(f"<code>❌ API Eʀʀᴏʀ: {e}</code>", parse_mode='HTML')
 
+from telegram import Update
+from telegram.ext import ContextTypes
+from telegram.error import BadRequest
+
 async def demote(update: Update, context: ContextTypes.DEFAULT_TYPE):
     sender_id = update.effective_user.id
     chat_id = update.effective_chat.id
+    bot_id = context.bot.id
 
+    # 1. Owner/Admin Bypass
     if sender_id != OWNER_IDS:
-        if not await is_admin(update, context, sender_id): return
+        if not await is_admin(update, context, sender_id): 
+            return
         
     target_id, name = await resolve_user_all(update, context)
     if not target_id: return
 
-    # Check if Target is Group Owner
+    # 2. Prevent demoting the Group Owner (Creator)
     target_member = await context.bot.get_chat_member(chat_id, target_id)
     if target_member.status == 'creator':
         await update.message.reply_text(f"👑 Gʀᴏᴜᴘ Oᴡɴᴇʀ Cᴀɴ'ᴛ Bᴇ Dᴇᴍᴏᴛᴇᴅ.")
         return
 
+    # 3. Prevent demoting self (The Bot)
+    if target_id == bot_id:
+        await update.message.reply_text("💠 Eʜᴇʜᴇ... I ᴄᴀɴ'ᴛ ᴅᴇᴍᴏᴛᴇ ᴍʏsᴇʟғ! Wʜᴏ ᴡᴏᴜʟᴅ ʀᴜɴ ᴛʜᴇ sʜᴏᴡ?")
+        return
+
     try:
+        # 4. Attempt to strip all permissions
         await context.bot.promote_chat_member(
             chat_id, target_id,
             can_change_info=False, can_delete_messages=False, 
@@ -3093,9 +3106,11 @@ async def demote(update: Update, context: ContextTypes.DEFAULT_TYPE):
             can_edit_stories=False, can_delete_stories=False
         )
         await update.message.reply_text(f"<b>📉 {name} ʜᴀs ʙᴇᴇɴ ᴅᴇᴍᴏᴛᴇᴅ.</b>", parse_mode='HTML')
+
     except BadRequest as e:
-        # This catches the "Not enough rights" error specifically for demoting admins promoted by others
-        if "not enough rights" in str(e).lower() or "can't remove chat owner" in str(e).lower():
+        error_msg = str(e).lower()
+        # This catches the "Chat_admin_required" or "Not enough rights" error
+        if "not enough rights" in error_msg or "admin_required" in error_msg:
             await update.message.reply_text(f"⚠️ {name} Pʀᴏᴍᴏᴛᴇᴅ Bʏ Sᴏᴍᴇᴏɴᴇ Oᴛʜᴇʀ Tʜᴀɴ Mᴇ!")
         else:
             await update.message.reply_text(f"<code>❌ API Eʀʀᴏʀ: {e}</code>", parse_mode='HTML')
