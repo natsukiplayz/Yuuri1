@@ -3127,8 +3127,8 @@ from telegram import Update
 from telegram.ext import ContextTypes
 from telegram.error import BadRequest
 
-# Replace with your actual Telegram ID
-OWNER_ID = 5773908061
+# Multiple owners support
+OWNER_IDS = [5773908061, 7139383373] 
 
 async def promote(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -3140,8 +3140,8 @@ async def promote(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("<code>🧩 Rᴇᴘʟʏ ᴛᴏ ᴀ ᴜsᴇʀ ᴏʀ ᴘʀᴏᴠɪᴅᴇ ᴀɴ ID.</code>", parse_mode='HTML')
         return
 
-    # 1. SENDER LOGIC: Who is using the command?
-    if user.id != OWNER_IDS:
+    # 1. SENDER LOGIC (Who is calling the command)
+    if user.id not in OWNER_IDS:
         if not await is_admin(update, context, user.id):
             await update.message.reply_text("🧐 Oᴘᴘs! Yᴏᴜ Nᴇᴇᴅ Tᴏ Bᴇ Aᴅᴍɪɴ Tᴏ Pʀᴏᴍᴏᴛᴇ Oᴛʜᴇʀs... ɴɪᴄᴇ ᴛʀʏ ᴛʜᴏ! 🧩")
             return
@@ -3149,38 +3149,36 @@ async def promote(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("💠 Eʜᴇʜᴇ... Yᴏᴜ Cᴀɴ'ᴛ Pʀᴏᴍᴏᴛᴇ Yᴏᴜʀsᴇʟғ! Tʜᴀᴛ's Cʜᴇᴀᴛɪɴɢ... 😁🫠")
             return
 
-    # 2. BOT LOGIC: Can the bot actually promote?
+    # 2. BOT PERMISSION LOGIC
     try:
         bot_member = await chat.get_member(bot_id)
         if not bot_member.can_promote_members:
             await update.message.reply_text("💠 Eʜᴇʜᴇ... Cᴀɴ Gɪᴠᴇ Mᴇ Fᴜʟʟ Pᴏᴡᴇʀ Aᴅᴍɪɴ? Sᴏ I Aʟꜱᴏ Cᴀɴ... 😁🫠")
             return
-    except Exception:
-        pass
+    except Exception: pass
 
-    # 3. TARGET LOGIC: What is the target's current rank?
+    # 3. TARGET STATUS LOGIC (Hierarchy check)
     try:
         target_member = await chat.get_member(target_id)
         
         if target_member.status == 'creator':
-            await update.message.reply_text("👑 Gʀᴏᴜᴘ Oᴡɴᴇʀ Cᴀɴ'ᴛ Bᴇ Pʀᴏᴍᴏᴛᴇᴅ.")
+            await update.message.reply_text("👑 <b>ɢʀᴏᴜᴘ ᴏᴡɴᴇʀ</b> ᴄᴀɴ'ᴛ ʙᴇ ᴘʀᴏᴍᴏᴛᴇᴅ. ᴛʜᴇʏ ᴀʟʀᴇᴀᴅʏ ᴏᴡɴ ᴛʜᴇ ᴘʟᴀᴄᴇ!", parse_mode='HTML')
             return
             
         if target_member.status == 'administrator':
-            await update.message.reply_text(f"⚠️ {name} Aʀᴇ Aʟʀᴇᴀᴅʏ Pʀᴏᴍᴏᴛᴇᴅ!🙀")
+            await update.message.reply_text(f"⚠️ {name} ᴀʀᴇ ᴀʟʀᴇᴀᴅʏ ᴘʀᴏᴍᴏᴛᴇᴅ!🙀")
             return
             
     except Exception:
-        return # User not found in chat
+        await update.message.reply_text("❌ ᴜsᴇʀ ɴᴏᴛ ғᴏᴜɴᴅ.")
+        return
 
     # 4. EXECUTE PROMOTION
     level = context.args[0] if context.args and context.args[0] in ["1", "2", "3"] else "1"
-    
     perms = {
         "can_change_info": True, "can_delete_messages": True,
         "can_manage_video_chats": True, "can_invite_users": True,
-        "can_pin_messages": True, "can_manage_topics": True,
-        "can_post_stories": False, "can_edit_stories": False, "can_delete_stories": False
+        "can_pin_messages": True, "can_manage_topics": True
     }
     if level in ["2", "3"]:
         perms.update({"can_restrict_members": True, "can_post_stories": True, "can_edit_stories": True, "can_delete_stories": True})
@@ -3189,17 +3187,17 @@ async def promote(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         await chat.promote_member(target_id, **perms)
+        # Separate title logic so it doesn't crash the whole command if it fails
         try:
             await context.bot.set_chat_administrator_custom_title(chat.id, target_id, "Aᴅᴍɪɴ")
-        except BadRequest:
-            pass
+        except: pass
             
         await update.message.reply_text(f"<b>🎖️ ᴘʀᴏᴍᴏᴛɪᴏɴ sᴜᴄᴄᴇssғᴜʟ</b>\n<b>ᴜsᴇʀ:</b> <code>{name}</code>\n<b>ʟᴇᴠᴇʟ:</b> <code>{level}</code>", parse_mode='HTML')
 
     except BadRequest as e:
         err = str(e).lower()
         if "rights_forbidden" in err or "not enough rights" in err:
-            await update.message.reply_text(f"⚠️ {name} Pʀᴏᴍᴏᴛᴇᴅ Bʏ Sᴏᴍᴇᴏɴᴇ Oᴛʜᴇʀ Tʜᴀɴ Mᴇ! I ᴄᴀɴ'ᴛ ᴛᴏᴜᴄʜ ᴛʜᴇᴍ.")
+            await update.message.reply_text(f"⚠️ {name} ᴘʀᴏᴍᴏᴛᴇᴅ ʙʏ sᴏᴍᴇᴏɴᴇ ᴏᴛʜᴇʀ ᴛʜᴀɴ ᴍᴇ! ɪ ᴄᴀɴ'ᴛ ᴛᴏᴜᴄʜ ᴛʜᴇᴍ.")
         else:
             await update.message.reply_text(f"<code>❌ API Eʀʀᴏʀ: {e}</code>", parse_mode='HTML')
 
@@ -3210,32 +3208,33 @@ async def demote(update: Update, context: ContextTypes.DEFAULT_TYPE):
     bot_id = context.bot.id
 
     target_id, name = await resolve_user_all(update, context)
-    if not target_id: 
-        return
+    if not target_id: return
 
     # 1. SENDER LOGIC
-    if user.id != OWNER_IDS:
+    if user.id not in OWNER_IDS:
         if not await is_admin(update, context, user.id):
             await update.message.reply_text("🧐 Oᴘᴘs! Yᴏᴜ Nᴇᴇᴅ Tᴏ Bᴇ Aᴅᴍɪɴ Tᴏ Dᴇᴍᴏᴛᴇ Oᴛʜᴇʀs... 🧩")
             return
 
-    # 2. BOT LOGIC (Don't demote self)
+    # 2. BOT LOGIC (Don't demote self/owners)
     if target_id == bot_id:
         await update.message.reply_text("💠 Eʜᴇʜᴇ... I ᴄᴀɴ'ᴛ ᴅᴇᴍᴏᴛᴇ ᴍʏsᴇʟғ! Wʜᴏ ᴡᴏᴜʟᴅ ʀᴜɴ ᴛʜᴇ sʜᴏᴡ?")
+        return
+    if target_id in OWNER_IDS:
+        await update.message.reply_text("👑 ɴɪᴄᴇ ᴛʀʏ... ʙᴜᴛ I ᴡᴏɴ'ᴛ ᴅᴇᴍᴏᴛᴇ ᴍʏ ᴏᴡɴᴇʀ! 😼")
         return
 
     # 3. TARGET LOGIC
     try:
         target_member = await chat.get_member(target_id)
         if target_member.status == 'creator':
-            await update.message.reply_text("👑 Gʀᴏᴜᴘ Oᴡɴᴇʀ Cᴀɴ'ᴛ Bᴇ Dᴇᴍᴏᴛᴇᴅ.")
+            await update.message.reply_text("👑 <b>ɢʀᴏᴜᴘ ᴏᴡɴᴇʀ</b> ᴄᴀɴ'ᴛ ʙᴇ ᴅᴇᴍᴏᴛᴇᴅ. ᴛʜᴇʏ ᴏᴡɴ ᴛʜᴇ ᴄʜᴀᴛ!", parse_mode='HTML')
             return
-        # If they aren't even an admin, we don't need to demote them!
-        if target_member.status not in ['administrator', 'creator']:
-            await update.message.reply_text(f"⚠️ {name} Is Nᴏᴛ Aɴ Aᴅᴍɪɴ! 🤷‍♂️")
+        
+        if target_member.status != 'administrator':
+            await update.message.reply_text(f"⚠️ {name} ɪs ɴᴏᴛ ᴀɴ ᴀᴅᴍɪɴ! 🤷‍♂️")
             return
-    except Exception:
-        return
+    except Exception: return
 
     # 4. EXECUTE DEMOTION
     try:
@@ -3244,16 +3243,14 @@ async def demote(update: Update, context: ContextTypes.DEFAULT_TYPE):
             can_change_info=False, can_delete_messages=False, 
             can_invite_users=False, can_restrict_members=False,
             can_pin_messages=False, can_promote_members=False,
-            can_manage_video_chats=False, can_post_stories=False,
-            can_edit_stories=False, can_delete_stories=False
+            can_manage_video_chats=False
         )
         await update.message.reply_text(f"<b>📉 {name} ʜᴀs ʙᴇᴇɴ ᴅᴇᴍᴏᴛᴇᴅ.</b>", parse_mode='HTML')
 
     except BadRequest as e:
         err = str(e).lower()
-        # If they ARE an admin, but the bot isn't allowed to touch them, this catches it!
         if "rights_forbidden" in err or "not enough rights" in err:
-            await update.message.reply_text(f"⚠️ {name} Pʀᴏᴍᴏᴛᴇᴅ Bʏ Sᴏᴍᴇᴏɴᴇ Oᴛʜᴇʀ Tʜᴀɴ Mᴇ!")
+            await update.message.reply_text(f"⚠️ {name} ᴘʀᴏᴍᴏᴛᴇᴅ ʙʏ sᴏᴍᴇᴏɴᴇ ᴏᴛʜᴇʀ ᴛʜᴀɴ ᴍᴇ!")
         else:
             await update.message.reply_text(f"<code>❌ API Eʀʀᴏʀ: {e}</code>", parse_mode='HTML')
 
