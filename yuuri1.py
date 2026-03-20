@@ -11,6 +11,7 @@ from io import BytesIO
 
 import requests
 import httpx
+from telegram.constants import ParseMode
 from fastapi import FastAPI, Request  # <--- Added for Webhooks
 from pymongo import MongoClient
 
@@ -3178,6 +3179,67 @@ async def promote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await message.reply_text(f"❌ API Eʀʀᴏʀ: {e}")
 
+async def demote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat = update.effective_chat
+    user = update.effective_user
+    message = update.effective_message
+
+    # 1. Target Resolution
+    target_id, name = await resolve_user_all(update, context) 
+    if not target_id:
+        return await message.reply_text("<code>⚠️ Uꜱᴀɢᴇ: /demote @username or reply to a user.</code>", parse_mode=ParseMode.HTML)
+
+    # 2. Hierarchy & Permission Checks
+    try:
+        # Check if SENDER is Owner or Admin
+        if user.id != OWNER_IDS:
+            sender_member = await chat.get_member(user.id)
+            if sender_member.status not in ["administrator", "creator"] or not sender_member.can_promote_members:
+                return await message.reply_text("🧐 Nɪᴄᴇ ᴛʀʏ, ʙᴜᴛ ʏᴏᴜ ɴᴇᴇᴅ 'Aᴅᴅ Nᴇᴡ Aᴅᴍɪɴs' ᴘᴇʀᴍɪssɪᴏɴ ᴛᴏ ᴅᴇᴍᴏᴛᴇ! 🧩")
+
+        # 3. Safety Checks (Cannot demote Owner or Bot)
+        if target_id == OWNER_IDS:
+            return await message.reply_text("👑 ɴɪᴄᴇ ᴛʀʏ... ʙᴜᴛ I ᴡᴏɴ'ᴛ ᴅᴇᴍᴏᴛᴇ ᴍʏ ᴏᴡɴᴇʀ! 😼")
+        
+        if target_id == context.bot.id:
+            return await message.reply_text("💠 I ᴄᴀɴ'ᴛ ᴅᴇᴍᴏᴛᴇ ᴍʏsᴇʟғ, sɪʟʟʏ! 😁")
+
+        # Check Bot's own permissions
+        bot_member = await chat.get_member(context.bot.id)
+        if not bot_member.can_promote_members:
+            return await message.reply_text("💠 I ɴᴇᴇᴅ 'Aᴅᴅ Nᴇᴡ Aᴅᴍɪɴs' ᴘᴇʀᴍɪssɪᴏɴ ᴛᴏ ʀᴇᴍᴏᴠᴇ ᴀᴅᴍɪɴs! 🫠")
+
+        # Check Target's current status
+        target_member = await chat.get_member(target_id)
+        if target_member.status == 'creator':
+            return await message.reply_text("👑 Tʜᴀᴛ's ᴛʜᴇ Gʀᴏᴜᴘ Oᴡɴᴇʀ. I ʜᴀᴠᴇ ɴᴏ ᴘᴏᴡᴇʀ ʜᴇʀᴇ.")
+        
+        if target_member.status != 'administrator':
+            return await message.reply_text(f"⚠️ <b>{name}</b> ɪs ɴᴏᴛ ᴀɴ ᴀᴅᴍɪɴ anyway! 🤷‍♂️", parse_mode=ParseMode.HTML)
+
+        # 4. Execute Demotion (Strip all admin rights)
+        await context.bot.promote_chat_member(
+            chat.id, 
+            target_id,
+            can_change_info=False,
+            can_delete_messages=False,
+            can_invite_users=False,
+            can_restrict_members=False,
+            can_pin_messages=False,
+            can_promote_members=False,
+            can_manage_chat=False,
+            can_manage_video_chats=False
+        )
+
+        await message.reply_text(f"📉 <b>ᴅᴇᴍᴏᴛɪᴏɴ sᴜᴄᴄᴇssғᴜʟ</b>\n👤 ᴜsᴇʀ: <b>{name}</b>", parse_mode=ParseMode.HTML)
+
+    except BadRequest as e:
+        err = str(e).lower()
+        if "not enough rights" in err or "forbidden" in err:
+            await message.reply_text(f"⚠️ I ᴄᴀɴ'ᴛ ᴅᴇᴍᴏᴛᴇ {name}! Tʜᴇʏ ᴍɪɢʜᴛ ʙᴇ ᴛʜᴇ ᴄʀᴇᴀᴛᴏʀ ᴏʀ ᴡᴇʀᴇ ᴘʀᴏᴍᴏᴛᴇᴅ ʙʏ sᴏᴍᴇᴏɴᴇ ʜɪɢʜᴇʀ ᴛʜᴀɴ ᴍᴇ.")
+        else:
+            await message.reply_text(f"❌ API Eʀʀᴏʀ: {e}")
+
 # ================= WARN SYSTEM =================
 from telegram import Update
 from telegram.ext import ContextTypes
@@ -3554,8 +3616,8 @@ application.add_handler(CommandHandler("ban", ban))
 application.add_handler(CommandHandler("unban", unban))
 application.add_handler(CommandHandler("mute", mute))
 application.add_handler(CommandHandler("unmute", unmute))
-application.add_handler(CommandHandler("promote", promote))
-application.add_handler(CommandHandler("demote", demote))
+application.add_handler(CommandHandler("promote", promote_user))
+application.add_handler(CommandHandler("demote", demote_user))
 application.add_handler(CommandHandler("warn", warn))
 application.add_handler(CommandHandler("unwarn", unwarn))
 
