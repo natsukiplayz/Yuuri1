@@ -3191,7 +3191,7 @@ async def promote(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.promote_chat_member(chat.id, target_id, **perms)
         # Try to set title, ignore if it fails (usually due to bot not being 'owner' of the admin status)
         try:
-            await context.bot.set_chat_administrator_custom_title(chat.id, target_id, Aᴅᴍɪɴ")
+            await context.bot.set_chat_administrator_custom_title(chat.id, target_id, "Aᴅᴍɪɴ")
         except: pass
 
         await update.message.reply_text(f"🎖️ <b>{name}</b> ᴘʀᴏᴍᴏᴛᴇᴅ ᴛᴏ ʟᴇᴠᴇʟ <b>{level}</b>!", parse_mode='HTML')
