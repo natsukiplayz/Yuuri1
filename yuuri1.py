@@ -288,7 +288,7 @@ def clear_all_torture():
 # ================= REDEEM SYSTEM =================
 async def create_redeem(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """/create <code> <limit> <type:value> - Owner Only"""
-    if update.effective_user.id != OWNER_ID:
+    if update.effective_user.id != OWNER_IDS:
         return
 
     if len(context.args) < 3:
@@ -615,7 +615,7 @@ from telegram.ext import ApplicationHandlerStop
 # --- BLOCK/UNBLOCK LOGIC ---
 async def block_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 1. Security check: Only Owner can use this command
-    if update.effective_user.id != OWNER_ID:
+    if update.effective_user.id != OWNER_IDS:
         return await update.message.reply_text("Oᴏᴘꜱ! Tʜɪꜱ Cᴏᴍᴍᴀɴᴅ Iꜱ Fᴏʀ Mʏ Oᴡɴᴇʀ Oɴʟʏ 😊")
 
     target_id = None
@@ -641,7 +641,7 @@ async def block_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 3. THE PROTECTOR GUARD 🛑
     bot_id = context.bot.id
 
-    if target_id == OWNER_ID:
+    if target_id == OWNER_IDS:
         return await update.message.reply_text("Yᴏᴜ ᴄᴀɴ'ᴛ ʙʟᴏᴄᴋ ʏᴏᴜʀsᴇʟғ, Bᴏss! Tʜᴀᴛ's ᴀ ᴛʀᴀᴘ. ⛔")
     
     if target_id == bot_id:
@@ -991,7 +991,7 @@ async def font_converter(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def leave_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Command: /leave - Yuri leaves with sass 💥"""
-    if update.effective_user.id != OWNER_ID:
+    if update.effective_user.id != OWNER_IDS:
         return
 
     chat = update.effective_chat
@@ -1128,7 +1128,7 @@ from datetime import datetime, timezone
 
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 1. Security check
-    if update.effective_user.id != OWNER_ID:
+    if update.effective_user.id != OWNER_IDS:
         return
 
     # 2. Calculate Uptime
@@ -2068,7 +2068,7 @@ async def rullrank(update: Update, context: ContextTypes.DEFAULT_TYPE):
 #--
 # ======= PRIVATE BROADCAST ========
 async def broad_c(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != OWNER_ID:
+    if update.effective_user.id != OWNER_IDS:
         return await update.message.reply_text("❌ Uɴᴀᴜᴛʜᴏʀɪᴢᴇᴅ")
 
     if broadcast_control["running"]:
@@ -2201,10 +2201,9 @@ async def referral(update: Update, context: ContextTypes.DEFAULT_TYPE):
 🔗 {link}
 
 ɪɴᴠɪᴛᴇ ꜰʀɪᴇɴᴅꜱ ᴜꜱɪɴɢ ᴛʜɪꜱ ʟɪɴᴋ
-
 💰 ʀᴇᴡᴀʀᴅ: 1000 ᴄᴏɪɴꜱ
-
-⚠️ ᴇᴀᴄʜ ᴜꜱᴇʀ ᴄᴀɴ ᴏɴʟʏ ᴜꜱᴇ ᴏɴᴇ ʀᴇꜰᴇʀʀᴀʟ
+🧩 Nᴏᴛᴇ :
+⚠️ Oɴʟʏ Nᴇᴡ Uꜱᴇʀꜱ Rᴇɢɪꜱᴛʀᴀᴛɪᴏɴ Wɪʟʟ Gɪᴠᴇ Mᴏɴᴇʏ. 💰
 """
 
     await update.message.reply_text(text)
@@ -3008,35 +3007,85 @@ async def unmute(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(get_fancy_text(f"🔊 {name} can speak again.", "2"))
 
 # ================= PROMOTION SYSTEM =================
+from telegram import Update
+from telegram.ext import ContextTypes, CommandHandler
 
 async def promote(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await is_admin(update, context, update.effective_user.id): return
+    # 1. Security Check
+    if not await is_admin(update, context, update.effective_user.id): 
+        return
+
+    # 2. Get target user
+    user_id, name = await resolve_user_all(update, context)
+    if not user_id: 
+        await update.message.reply_text("<code>❌ Pʟᴇᴀsᴇ ʀᴇᴘʟʏ ᴛᴏ ᴀ ᴜsᴇʀ ᴏʀ ᴘʀᴏᴠɪᴅᴇ ᴀɴ ID.</code>", parse_mode='HTML')
+        return
+
+    # 3. Determine Level (Default to 1 if not specified)
+    level = "1"
+    if context.args:
+        if context.args[0] in ["1", "2", "3"]:
+            level = context.args[0]
+
+    # 4. Permission Mapping
+    # Level 1: Basic
+    perms = {
+        "can_change_info": True, "can_delete_messages": True,
+        "can_manage_video_chats": True, "can_invite_users": True,
+        "can_pin_messages": True, "can_manage_topics": True
+    }
+
+    # Level 2: Moderate (Adds Ban and Stories)
+    if level in ["2", "3"]:
+        perms.update({
+            "can_restrict_members": True, "can_post_stories": True,
+            "can_edit_stories": True, "can_delete_stories": True
+        })
+
+    # Level 3: Super (Adds Admin Management)
+    if level == "3":
+        perms.update({"can_promote_members": True})
+
+    try:
+        # Apply Permissions
+        await context.bot.promote_chat_member(update.effective_chat.id, user_id, **perms)
+        
+        # Set Admin Title/Tag based on Level
+        titles = {"1": "Lvl 1 Admin", "2": "Lvl 2 Admin", "3": "Lvl 3 Admin"}
+        try:
+            await context.bot.set_chat_administrator_custom_title(update.effective_chat.id, user_id, titles[level])
+        except:
+            pass # Fails if bot didn't promote the user or lacks 'Add Admins' perm
+
+        await update.message.reply_text(
+            f"<b>🎖️ ᴘʀᴏᴍᴏᴛɪᴏɴ sᴜᴄᴄᴇssғᴜʟ</b>\n"
+            f"<b>ᴜsᴇʀ:</b> <code>{name}</code>\n"
+            f"<b>ʟᴇᴠᴇʟ:</b> <code>{level}</code>", 
+            parse_mode='HTML'
+        )
+    except Exception as e:
+        await update.message.reply_text(f"<code>❌ API Eʀʀᴏʀ: {e}</code>", parse_mode='HTML')
+
+async def demote(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await is_admin(update, context, update.effective_user.id): 
+        return
+        
     user_id, name = await resolve_user_all(update, context)
     if not user_id: return
 
     try:
-        # Full promotion logic
+        # Strip all permissions
         await context.bot.promote_chat_member(
             update.effective_chat.id, user_id,
-            can_manage_chat=True, can_delete_messages=True, 
-            can_restrict_members=True, can_pin_messages=True,
-            can_promote_members=False # Usually False unless user is owner
+            can_change_info=False, can_delete_messages=False, 
+            can_invite_users=False, can_restrict_members=False,
+            can_pin_messages=False, can_promote_members=False,
+            can_manage_video_chats=False, can_post_stories=False,
+            can_edit_stories=False, can_delete_stories=False
         )
-        await update.message.reply_text(get_fancy_text(f"🎖️ {name} has been promoted!", "2"))
+        await update.message.reply_text(f"<b>📉 {name} ʜᴀs ʙᴇᴇɴ ᴅᴇᴍᴏᴛᴇᴅ ᴛᴏ ᴍᴇᴍʙᴇʀ.</b>", parse_mode='HTML')
     except Exception as e:
-        await update.message.reply_text(f"❌ API Error: {e}")
-
-async def demote(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await is_admin(update, context, update.effective_user.id): return
-    user_id, name = await resolve_user_all(update, context)
-    if not user_id: return
-
-    await context.bot.promote_chat_member(
-        update.effective_chat.id, user_id,
-        can_manage_chat=False, can_delete_messages=False, 
-        can_restrict_members=False, can_pin_messages=False
-    )
-    await update.message.reply_text(get_fancy_text(f"📉 {name} has been demoted.", "2"))
+        await update.message.reply_text(f"<code>❌ API Eʀʀᴏʀ: {e}</code>", parse_mode='HTML')
 
 # ================= WARN SYSTEM =================
 
