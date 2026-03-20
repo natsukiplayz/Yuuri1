@@ -1172,7 +1172,7 @@ from telegram import Update
 from telegram.ext import ContextTypes, CommandHandler
 
 # Replace with your actual ID
-OWNER_ID = 123456789 
+OWNER_IDS = 5773908061
 
 async def ping(update: Update, context: ContextTypes.DEFAULT_TYPE):
     start_time = time.time()
@@ -1184,7 +1184,7 @@ async def ping(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Edit with the result
     await message.edit_text(
-        f"<b>Pᴏɴɢ!</b> 🏓\n\n📡 Lᴀᴛᴇɴᴄʏ: <code>{latency}ms</code>", 
+        f"<b>Pᴏɴɢ!</b> 🏓\n📡 Lᴀᴛᴇɴᴄʏ: <code>{latency}ms</code>", 
         parse_mode='HTML'
     )
 
@@ -1192,7 +1192,7 @@ async def ping(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def owner_cmds(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     
-    if user_id != OWNER_ID:
+    if user_id != OWNER_IDS:
         # Using the "Invalid Code" style font for the error
         await update.message.reply_text("Yᴏᴜ ᴅᴏ ɴᴏᴛ ʜᴀᴠᴇ ᴘᴇʀᴍɪssɪᴏɴ.")
         return
