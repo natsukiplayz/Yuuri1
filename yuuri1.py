@@ -3009,88 +3009,96 @@ async def unmute(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ================= PROMOTION SYSTEM =================
 from telegram import Update
 from telegram.ext import ContextTypes, CommandHandler
+from telegram.error import BadRequest
 
 async def promote(update: Update, context: ContextTypes.DEFAULT_TYPE):
     sender_id = update.effective_user.id
     chat_id = update.effective_chat.id
+    bot_id = context.bot.id
 
-    # 1. Security Check: Allow if sender is Owner OR an Admin
+    # 1. Bot Permission Check (Can the bot even promote people?)
+    bot_member = await context.bot.get_chat_member(chat_id, bot_id)
+    if not bot_member.can_promote_members:
+        await update.message.reply_text("💠 Eʜᴇʜᴇ... Cᴀɴ Gɪᴠᴇ Mᴇ Fᴜʟʟ Pᴏᴡᴇʀ Aᴅᴍɪɴ? Sᴏ I Aʟꜱᴏ Cᴀɴ... 😁🫠")
+        return
+
+    # 2. Security Check (Owner or Admin only)
     if sender_id != OWNER_IDS:
         if not await is_admin(update, context, sender_id):
             return
 
-    # 2. Get target user (could be self if you reply to your own msg or use your ID)
+    # 3. Get target user
     target_id, name = await resolve_user_all(update, context)
     if not target_id:
-        await update.message.reply_text("<code>❌ Rᴇᴘʟʏ ᴛᴏ ᴀ ᴜsᴇʀ ᴏʀ ᴘʀᴏᴠɪᴅᴇ ᴀɴ ID.</code>", parse_mode='HTML')
+        await update.message.reply_text("<code>🧩 Rᴇᴘʟʏ ᴛᴏ ᴀ ᴜsᴇʀ ᴏʀ ᴘʀᴏᴠɪᴅᴇ ᴀɴ ID.</code>", parse_mode='HTML')
         return
 
-    # 3. Determine Level
-    level = "1"
-    if context.args:
-        if context.args[0] in ["1", "2", "3"]:
-            level = context.args[0]
+    # 4. Check if Target is Group Owner or already Admin
+    target_member = await context.bot.get_chat_member(chat_id, target_id)
+    
+    if target_member.status == 'creator':
+        await update.message.reply_text(f"👑 Gʀᴏᴜᴘ Oᴡɴᴇʀ Cᴀɴ'ᴛ Bᴇ Pʀᴏᴍᴏᴛᴇᴅ.")
+        return
+        
+    if target_member.status == 'administrator':
+        await update.message.reply_text(f"⚠️ {name} Aʀᴇ Aʟʀᴇᴀᴅʏ Pʀᴏᴍᴏᴛᴇᴅ!🙀")
+        return
 
-    # 4. Permission Mapping (100% same as your request)
+    # 5. Permission Mapping
+    level = context.args[0] if context.args and context.args[0] in ["1", "2", "3"] else "1"
     perms = {
         "can_change_info": True, "can_delete_messages": True,
         "can_manage_video_chats": True, "can_invite_users": True,
         "can_pin_messages": True, "can_manage_topics": True
     }
-
     if level in ["2", "3"]:
-        perms.update({
-            "can_restrict_members": True, "can_post_stories": True,
-            "can_edit_stories": True, "can_delete_stories": True
-        })
-
+        perms.update({"can_restrict_members": True, "can_post_stories": True, "can_edit_stories": True, "can_delete_stories": True})
     if level == "3":
         perms.update({"can_promote_members": True})
 
     try:
-        # 5. Apply Promotion via Telegram API
         await context.bot.promote_chat_member(chat_id, target_id, **perms)
-        
-        # 6. Set Custom Title
-        titles = {"1": "Lvl 1 Admin", "2": "Lvl 2 Admin", "3": "Lvl 3 Admin"}
+        titles = {"1": "Aᴅᴍɪɴ", "2": "Aᴅᴍɪɴ", "3": "Aᴅᴍɪɴ"}
         try:
             await context.bot.set_chat_administrator_custom_title(chat_id, target_id, titles[level])
-        except:
-            pass # Fails if bot lacks 'Add Admins' or didn't promote the target
+        except: pass
 
-        await update.message.reply_text(
-            f"<b>🎖️ sʏsᴛᴇᴍ ᴜᴘᴅᴀᴛᴇ</b>\n"
-            f"<b>ᴜsᴇʀ:</b> <code>{name}</code>\n"
-            f"<b>sᴛᴀᴛᴜs:</b> <code>ᴘʀᴏᴍᴏᴛᴇᴅ (ʟᴠʟ {level})</code>", 
-            parse_mode='HTML'
-        )
+        await update.message.reply_text(f"<b>🎖️ ᴘʀᴏᴍᴏᴛɪᴏɴ sᴜᴄᴄᴇssғᴜʟ</b>\n<b>ᴜsᴇʀ:</b> <code>{name}</code>\n<b>ʟᴇᴠᴇʟ:</b> <code>{level}</code>", parse_mode='HTML')
     except Exception as e:
         await update.message.reply_text(f"<code>❌ API Eʀʀᴏʀ: {e}</code>", parse_mode='HTML')
 
 async def demote(update: Update, context: ContextTypes.DEFAULT_TYPE):
     sender_id = update.effective_user.id
-    
-    # Security Check: Owner bypass
+    chat_id = update.effective_chat.id
+
     if sender_id != OWNER_IDS:
-        if not await is_admin(update, context, sender_id):
-            return
+        if not await is_admin(update, context, sender_id): return
         
     target_id, name = await resolve_user_all(update, context)
     if not target_id: return
 
+    # Check if Target is Group Owner
+    target_member = await context.bot.get_chat_member(chat_id, target_id)
+    if target_member.status == 'creator':
+        await update.message.reply_text(f"👑 Gʀᴏᴜᴘ Oᴡɴᴇʀ Cᴀɴ'ᴛ Bᴇ Dᴇᴍᴏᴛᴇᴅ.")
+        return
+
     try:
-        # Strip all permissions back to Member status
         await context.bot.promote_chat_member(
-            update.effective_chat.id, target_id,
+            chat_id, target_id,
             can_change_info=False, can_delete_messages=False, 
             can_invite_users=False, can_restrict_members=False,
             can_pin_messages=False, can_promote_members=False,
             can_manage_video_chats=False, can_post_stories=False,
             can_edit_stories=False, can_delete_stories=False
         )
-        await update.message.reply_text(f"<b>📉 sʏsᴛᴇᴍ ᴜᴘᴅᴀᴛᴇ</b>\n<b>ᴜsᴇʀ:</b> <code>{name}</code>\n<b>sᴛᴀᴛᴜs:</b> <code>ᴅᴇᴍᴏᴛᴇᴅ</code>", parse_mode='HTML')
-    except Exception as e:
-        await update.message.reply_text(f"<code>❌ API Eʀʀᴏʀ: {e}</code>", parse_mode='HTML')
+        await update.message.reply_text(f"<b>📉 {name} ʜᴀs ʙᴇᴇɴ ᴅᴇᴍᴏᴛᴇᴅ.</b>", parse_mode='HTML')
+    except BadRequest as e:
+        # This catches the "Not enough rights" error specifically for demoting admins promoted by others
+        if "not enough rights" in str(e).lower() or "can't remove chat owner" in str(e).lower():
+            await update.message.reply_text(f"⚠️ {name} Pʀᴏᴍᴏᴛᴇᴅ Bʏ Sᴏᴍᴇᴏɴᴇ Oᴛʜᴇʀ Tʜᴀɴ Mᴇ!")
+        else:
+            await update.message.reply_text(f"<code>❌ API Eʀʀᴏʀ: {e}</code>", parse_mode='HTML')
 
 # ================= WARN SYSTEM =================
 
