@@ -3156,7 +3156,7 @@ async def promote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 4. Hierarchy & Bot Checks
     try:
         # Check if SENDER is Owner or Admin
-        if user.id != OWNER_IDS:
+        if user.id != OWNER_ID:
             sender_member = await chat.get_member(user.id)
             if sender_member.status not in ["administrator", "creator"] or not sender_member.can_promote_members:
                 return await message.reply_text("🧐 Oᴘᴘs! Yᴏᴜ Nᴇᴇᴅ Tᴏ Bᴇ Aᴅᴍɪɴ Tᴏ Pʀᴏᴍᴏᴛᴇ Oᴛʜᴇʀs... 🧩")
@@ -3192,14 +3192,10 @@ async def demote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 2. Hierarchy & Permission Checks
     try:
         # Check if SENDER is Owner or Admin
-        if user.id != OWNER_IDS:
+        if user.id != OWNER_ID:
             sender_member = await chat.get_member(user.id)
             if sender_member.status not in ["administrator", "creator"] or not sender_member.can_promote_members:
                 return await message.reply_text("🧐 Nɪᴄᴇ ᴛʀʏ, ʙᴜᴛ ʏᴏᴜ ɴᴇᴇᴅ 'Aᴅᴅ Nᴇᴡ Aᴅᴍɪɴs' ᴘᴇʀᴍɪssɪᴏɴ ᴛᴏ ᴅᴇᴍᴏᴛᴇ! 🧩")
-
-        # 3. Safety Checks (Cannot demote Owner or Bot)
-        if target_id == OWNER_IDS:
-            return await message.reply_text("👑 ɴɪᴄᴇ ᴛʀʏ... ʙᴜᴛ I ᴡᴏɴ'ᴛ ᴅᴇᴍᴏᴛᴇ ᴍʏ ᴏᴡɴᴇʀ! 😼")
         
         if target_id == context.bot.id:
             return await message.reply_text("💠 I ᴄᴀɴ'ᴛ ᴅᴇᴍᴏᴛᴇ ᴍʏsᴇʟғ, sɪʟʟʏ! 😁")
