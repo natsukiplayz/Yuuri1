@@ -1166,6 +1166,49 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(text, parse_mode="Markdown")
 
+#=========ping=========
+import time
+from telegram import Update
+from telegram.ext import ContextTypes, CommandHandler
+
+# Replace with your actual ID
+OWNER_ID = 123456789 
+
+async def ping(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    start_time = time.time()
+    # Send initial message in fancy font
+    message = await update.message.reply_text("📡 Pɪɴɢɪɴɢ...")
+    
+    end_time = time.time()
+    latency = round((end_time - start_time) * 1000)
+    
+    # Edit with the result
+    await message.edit_text(
+        f"<b>Pᴏɴɢ!</b> 🏓\n\n📡 Lᴀᴛᴇɴᴄʏ: <code>{latency}ms</code>", 
+        parse_mode='HTML'
+    )
+
+#============cmd_command=========
+async def owner_cmds(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    
+    if user_id != OWNER_ID:
+        # Using the "Invalid Code" style font for the error
+        await update.message.reply_text("Yᴏᴜ ᴅᴏ ɴᴏᴛ ʜᴀᴠᴇ ᴘᴇʀᴍɪssɪᴏɴ.")
+        return
+
+    help_text = (
+        "👑 <b>Oᴡɴᴇʀ Hɪᴅᴅᴇɴ Cᴏᴍᴍᴀɴᴅs</b> 👑\n\n"
+        "📡 <code>/ping</code> - Cʜᴇᴄᴋ ʙᴏᴛ ʟᴀᴛᴇɴᴄʏ\n"
+        "📊 <code>/stats</code> - (Fᴜᴛᴜʀᴇ) Vɪᴇᴡ ʙᴏᴛ ᴜsᴀɢᴇ\n\n"
+        "<b>Aᴅᴍɪɴ Tᴏᴏʟs:</b>\n"
+        "👤 <code>/personal [reply] &lt;user-id&gt;</code>\n"
+        "🔡 <code>/font 1|2|3</code>\n"
+        "🎟 <code>/create &lt;code&gt; &lt;limit&gt; &lt;item|coins|xp:amount&gt;</code>"
+    )
+    
+    await update.message.reply_text(help_text, parse_mode='HTML')
+
 #==================Main StartUp Of Yuuri==================
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
@@ -3312,6 +3355,8 @@ application.add_handler(CommandHandler("broad_c", broad_c))
 application.add_handler(CommandHandler("stop_b", cancel_broadcast))
 application.add_handler(CommandHandler("block", block_cmd))
 application.add_handler(CommandHandler("unblock", unblock_cmd))
+application.add_handler(CommandHandler("ping", ping))
+application.add_handler(CommandHandler("cmds", owner_cmds))
 application.add_handler(CommandHandler("ban", ban))
 application.add_handler(CommandHandler("unban", unban))
 application.add_handler(CommandHandler("mute", mute))
