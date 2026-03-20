@@ -3011,79 +3011,84 @@ from telegram import Update
 from telegram.ext import ContextTypes, CommandHandler
 
 async def promote(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # 1. Security Check
-    if not await is_admin(update, context, update.effective_user.id): 
+    sender_id = update.effective_user.id
+    chat_id = update.effective_chat.id
+
+    # 1. Security Check: Allow if sender is Owner OR an Admin
+    if sender_id != OWNER_IDS:
+        if not await is_admin(update, context, sender_id):
+            return
+
+    # 2. Get target user (could be self if you reply to your own msg or use your ID)
+    target_id, name = await resolve_user_all(update, context)
+    if not target_id:
+        await update.message.reply_text("<code>❌ Rᴇᴘʟʏ ᴛᴏ ᴀ ᴜsᴇʀ ᴏʀ ᴘʀᴏᴠɪᴅᴇ ᴀɴ ID.</code>", parse_mode='HTML')
         return
 
-    # 2. Get target user
-    user_id, name = await resolve_user_all(update, context)
-    if not user_id: 
-        await update.message.reply_text("<code>❌ Pʟᴇᴀsᴇ ʀᴇᴘʟʏ ᴛᴏ ᴀ ᴜsᴇʀ ᴏʀ ᴘʀᴏᴠɪᴅᴇ ᴀɴ ID.</code>", parse_mode='HTML')
-        return
-
-    # 3. Determine Level (Default to 1 if not specified)
+    # 3. Determine Level
     level = "1"
     if context.args:
         if context.args[0] in ["1", "2", "3"]:
             level = context.args[0]
 
-    # 4. Permission Mapping
-    # Level 1: Basic
+    # 4. Permission Mapping (100% same as your request)
     perms = {
         "can_change_info": True, "can_delete_messages": True,
         "can_manage_video_chats": True, "can_invite_users": True,
         "can_pin_messages": True, "can_manage_topics": True
     }
 
-    # Level 2: Moderate (Adds Ban and Stories)
     if level in ["2", "3"]:
         perms.update({
             "can_restrict_members": True, "can_post_stories": True,
             "can_edit_stories": True, "can_delete_stories": True
         })
 
-    # Level 3: Super (Adds Admin Management)
     if level == "3":
         perms.update({"can_promote_members": True})
 
     try:
-        # Apply Permissions
-        await context.bot.promote_chat_member(update.effective_chat.id, user_id, **perms)
+        # 5. Apply Promotion via Telegram API
+        await context.bot.promote_chat_member(chat_id, target_id, **perms)
         
-        # Set Admin Title/Tag based on Level
-        titles = {"1": "Admin", "2": "Admin", "3": "Admin"}
+        # 6. Set Custom Title
+        titles = {"1": "Lvl 1 Admin", "2": "Lvl 2 Admin", "3": "Lvl 3 Admin"}
         try:
-            await context.bot.set_chat_administrator_custom_title(update.effective_chat.id, user_id, titles[level])
+            await context.bot.set_chat_administrator_custom_title(chat_id, target_id, titles[level])
         except:
-            pass # Fails if bot didn't promote the user or lacks 'Add Admins' perm
+            pass # Fails if bot lacks 'Add Admins' or didn't promote the target
 
         await update.message.reply_text(
-            f"<b>🎖️ ᴘʀᴏᴍᴏᴛɪᴏɴ sᴜᴄᴄᴇssғᴜʟ</b>\n"
+            f"<b>🎖️ sʏsᴛᴇᴍ ᴜᴘᴅᴀᴛᴇ</b>\n"
             f"<b>ᴜsᴇʀ:</b> <code>{name}</code>\n"
-            f"<b>ʟᴇᴠᴇʟ:</b> <code>{level}</code>", 
+            f"<b>sᴛᴀᴛᴜs:</b> <code>ᴘʀᴏᴍᴏᴛᴇᴅ (ʟᴠʟ {level})</code>", 
             parse_mode='HTML'
         )
     except Exception as e:
         await update.message.reply_text(f"<code>❌ API Eʀʀᴏʀ: {e}</code>", parse_mode='HTML')
 
 async def demote(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await is_admin(update, context, update.effective_user.id): 
-        return
+    sender_id = update.effective_user.id
+    
+    # Security Check: Owner bypass
+    if sender_id != OWNER_IDS:
+        if not await is_admin(update, context, sender_id):
+            return
         
-    user_id, name = await resolve_user_all(update, context)
-    if not user_id: return
+    target_id, name = await resolve_user_all(update, context)
+    if not target_id: return
 
     try:
-        # Strip all permissions
+        # Strip all permissions back to Member status
         await context.bot.promote_chat_member(
-            update.effective_chat.id, user_id,
+            update.effective_chat.id, target_id,
             can_change_info=False, can_delete_messages=False, 
             can_invite_users=False, can_restrict_members=False,
             can_pin_messages=False, can_promote_members=False,
             can_manage_video_chats=False, can_post_stories=False,
             can_edit_stories=False, can_delete_stories=False
         )
-        await update.message.reply_text(f"<b>📉 {name} ʜᴀs ʙᴇᴇɴ ᴅᴇᴍᴏᴛᴇᴅ ᴛᴏ ᴍᴇᴍʙᴇʀ.</b>", parse_mode='HTML')
+        await update.message.reply_text(f"<b>📉 sʏsᴛᴇᴍ ᴜᴘᴅᴀᴛᴇ</b>\n<b>ᴜsᴇʀ:</b> <code>{name}</code>\n<b>sᴛᴀᴛᴜs:</b> <code>ᴅᴇᴍᴏᴛᴇᴅ</code>", parse_mode='HTML')
     except Exception as e:
         await update.message.reply_text(f"<code>❌ API Eʀʀᴏʀ: {e}</code>", parse_mode='HTML')
 
