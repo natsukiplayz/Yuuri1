@@ -3127,9 +3127,6 @@ from telegram import Update
 from telegram.ext import ContextTypes
 from telegram.error import BadRequest
 
-# Multiple owners support
-OWNER_IDS = [5773908061, 7139383373] 
-
 async def promote(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat = update.effective_chat
