@@ -3051,7 +3051,7 @@ async def promote(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.promote_chat_member(update.effective_chat.id, user_id, **perms)
         
         # Set Admin Title/Tag based on Level
-        titles = {"1": "Lvl 1 Admin", "2": "Lvl 2 Admin", "3": "Lvl 3 Admin"}
+        titles = {"1": "Admin", "2": "Admin", "3": "Admin"}
         try:
             await context.bot.set_chat_administrator_custom_title(update.effective_chat.id, user_id, titles[level])
         except:
