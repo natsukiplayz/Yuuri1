@@ -47,8 +47,10 @@ OWNER_ID = int(os.getenv("OWNER_ID"))
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 MONGO_URI = os.getenv("MONGO_URI")
 #--
-OWNER_ID: 7139383373
-OWNER_IDS: 5773908061
+
+OWNER_ID = 7139383373
+OWNER_IDS = 5773908061
+
 # ================= MONGODB =================
 client = MongoClient(MONGO_URI)
 db = client["yuuri_db"]
