@@ -2981,7 +2981,7 @@ async def kick_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not target_id: return
 
     if target_id == OWNER_IDS:
-        await message.reply_text("👑 ɪ ᴄᴀɴ'ᴛ ᴋɪᴄᴋ ᴛʜᴇ ʙᴏss")
+        await message.reply_text("👑Oᴏᴘꜱ I Cᴀɴ'ᴛ Kɪᴄᴋ Tʜᴇ Bᴏꜱꜱ ☠")
         return
 
     try:
@@ -3043,12 +3043,12 @@ async def mute(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         target_member = await chat.get_member(target_id)
         if target_member.status in ['creator', 'administrator']:
-            await message.reply_text("⚠️ ᴀᴅᴍɪɴs ᴅᴏɴ'ᴛ ʜᴀᴠᴇ ᴍᴜᴢᴢʟᴇs")
+            await message.reply_text("Yᴏᴜ Cᴀɴ'ᴛ Dᴏ Aɴʏᴛʜɪɴɢ Tᴏ Tʜᴏꜱᴇ Cʜɪᴘᴋᴜ Aᴅᴍɪɴ Lᴏɢᴢ 🪵😁")
             return
         
         await chat.restrict_member(target_id, permissions=ChatPermissions(can_send_messages=False))
         await message.reply_text(
-            f"🎖️ sʏsᴛᴇᴍ ᴜᴘᴅᴀᴛᴇ\nᴜsᴇʀ: <b>{name}</b>\nsᴛᴀᴛᴜs: ᴍᴜᴛᴇᴅ\nAccess: ʀᴇsᴛʀɪᴄᴛᴇᴅ",
+            f"🎖️ Sʏꜱᴛᴇᴍ Uᴘᴅᴀᴛᴇ\nUꜱᴇʀ: <b>{name}</b>\nSᴛᴀᴛᴜꜱ: ᴍᴜᴛᴇᴅ\nAccess: Rᴇsᴛʀɪᴄᴛᴇᴅ",
             parse_mode='HTML'
         )
     except BadRequest as e:
@@ -3286,6 +3286,139 @@ async def unwarn(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 3. DATABASE RESET
     admins_db.update_one({"chat_id": chat.id, "user_id": target_id}, {"$set": {"warns": 0}})
     await update.message.reply_text(f"<b>✅ ᴡᴀʀɴs ғᴏʀ {name} ʜᴀs ʙᴇᴇɴ ʀᴇsᴇᴛ.</b>", parse_mode='HTML')
+
+# --- PIN COMMAND ---
+async def pin_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    chat = update.effective_chat
+    message = update.effective_message
+    
+    if user.id != OWNER_ID:
+        if not await is_admin(update, context, user.id):
+            await message.reply_text("🧐 ᴏᴘᴘs ʏᴏᴜ ɴᴇᴇᴅ ᴛᴏ ʙᴇ ᴀᴅᴍɪɴ ᴛᴏ ᴘɪɴ ᴍᴇssᴀɢᴇs")
+            return
+
+    if not message.reply_to_message:
+        await message.reply_text("<code>⚠️ ᴜsᴀɢᴇ: ʀᴇᴘʟʏ ᴛᴏ ᴀ ᴍᴇssᴀɢᴇ ᴛᴏ ᴘɪɴ ɪᴛ</code>", parse_mode='HTML')
+        return
+
+    try:
+        target_user = message.reply_to_message.from_user
+        name = target_user.first_name if target_user else "sʏsᴛᴇᴍ"
+
+        await context.bot.pin_chat_message(
+            chat_id=chat.id,
+            message_id=message.reply_to_message.message_id,
+            disable_notification=False
+        )
+
+        # CLEAN CALLBACK
+        response = (
+            f"ᴜsᴇʀ: <b>{name}</b>\n"
+            "sᴛᴀᴛᴜs: ᴘɪɴɴᴇᴅ"
+        )
+        await message.reply_text(response, parse_mode='HTML')
+
+    except BadRequest as e:
+        await message.reply_text(f"❌ API ᴇʀʀᴏʀ: {str(e).lower()}")
+
+# --- UNPIN COMMAND ---
+async def unpin_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    chat = update.effective_chat
+    message = update.effective_message
+
+    if user.id != OWNER_ID:
+        if not await is_admin(update, context, user.id):
+            await message.reply_text("🧐 ᴏᴘᴘs ʏᴏᴜ ɴᴇᴇᴅ ᴛᴏ ʙᴇ ᴀᴅᴍɪɴ ᴛᴏ ᴜɴᴘɪɴ ᴍᴇssᴀɢᴇs")
+            return
+
+    try:
+        if message.reply_to_message:
+            target_user = message.reply_to_message.from_user
+            name = target_user.first_name if target_user else "sʏsᴛᴇᴍ"
+            await context.bot.unpin_chat_message(
+                chat_id=chat.id,
+                message_id=message.reply_to_message.message_id
+            )
+        else:
+            name = "ʟᴀᴛᴇsᴛ ᴘɪɴ"
+            await context.bot.unpin_chat_message(chat_id=chat.id)
+
+        # CLEAN CALLBACK
+        response = (
+            f"ᴜsᴇʀ: <b>{name}</b>\n"
+            "sᴛᴀᴛᴜs: ᴜɴᴘɪɴɴᴇᴅ"
+        )
+        await message.reply_text(response, parse_mode='HTML')
+
+    except BadRequest as e:
+        await message.reply_text(f"❌ API ᴇʀʀᴏʀ: {str(e).lower()}")
+
+#===========purge=========
+async def purge(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    chat = update.effective_chat
+    message = update.effective_message
+
+    if user.id != OWNER_IDS:
+        if not await is_admin(update, context, user.id):
+            await message.reply_text("🧐 ᴏᴘᴘs ʏᴏᴜ ɴᴇᴇᴅ ᴛᴏ ʙᴇ ᴀᴅᴍɪɴ ᴛᴏ ᴘᴜʀɢᴇ")
+            return
+
+    if not message.reply_to_message:
+        await message.reply_text("<code>⚠️ ʀᴇᴘʟʏ ᴛᴏ ᴀ ᴍᴇssᴀɢᴇ ᴛᴏ sᴛᴀʀᴛ ᴘᴜʀɢᴇ ғʀᴏᴍ ᴛʜᴇʀᴇ</code>", parse_mode='HTML')
+        return
+
+    try:
+        message_id = message.reply_to_message.message_id
+        delete_ids = list(range(message_id, message.message_id))
+        
+        # Delete messages in batches of 100 (Telegram limit)
+        for i in range(0, len(delete_ids), 100):
+            await context.bot.delete_messages(chat_id=chat.id, message_ids=delete_ids[i:i+100])
+
+        # Delete the command message itself
+        await message.delete()
+        
+        # Send a temporary confirmation
+        await chat.send_message("sᴛᴀᴛᴜs: ᴘᴜʀɢᴇ ᴄᴏᴍᴘʟᴇᴛᴇ")
+    except BadRequest as e:
+        await message.reply_text(f"❌ API ᴇʀʀᴏʀ: {str(e).lower()}")
+
+#========temporary mute=======
+import datetime
+
+async def tmute(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    chat = update.effective_chat
+    message = update.effective_message
+
+    if user.id != OWNER_ID:
+        if not await is_admin(update, context, user.id): return
+
+    target_id, name = await resolve_user_all(update, context)
+    if not target_id: return
+
+    # Check for duration (e.g., /tmute 30m)
+    if not context.args:
+        await message.reply_text("<code>⚠️ ᴜsᴀɢᴇ: /ᴛᴍᴜᴛᴇ [ᴛɪᴍᴇ] (ᴇ.ɢ. 30ᴍ, 1ʜ, 1ᴅ)</code>", parse_mode='HTML')
+        return
+
+    # Simple time parser (minutes only for this example)
+    try:
+        time_val = int(context.args[0][:-1])
+        until = datetime.datetime.now() + datetime.timedelta(minutes=time_val)
+        
+        await chat.restrict_member(
+            target_id, 
+            permissions=ChatPermissions(can_send_messages=False),
+            until_date=until
+        )
+        
+        await message.reply_text(f"ᴜsᴇʀ: <b>{name}</b>\nsᴛᴀᴛᴜs: ᴛ-ᴍᴜᴛᴇᴅ\nᴛɪᴍᴇ: {time_val}ᴍ", parse_mode='HTML')
+    except Exception:
+        await message.reply_text("❌ ɪɴᴠᴀʟɪᴅ ᴛɪᴍᴇ ғᴏʀᴍᴀᴛ")
 
 # ================= AUTO UPDATE CHAT =================
 async def save_chat_and_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -3578,6 +3711,10 @@ application.add_handler(CommandHandler("cmds", owner_cmds))
 application.add_handler(CommandHandler("kick", kick_user))
 application.add_handler(CommandHandler("ban", ban))
 application.add_handler(CommandHandler("unban", unban))
+application.add_handler(CommandHandler("tmute", tmute))
+application.add_handler(CommandHandler(dlt", purge))
+application.add_handler(CommandHandler("unpin", unpin_message))
+application.add_handler(CommandHandler("pin", pin_message))
 application.add_handler(CommandHandler("mute", mute))
 application.add_handler(CommandHandler("unmute", unmute))
 application.add_handler(CommandHandler("promote", promote_user))
