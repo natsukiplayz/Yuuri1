@@ -2975,7 +2975,7 @@ async def ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"<code>❌ API Eʀʀᴏʀ: {e}</code>", parse_mode='HTML')
 
 # --- KICK COMMAND ---
-async def kick(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def kick_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat = update.effective_chat
     
@@ -3562,7 +3562,7 @@ application.add_handler(CommandHandler("kiss", kiss))
 application.add_handler(CommandHandler("hug", hug))
 application.add_handler(CommandHandler("bite", bite))
 application.add_handler(CommandHandler("slap", slap))
-application.add_handler(CommandHandler("kick_hit", kick))
+application.add_handler(CommandHandler("kick", kick))
 application.add_handler(CommandHandler("punch", punch))
 application.add_handler(CommandHandler("murder", murder))
 application.add_handler(CommandHandler("leave", leave_group))
@@ -3577,7 +3577,7 @@ application.add_handler(CommandHandler("block", block_cmd))
 application.add_handler(CommandHandler("unblock", unblock_cmd))
 application.add_handler(CommandHandler("ping", ping))
 application.add_handler(CommandHandler("cmds", owner_cmds))
-application.add_handler(CommandHandler("kick", kick))
+application.add_handler(CommandHandler("kick", kick_user))
 application.add_handler(CommandHandler("ban", ban))
 application.add_handler(CommandHandler("unban", unban))
 application.add_handler(CommandHandler("mute", mute))
