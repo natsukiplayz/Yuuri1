@@ -74,10 +74,10 @@ logging.basicConfig(level=logging.INFO)
 
 #===========Systems========
 #--
-# ===== USER SYSTEM =====
-def get_user(user):
-    # 1. Try to find the user
-    data = users.find_one({"id": user.id})
+# ===== USER SYSTEM (FIXED) =====
+async def get_user(user):
+    # 1. Try to find the user - MUST AWAIT
+    data = await users.find_one({"id": user.id})
 
     # Default template for NEW users
     default_data = {
@@ -92,22 +92,21 @@ def get_user(user):
         "inventory": [],
         "referred_by": None,
         "blocked": False,
-        "premium": False  # Added this since we used it in Richest/Profile!
+        "premium": False
     }
 
     if not data:
-        users.insert_one(default_data)
+        # MUST AWAIT
+        await users.insert_one(default_data)
         return default_data
 
-    # 2. ✨ THE IMPROVED AUTO-REPAIR & NAME SYNC
+    # 2. ✨ AUTO-REPAIR & NAME SYNC
     updated_fields = {}
     
-    # Sync Name: If the user changed their name on Telegram, update it in DB
     if data.get("name") != user.first_name:
         data["name"] = user.first_name
         updated_fields["name"] = user.first_name
 
-    # Check for missing keys (Schema Evolution)
     for key, value in default_data.items():
         if key not in data:
             data[key] = value
@@ -115,14 +114,15 @@ def get_user(user):
     
     # 3. Optimized Save: Only write to DB if something actually changed
     if updated_fields:
-        users.update_one({"id": user.id}, {"$set": updated_fields})
+        # MUST AWAIT
+        await users.update_one({"id": user.id}, {"$set": updated_fields})
 
     return data
 
-def save_user(data):
-    # Using 'id' as the filter is correct. 
-    # Ensure 'id' is indexed in your MongoDB for lightning-fast lookups.
-    users.update_one({"id": data["id"]}, {"$set": data}, upsert=True)
+async def save_user(data):
+    # MUST AWAIT
+    await users.update_one({"id": data["id"]}, {"$set": data}, upsert=True)
+
 
 # ======Broadcast_System======
 import asyncio
