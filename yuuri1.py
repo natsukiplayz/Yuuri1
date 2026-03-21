@@ -3717,7 +3717,6 @@ application.add_handler(MessageHandler(filters.ALL, save_chat_and_user), group=-
 
 # Command Handlers
 application.add_handler(CommandHandler("allow", allow_command))
-application.add_handler(CommandHandler("stopall", stop_all_torture_cmd))
 application.add_handler(CommandHandler("create", create_redeem))
 application.add_handler(CommandHandler("redeem", redeem))
 application.add_handler(CommandHandler("start", start_command))
