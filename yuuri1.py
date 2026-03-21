@@ -703,80 +703,76 @@ async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_html(text)
 
 # ===== Fun Interaction Commands =====
-
 import random
 from telegram import Update
 from telegram.ext import ContextTypes
 
 # ===============================
-# GIF DATABASE
+# GIF DATABASE (Unchanged)
 # ===============================
 
 KISS_GIFS = [
-"CgACAgQAAxkBAAFEqThps851iVq2fmWNXo3sq1HTx8qP4QACggMAAp897VKT2Ktemaxp2joE",
-"CgACAgQAAxkBAAFEqUpps88XuvzJ7gKt9RgT8r3_MgpGhwACgAcAAvwpjFMTm9An_6_McToE",
-"CgACAgQAAxkBAAFEqUxps89ecJSnnN0UOSk13Y6xp7ZI3QACvgQAAp-RzVId4q-39NiNDjoE"
+    "CgACAgQAAxkBAAFEqThps851iVq2fmWNXo3sq1HTx8qP4QACggMAAp897VKT2Ktemaxp2joE",
+    "CgACAgQAAxkBAAFEqUpps88XuvzJ7gKt9RgT8r3_MgpGhwACgAcAAvwpjFMTm9An_6_McToE",
+    "CgACAgQAAxkBAAFEqUxps89ecJSnnN0UOSk13Y6xp7ZI3QACvgQAAp-RzVId4q-39NiNDjoE"
 ]
 
 HUG_GIFS = [
-"CgACAgQAAxkBAAFEqVRps9AQLzL3MSq0ciO-AAEzsh47bOEAAq4FAAIL_z1TzpL3e-CUa0I6BA",
-"CgACAgQAAxkBAAFEqVVps9AQMt85jqkHjtSeCzgLLfaFngAC7QUAAkWIzFF_W-zVNIr6QjoE",
-"CgACAgQAAxkBAAFEqVZps9AQUhBv94fq6VuPvtMeifMetQACpwgAAsq9fFK5IuJw0Q6KazoE"
+    "CgACAgQAAxkBAAFEqVRps9AQLzL3MSq0ciO-AAEzsh47bOEAAq4FAAIL_z1TzpL3e-CUa0I6BA",
+    "CgACAgQAAxkBAAFEqVVps9AQMt85jqkHjtSeCzgLLfaFngAC7QUAAkWIzFF_W-zVNIr6QjoE",
+    "CgACAgQAAxkBAAFEqVZps9AQUhBv94fq6VuPvtMeifMetQACpwgAAsq9fFK5IuJw0Q6KazoE"
 ]
 
 BITE_GIFS = [
-"CgACAgQAAxkBAAFEqXdps9F3CUDP_uXjN4HWcMBiacvatQACBQMAAsV7BVM4j4JdPptQDzoE",
-"CgACAgQAAxkBAAFEqXhps9F32LDcpcXH9NOS-ktnVDG-HgACOwMAAqV6RFELerv_D_rO8joE",
-"CgACAgQAAxkBAAFEqXlps9F3rRMKmv4PISyGVOxXs4v4EAACJQMAAudMBVPQtxclFSEtgDoE"
+    "CgACAgQAAxkBAAFEqXdps9F3CUDP_uXjN4HWcMBiacvatQACBQMAAsV7BVM4j4JdPptQDzoE",
+    "CgACAgQAAxkBAAFEqXhps9F32LDcpcXH9NOS-ktnVDG-HgACOwMAAqV6RFELerv_D_rO8joE",
+    "CgACAgQAAxkBAAFEqXlps9F3rRMKmv4PISyGVOxXs4v4EAACJQMAAudMBVPQtxclFSEtgDoE"
 ]
 
 SLAP_GIFS = [
-"CgACAgQAAxkBAAFEqaJps9JRC5Mfb5jNr5XgAm6RMWovEAACyQUAApZrVVAar3BemvEERjoE",
-"CgACAgQAAxkBAAFEqaNps9JRkv0XbMCeGvsQFLaGGUyuwAACbAMAAvp45FPnsYLcLNShDToE",
-"CgACAgQAAxkBAAFEqaRps9JRPuXBNf7aa9v_whuwU2nLEgACPQMAAhreBFPkfVHAxMcKpjoE"
+    "CgACAgQAAxkBAAFEqaJps9JRC5Mfb5jNr5XgAm6RMWovEAACyQUAApZrVVAar3BemvEERjoE",
+    "CgACAgQAAxkBAAFEqaNps9JRkv0XbMCeGvsQFLaGGUyuwAACbAMAAvp45FPnsYLcLNShDToE",
+    "CgACAgQAAxkBAAFEqaRps9JRPuXBNf7aa9v_whuwU2nLEgACPQMAAhreBFPkfVHAxMcKpjoE"
 ]
 
 KICK_GIFS = [
-"CgACAgQAAxkBAAFEq3Vps-hF0AJg7zywn9El8BJUA3DzEwAC8wIAAnvgBFMZAV2MHSAZlzoE",
-"CgACAgQAAxkBAAFEq3Zps-hFW0CEBmL6u7njUYLGr22q3AAC0gYAAog2jFBmFZXucvqURjoE",
-"CgACAgQAAxkBAAFEq3dps-hFNX4ZQ4rdT5s32Wnn3NhVAAPIBwACgbe1UVl5Z4WkKnrHOgQ"
+    "CgACAgQAAxkBAAFEq3Vps-hF0AJg7zywn9El8BJUA3DzEwAC8wIAAnvgBFMZAV2MHSAZlzoE",
+    "CgACAgQAAxkBAAFEq3Zps-hFW0CEBmL6u7njUYLGr22q3AAC0gYAAog2jFBmFZXucvqURjoE",
+    "CgACAgQAAxkBAAFEq3dps-hFNX4ZQ4rdT5s32Wnn3NhVAAPIBwACgbe1UVl5Z4WkKnrHOgQ"
 ]
 
 PUNCH_GIFS = [
-"CgACAgQAAxkBAAFEq4pps-jh2SYq4RCb0d3QXA1ano0ihgACmQYAAmNlfVBPu8eB0yXiOzoE",
-"CgACAgQAAxkBAAFEq4tps-jh9BFfmDjK6XNDKL15Pjzn9wAC8wIAAoSnLVNyqAKuMP98wjoE",
-"CgACAgQAAxkBAAFEq4xps-jh_GtyKDOrEQABr0ParkF7kpEAAsMCAAInZQ1THZgTJK0G2bA6BA"
+    "CgACAgQAAxkBAAFEq4pps-jh2SYq4RCb0d3QXA1ano0ihgACmQYAAmNlfVBPu8eB0yXiOzoE",
+    "CgACAgQAAxkBAAFEq4tps-jh9BFfmDjK6XNDKL15Pjzn9wAC8wIAAoSnLVNyqAKuMP98wjoE",
+    "CgACAgQAAxkBAAFEq4xps-jh_GtyKDOrEQABr0ParkF7kpEAAsMCAAInZQ1THZgTJK0G2bA6BA"
 ]
 
 MURDER_GIFS = [
-"CgACAgQAAxkBAAFEq5tps-nhOiSq-vuyjmk13zm30l7R5gAC8AIAAvmANVPbgt6AF05WbzoE",
-"CgACAgQAAxkBAAFEq5xps-nhBH8Ml1UEBCjctbNpBmH1jwACLQMAAuLJDFMgyege_IFM2ToE",
-"CgACAgQAAxkBAAFEq51ps-nhCb0TEIbTPAIBrY2fjxF4cgACQQMAAhQTJVOQ4cLMXsbquToE"
+    "CgACAgQAAxkBAAFEq5tps-nhOiSq-vuyjmk13zm30l7R5gAC8AIAAvmANVPbgt6AF05WbzoE",
+    "CgACAgQAAxkBAAFEq5xps-nhBH8Ml1UEBCjctbNpBmH1jwACLQMAAuLJDFMgyege_IFM2ToE",
+    "CgACAgQAAxkBAAFEq51ps-nhCb0TEIbTPAIBrY2fjxF4cgACQQMAAhQTJVOQ4cLMXsbquToE"
 ]
 
-WARNING_TEXT = "Cʜᴜᴘ!! Wᴀʀɴᴀ Yᴜᴜᴋɪ K Bᴛᴀ Dᴜɴɢɪ 😒"
+WARNING_TEXT = "ᴄʜᴜᴘ!! ᴡᴀʀɴᴀ ʏᴜᴜᴋɪ ᴋᴏ ʙᴀᴛᴀ ᴅᴜɴɢɪ"
 
 
 # ===============================
 # CHECK FUNCTION
 # ===============================
 
-async def check_target(update: Update, action):
-
+async def check_target(update: Update, action_text):
     if not update.message.reply_to_message:
-        await update.message.reply_text("Rᴇᴘʟʏ Tᴏ Sᴏᴍᴇᴏɴᴇ Fɪʀsᴛ 😶")
+        await update.message.reply_text("ʀᴇᴘʟʏ ᴛᴏ sᴏᴍᴇᴏɴᴇ ғɪʀsᴛ")
         return None
 
     sender = update.effective_user
     target = update.message.reply_to_message.from_user
-    bot = update.get_bot()
+    bot = await update.get_bot().get_me()
 
-    # user tries command on themselves
     if sender.id == target.id:
-        await update.message.reply_text(f"Yᴏᴜ Cᴀɴ'ᴛ {action} Yᴏᴜʀsᴇʟғ 😑")
+        await update.message.reply_text(f"ʏᴏᴜ ᴄᴀɴ'ᴛ {action_text} ʏᴏᴜʀsᴇʟғ")
         return None
 
-    # user tries command on bot
     if target.id == bot.id:
         await update.message.reply_text(WARNING_TEXT)
         return None
@@ -789,106 +785,79 @@ async def check_target(update: Update, action):
 # ===============================
 
 async def kiss(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    data = await check_target(update, "Kɪss")
-    if not data:
-        return
+    data = await check_target(update, "ᴋɪss")
+    if not data: return
     sender, target = data
-
     gif = random.choice(KISS_GIFS)
-
     await update.message.reply_animation(
         gif,
-        caption=f"{sender.mention_html()} 💋 Kɪssᴇᴅ {target.mention_html()}",
+        caption=f"{sender.mention_html()} ᴋɪssᴇᴅ {target.mention_html()}",
         parse_mode="HTML"
     )
-
 
 async def hug(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    data = await check_target(update, "Hᴜɢ")
-    if not data:
-        return
+    data = await check_target(update, "ʜᴜɢ")
+    if not data: return
     sender, target = data
-
     gif = random.choice(HUG_GIFS)
-
     await update.message.reply_animation(
         gif,
-        caption=f"{sender.mention_html()} 🤗 Hᴜɢɢᴇᴅ {target.mention_html()}",
+        caption=f"{sender.mention_html()} ʜᴜɢɢᴇᴅ {target.mention_html()}",
         parse_mode="HTML"
     )
-
 
 async def bite(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    data = await check_target(update, "Bɪᴛᴇ")
-    if not data:
-        return
+    data = await check_target(update, "ʙɪᴛᴇ")
+    if not data: return
     sender, target = data
-
     gif = random.choice(BITE_GIFS)
-
     await update.message.reply_animation(
         gif,
-        caption=f"{sender.mention_html()} 😈 Bɪᴛ {target.mention_html()}",
+        caption=f"{sender.mention_html()} ʙɪᴛ {target.mention_html()}",
         parse_mode="HTML"
     )
-
 
 async def slap(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    data = await check_target(update, "Sʟᴀᴘ")
-    if not data:
-        return
+    data = await check_target(update, "sʟᴀᴘ")
+    if not data: return
     sender, target = data
-
     gif = random.choice(SLAP_GIFS)
-
     await update.message.reply_animation(
         gif,
-        caption=f"{sender.mention_html()} 👋 Sʟᴀᴘᴘᴇᴅ {target.mention_html()}",
+        caption=f"{sender.mention_html()} sʟᴀᴘᴘᴇᴅ {target.mention_html()}",
         parse_mode="HTML"
     )
-
 
 async def kick(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    data = await check_target(update, "Kɪᴄᴋ")
-    if not data:
-        return
+    data = await check_target(update, "ᴋɪᴄᴋ")
+    if not data: return
     sender, target = data
-
     gif = random.choice(KICK_GIFS)
-
     await update.message.reply_animation(
         gif,
-        caption=f"{sender.mention_html()} 🦶 Kɪᴄᴋᴇᴅ {target.mention_html()}",
+        caption=f"{sender.mention_html()} ᴋɪᴄᴋᴇᴅ {target.mention_html()}",
         parse_mode="HTML"
     )
-
 
 async def punch(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    data = await check_target(update, "Pᴜɴᴄʜ")
-    if not data:
-        return
+    data = await check_target(update, "ᴘᴜɴᴄʜ")
+    if not data: return
     sender, target = data
-
     gif = random.choice(PUNCH_GIFS)
-
     await update.message.reply_animation(
         gif,
-        caption=f"{sender.mention_html()} 👊 Pᴜɴᴄʜᴇᴅ {target.mention_html()}",
+        caption=f"{sender.mention_html()} ᴘᴜɴᴄʜᴇᴅ {target.mention_html()}",
         parse_mode="HTML"
     )
 
-
 async def murder(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    data = await check_target(update, "Mᴜʀᴅᴇʀ")
-    if not data:
-        return
+    data = await check_target(update, "ᴍᴜʀᴅᴇʀ")
+    if not data: return
     sender, target = data
-
     gif = random.choice(MURDER_GIFS)
-
     await update.message.reply_animation(
         gif,
-        caption=f"{sender.mention_html()} 🔪 Mᴜʀᴅᴇʀᴇᴅ {target.mention_html()}",
+        caption=f"{sender.mention_html()} ᴍᴜʀᴅᴇʀᴇᴅ {target.mention_html()}",
         parse_mode="HTML"
     )
 
