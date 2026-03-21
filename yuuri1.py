@@ -64,6 +64,10 @@ admins_db = db["admins"]
 torture_db = db["torture_registry"]
 allowed_collection = db["allowed_users"] 
 
+async_client = AsyncIOMotorClient(MONGO_URI)
+async_db = async_client["yuuri_db"]
+groups_collection = async_db["saved_groups"]
+
 # ================= LOG =================
 logging.basicConfig(level=logging.INFO)
 
