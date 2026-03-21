@@ -2621,16 +2621,84 @@ async def allow_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         allowed_collection.update_one({"user_id": target_id}, {"$set": {"allowed": True}}, upsert=True)
         await update.message.reply_text(f"✅ Usᴇʀ `{target_id}` ɪs ɴᴏᴡ ᴀʟʟᴏᴡᴇᴅ ᴛᴏ ʙʏᴘᴀss sᴇᴄᴜʀɪᴛʏ.")
 
-#=========AniWorld========
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ContextTypes
-
-# Global dictionary to store your groups temporarily
-# Note: If you restart the bot, these will clear unless you connect a database!
+# ================= SAVED GROUPS DB SETUP =================
+# Use your existing 'db' (AsyncIOMotorClient)
+groups_collection = db["saved_groups"]
 SAVED_GROUPS = {}
 
-# --- SAVE GC COMMAND ---
+async def load_groups_from_db():
+    global SAVED_GROUPS
+    cursor = groups_collection.find({})
+    async for doc in cursor:
+        # Convert 'pos' to int to ensure layout works
+        SAVED_GROUPS[int(doc["pos"])] = {"name": doc["name"], "url": doc["url"]}
+
+# --- SAVE COMMAND ---
 async def save_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    if user.id != OWNER_ID: return
+
+    args = context.args
+    if len(args) < 3:
+        await update.message.reply_text("<code>⚠️ ᴜsᴀɢᴇ: /sᴀᴠᴇ [ɴᴀᴍᴇ] [ᴜʀʟ] [ᴘᴏs]</code>", parse_mode='HTML')
+        return
+
+    try:
+        pos = int(args[-1])
+        url = args[-2]
+        name = " ".join(args[:-2])
+
+        # 1. Update MongoDB
+        await groups_collection.update_one(
+            {"pos": pos},
+            {"$set": {"name": name, "url": url}},
+            upsert=True
+        )
+
+        # 2. Sync Local Memory
+        SAVED_GROUPS[pos] = {"name": name, "url": url}
+        
+        await update.message.reply_text(f"✅ sᴀᴠᴇᴅ ᴛᴏ ᴘᴏsɪᴛɪᴏɴ {pos}")
+    except Exception as e:
+        await update.message.reply_text(f"❌ ᴇʀʀᴏʀ: {e}")
+
+# --- VIEW COMMAND ---
+async def savgc_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != OWNER_ID: return
+
+    keyboard = []
+    # Row 1 (Big)
+    if 1 in SAVED_GROUPS:
+        keyboard.append([InlineKeyboardButton(SAVED_GROUPS[1]["name"], url=SAVED_GROUPS[1]["url"])])
+    
+    # Row 2 (Small Small)
+    row2 = []
+    if 2 in SAVED_GROUPS: row2.append(InlineKeyboardButton(SAVED_GROUPS[2]["name"], url=SAVED_GROUPS[2]["url"]))
+    if 3 in SAVED_GROUPS: row2.append(InlineKeyboardButton(SAVED_GROUPS[3]["name"], url=SAVED_GROUPS[3]["url"]))
+    if row2: keyboard.append(row2)
+
+    # Row 3 (Small Small)
+    row3 = []
+    if 4 in SAVED_GROUPS: row3.append(InlineKeyboardButton(SAVED_GROUPS[4]["name"], url=SAVED_GROUPS[4]["url"]))
+    if 5 in SAVED_GROUPS: row3.append(InlineKeyboardButton(SAVED_GROUPS[5]["name"], url=SAVED_GROUPS[5]["url"]))
+    if row3: keyboard.append(row3)
+
+    # Row 4 (Big)
+    if 6 in SAVED_GROUPS:
+        keyboard.append([InlineKeyboardButton(SAVED_GROUPS[6]["name"], url=SAVED_GROUPS[6]["url"])])
+
+    if not keyboard:
+        await update.message.reply_text("⚠️ ɴᴏ ɢʀᴏᴜᴘs sᴀᴠᴇᴅ.")
+        return
+
+    await update.message.reply_text(
+        "❖ <b>Yᴏᴜʀ Sᴀᴠᴇᴅ Gʀᴏᴜᴘꜱ</b> ❖",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode='HTML'
+    )
+
+# --- DELETE COMMAND ---
+async def del_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     message = update.effective_message
 
@@ -2638,93 +2706,37 @@ async def save_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user.id != OWNER_ID:
         return
 
-    args = context.args
-    if len(args) < 3:
-        await message.reply_text("<code>⚠️ ᴜsᴀɢᴇ: /sᴀᴠᴇ [ɴᴀᴍᴇ ᴏғ ɢʀᴏᴜᴘ] [ᴜʀʟ] [ᴘᴏsɪᴛɪᴏɴ 1-6]</code>", parse_mode='HTML')
+    # Check for position argument
+    if not context.args:
+        await message.reply_text("<code>⚠️ ᴜsᴀɢᴇ: /ᴅᴇʟ [ᴘᴏsɪᴛɪᴏɴ 1-6]</code>", parse_mode='HTML')
         return
 
-    # Extract position (last argument)
     try:
-        pos = int(args[-1])
-        if pos < 1 or pos > 6:
-            await message.reply_text("❌ ᴘᴏsɪᴛɪᴏɴ ᴍᴜsᴛ ʙᴇ ʙᴇᴛᴡᴇᴇɴ 1 ᴀɴᴅ 6")
-            return
-    except ValueError:
-        await message.reply_text("❌ ᴘᴏsɪᴛɪᴏɴ ᴍᴜsᴛ ʙᴇ ᴀ ɴᴜᴍʙᴇʀ (1-6)")
-        return
-
-    # Extract URL (second to last argument)
-    url = args[-2]
-    if not url.startswith("http"):
-        await message.reply_text("❌ ᴘʟᴇᴀsᴇ ᴘʀᴏᴠɪᴅᴇ ᴀ ᴠᴀʟɪᴅ ʟɪɴᴋ sᴛᴀʀᴛɪɴɢ ᴡɪᴛʜ ʜᴛᴛᴘ/ʜᴛᴛᴘs")
-        return
-
-    # Extract Name (everything before the URL)
-    name = " ".join(args[:-2])
-
-    # Save to memory
-    SAVED_GROUPS[pos] = {"name": name, "url": url}
-    
-    # CLEAN CALLBACK
-    response = (
-        f"ᴜsᴇʀ: <b>{user.first_name}</b>\n"
-        "sᴛᴀᴛᴜs: ɢʀᴏᴜᴘ sᴀᴠᴇᴅ\n"
-        f"ᴘᴏsɪᴛɪᴏɴ: {pos}\n"
-        f"ɴᴀᴍᴇ: {name}"
-    )
-    await message.reply_text(response, parse_mode='HTML')
-
-# --- VIEW SAVED GCS COMMAND ---
-async def savgc_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    message = update.effective_message
-
-    # Owner only check
-    if user.id != OWNER_IDS:
-        return
-
-    keyboard = []
-    
-    # Position 1: Big (Row 1)
-    if 1 in SAVED_GROUPS:
-        keyboard.append([InlineKeyboardButton(SAVED_GROUPS[1]["name"], url=SAVED_GROUPS[1]["url"])])
+        pos = int(context.args[0])
         
-    # Position 2 & 3: Small Small (Row 2)
-    row2 = []
-    if 2 in SAVED_GROUPS:
-        row2.append(InlineKeyboardButton(SAVED_GROUPS[2]["name"], url=SAVED_GROUPS[2]["url"]))
-    if 3 in SAVED_GROUPS:
-        row2.append(InlineKeyboardButton(SAVED_GROUPS[3]["name"], url=SAVED_GROUPS[3]["url"]))
-    if row2:
-        keyboard.append(row2)
+        # 1. Remove from MongoDB
+        result = await groups_collection.delete_one({"pos": pos})
+        
+        # 2. Remove from Local Memory
+        if pos in SAVED_GROUPS:
+            name_deleted = SAVED_GROUPS[pos]["name"]
+            del SAVED_GROUPS[pos]
+            
+            # CLEAN CALLBACK
+            response = (
+                f"ᴜsᴇʀ: <b>{user.first_name}</b>\n"
+                "sᴛᴀᴛᴜs: ɢʀᴏᴜᴘ ʀᴇᴍᴏᴠᴇᴅ\n"
+                f"ᴘᴏsɪᴛɪᴏɴ: {pos}\n"
+                f"ɴᴀᴍᴇ: {name_deleted}"
+            )
+            await message.reply_text(response, parse_mode='HTML')
+        else:
+            await message.reply_text(f"🧐 ɴᴏᴛʜɪɴɢ ɪs sᴀᴠᴇᴅ ᴀᴛ ᴘᴏsɪᴛɪᴏɴ {pos}")
 
-    # Position 4 & 5: Small Small (Row 3)
-    row3 = []
-    if 4 in SAVED_GROUPS:
-        row3.append(InlineKeyboardButton(SAVED_GROUPS[4]["name"], url=SAVED_GROUPS[4]["url"]))
-    if 5 in SAVED_GROUPS:
-        row3.append(InlineKeyboardButton(SAVED_GROUPS[5]["name"], url=SAVED_GROUPS[5]["url"]))
-    if row3:
-        keyboard.append(row3)
-
-    # Position 6: Big (Row 4)
-    if 6 in SAVED_GROUPS:
-        keyboard.append([InlineKeyboardButton(SAVED_GROUPS[6]["name"], url=SAVED_GROUPS[6]["url"])])
-
-    if not keyboard:
-        await message.reply_text("⚠️ ʏᴏᴜ ʜᴀᴠᴇɴ'ᴛ sᴀᴠᴇᴅ ᴀɴʏ ɢʀᴏᴜᴘs ʏᴇᴛ!")
-        return
-
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    # AESTHETIC OUTPUT
-    await message.reply_text(
-        "❖ <b>Yᴏᴜʀ Sᴀᴠᴇᴅ Gʀᴏᴜᴘꜱ</b> ❖\n\n"
-        "➻ ʜᴇʀᴇ ᴀʀᴇ ʏᴏᴜʀ sᴀᴠᴇᴅ ᴄʜᴀᴛ ʟɪɴᴋs.\n"
-        "➻ ᴄʟɪᴄᴋ ᴛᴏ ᴊᴏɪɴ:",
-        reply_markup=reply_markup,
-        parse_mode='HTML'
-    )
+    except ValueError:
+        await message.reply_text("❌ ᴘʟᴇᴀsᴇ ᴘʀᴏᴠɪᴅᴇ ᴀ ᴠᴀʟɪᴅ ᴘᴏsɪᴛɪᴏɴ ɴᴜᴍʙᴇʀ")
+    except Exception as e:
+        await message.reply_text(f"❌ ᴅʙ ᴇʀʀᴏʀ: {str(e).lower()}")
 
 #=============Big_Upgrades==========
 #--
@@ -3799,7 +3811,7 @@ application.add_handler(CommandHandler("leave", leave_group))
 application.add_handler(CommandHandler("personal", send_personal))
 application.add_handler(CommandHandler("q", quote))
 application.add_handler(CommandHandler("obt", save_sticker))
-application.add_handler(CommandHandler("groups", aniworld_command))
+application.add_handler(CommandHandler("groups", savgc_command))
 application.add_handler(CommandHandler("broad_gc", broad_gc))
 application.add_handler(CommandHandler("broad_c", broad_c))
 application.add_handler(CommandHandler("stop_b", cancel_broadcast))
@@ -3821,7 +3833,7 @@ application.add_handler(CommandHandler("demote", demote_user))
 application.add_handler(CommandHandler("warn", warn))
 application.add_handler(CommandHandler("unwarn", unwarn))
 application.add_handler(CommandHandler("save", save_group))
-application.add_handler(CommandHandler("savlist", savgc_command))
+application.add_handler(CommandHandler("del", del_group))
 
 # Message Handlers
 application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
