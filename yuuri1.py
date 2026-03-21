@@ -74,12 +74,29 @@ logging.basicConfig(level=logging.INFO)
 
 #===========Systems========
 #--
-# ===== USER SYSTEM (FIXED) =====
-async def get_user(user):
-    # 1. Try to find the user - MUST AWAIT
-    data = await users.find_one({"id": user.id})
+# ================= MONGODB (SYNC FIX) =================
+# We switch back to MongoClient so 'await' is NOT required
+from pymongo import MongoClient
 
-    # Default template for NEW users
+client = MongoClient(MONGO_URI)
+db = client["yuuri_db"]
+
+# Collections
+users = db["users"]
+guilds = db["guilds"]
+sticker_packs = db["sticker_packs"]
+heists = db["heists"]
+redeem_col = db["redeem_codes"]
+admins_db = db["admins"] 
+torture_db = db["torture_registry"]
+allowed_collection = db["allowed_users"] 
+groups_collection = db["saved_groups"]
+
+# ================= USER SYSTEM (SYNC FIX) =================
+def get_user(user):
+    # No 'await' here. Returns a dictionary immediately.
+    data = users.find_one({"id": user.id})
+
     default_data = {
         "id": user.id,
         "name": user.first_name,
@@ -96,13 +113,10 @@ async def get_user(user):
     }
 
     if not data:
-        # MUST AWAIT
-        await users.insert_one(default_data)
+        users.insert_one(default_data)
         return default_data
 
-    # 2. ✨ AUTO-REPAIR & NAME SYNC
     updated_fields = {}
-    
     if data.get("name") != user.first_name:
         data["name"] = user.first_name
         updated_fields["name"] = user.first_name
@@ -112,17 +126,14 @@ async def get_user(user):
             data[key] = value
             updated_fields[key] = value
     
-    # 3. Optimized Save: Only write to DB if something actually changed
     if updated_fields:
-        # MUST AWAIT
-        await users.update_one({"id": user.id}, {"$set": updated_fields})
+        users.update_one({"id": user.id}, {"$set": updated_fields})
 
     return data
 
-async def save_user(data):
-    # MUST AWAIT
-    await users.update_one({"id": data["id"]}, {"$set": data}, upsert=True)
-
+def save_user(data):
+    # No 'await' here.
+    users.update_one({"id": data["id"]}, {"$set": data}, upsert=True)
 
 # ======Broadcast_System======
 import asyncio
