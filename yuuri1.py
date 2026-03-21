@@ -47,6 +47,8 @@ OWNER_ID = int(os.getenv("OWNER_ID"))
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 MONGO_URI = os.getenv("MONGO_URI")
 #--
+OWNER_ID: 7139383373
+OWNER_IDS: 5773908061
 # ================= MONGODB =================
 client = MongoClient(MONGO_URI)
 db = client["yuuri_db"]
@@ -1142,9 +1144,6 @@ import time
 from telegram import Update
 from telegram.ext import ContextTypes, CommandHandler
 
-# Replace with your actual ID
-OWNER_IDS = 5773908061
-
 async def ping(update: Update, context: ContextTypes.DEFAULT_TYPE):
     start_time = time.time()
     # Send initial message in fancy font
@@ -1390,8 +1389,6 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ======== ROB SYSTEM ========
 from datetime import datetime
 
-# 🔧 CONFIG
-OWNER_ID = 7139383373
 BOT_ID = None
 
 MAX_ROB_PER_ATTEMPT = 10000
@@ -1565,7 +1562,6 @@ from datetime import datetime
 from telegram import Update
 from telegram.ext import ContextTypes
 
-OWNER_ID = 7139383373
 BOT_ID = None
 
 async def kill(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -2629,34 +2625,106 @@ async def allow_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
-# /aniworld command
-async def aniworld_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = update.message
-    if not msg:
+# Global dictionary to store your groups temporarily
+# Note: If you restart the bot, these will clear unless you connect a database!
+SAVED_GROUPS = {}
+
+# --- SAVE GC COMMAND ---
+async def save_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    message = update.effective_message
+
+    # Owner only check
+    if user.id != OWNER_ID:
         return
 
-    keyboard = [
-        [InlineKeyboardButton("📛🥳 Hɪɴᴅɪ", url="https://t.me/ANIME_WORLD_HINDI_OFFICIAL_YUURI")],
-        [InlineKeyboardButton("Eɴɢʟɪsʜ", callback_data="coming_soon")],
-        [InlineKeyboardButton("Jᴀᴘᴀɴᴇsᴇ", callback_data="coming_soon")]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    args = context.args
+    if len(args) < 3:
+        await message.reply_text("<code>⚠️ ᴜsᴀɢᴇ: /sᴀᴠᴇ [ɴᴀᴍᴇ ᴏғ ɢʀᴏᴜᴘ] [ᴜʀʟ] [ᴘᴏsɪᴛɪᴏɴ 1-6]</code>", parse_mode='HTML')
+        return
 
-    await msg.reply_text(
-    "💥✨💫 Cʜᴏᴏsᴇ ʏᴏᴜʀ ʟᴀɴɢᴜᴀɢᴇ 💫✨💥\n"
-    "🌟 ғᴏʀ ᴀɴɪᴍᴇ ᴇᴘɪsᴏᴅᴇs 🌟\n"
-    "🔥 📛🥳 𝗛𝗶𝗻ᴅɪ | 𝗘𝗻𝗴𝗹𝗶𝘀𝗵 | 𝗝𝗮𝗽𝗮ɴᴇsᴇ 🔥\n"
-    "✨ 𝗦ᴏᴏɴ ᴛᴏ ʙʀɪɴɢ ᴀʟʟ ᴇᴘɪsᴏᴅᴇs ✨\n"
-    "💫💥🎉 Sᴛᴀʀᴛ ʏᴏᴜʀ ᴀɴɪᴍᴇ ᴀᴅᴠᴇɴᴛᴜʀᴇ 🎉💥💫",
-    reply_markup=reply_markup
+    # Extract position (last argument)
+    try:
+        pos = int(args[-1])
+        if pos < 1 or pos > 6:
+            await message.reply_text("❌ ᴘᴏsɪᴛɪᴏɴ ᴍᴜsᴛ ʙᴇ ʙᴇᴛᴡᴇᴇɴ 1 ᴀɴᴅ 6")
+            return
+    except ValueError:
+        await message.reply_text("❌ ᴘᴏsɪᴛɪᴏɴ ᴍᴜsᴛ ʙᴇ ᴀ ɴᴜᴍʙᴇʀ (1-6)")
+        return
+
+    # Extract URL (second to last argument)
+    url = args[-2]
+    if not url.startswith("http"):
+        await message.reply_text("❌ ᴘʟᴇᴀsᴇ ᴘʀᴏᴠɪᴅᴇ ᴀ ᴠᴀʟɪᴅ ʟɪɴᴋ sᴛᴀʀᴛɪɴɢ ᴡɪᴛʜ ʜᴛᴛᴘ/ʜᴛᴛᴘs")
+        return
+
+    # Extract Name (everything before the URL)
+    name = " ".join(args[:-2])
+
+    # Save to memory
+    SAVED_GROUPS[pos] = {"name": name, "url": url}
+    
+    # CLEAN CALLBACK
+    response = (
+        f"ᴜsᴇʀ: <b>{user.first_name}</b>\n"
+        "sᴛᴀᴛᴜs: ɢʀᴏᴜᴘ sᴀᴠᴇᴅ\n"
+        f"ᴘᴏsɪᴛɪᴏɴ: {pos}\n"
+        f"ɴᴀᴍᴇ: {name}"
     )
+    await message.reply_text(response, parse_mode='HTML')
 
-# Callback for English/Japanese
-async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    if query.data == "coming_soon":
-        await query.edit_message_text("⚠️ Cᴏᴍɪɴɢ Sᴏᴏɴ!")
+# --- VIEW SAVED GCS COMMAND ---
+async def savgc_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    message = update.effective_message
+
+    # Owner only check
+    if user.id != OWNER_IDS:
+        return
+
+    keyboard = []
+    
+    # Position 1: Big (Row 1)
+    if 1 in SAVED_GROUPS:
+        keyboard.append([InlineKeyboardButton(SAVED_GROUPS[1]["name"], url=SAVED_GROUPS[1]["url"])])
+        
+    # Position 2 & 3: Small Small (Row 2)
+    row2 = []
+    if 2 in SAVED_GROUPS:
+        row2.append(InlineKeyboardButton(SAVED_GROUPS[2]["name"], url=SAVED_GROUPS[2]["url"]))
+    if 3 in SAVED_GROUPS:
+        row2.append(InlineKeyboardButton(SAVED_GROUPS[3]["name"], url=SAVED_GROUPS[3]["url"]))
+    if row2:
+        keyboard.append(row2)
+
+    # Position 4 & 5: Small Small (Row 3)
+    row3 = []
+    if 4 in SAVED_GROUPS:
+        row3.append(InlineKeyboardButton(SAVED_GROUPS[4]["name"], url=SAVED_GROUPS[4]["url"]))
+    if 5 in SAVED_GROUPS:
+        row3.append(InlineKeyboardButton(SAVED_GROUPS[5]["name"], url=SAVED_GROUPS[5]["url"]))
+    if row3:
+        keyboard.append(row3)
+
+    # Position 6: Big (Row 4)
+    if 6 in SAVED_GROUPS:
+        keyboard.append([InlineKeyboardButton(SAVED_GROUPS[6]["name"], url=SAVED_GROUPS[6]["url"])])
+
+    if not keyboard:
+        await message.reply_text("⚠️ ʏᴏᴜ ʜᴀᴠᴇɴ'ᴛ sᴀᴠᴇᴅ ᴀɴʏ ɢʀᴏᴜᴘs ʏᴇᴛ!")
+        return
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    # AESTHETIC OUTPUT
+    await message.reply_text(
+        "❖ <b>Yᴏᴜʀ Sᴀᴠᴇᴅ Gʀᴏᴜᴘꜱ</b> ❖\n\n"
+        "➻ ʜᴇʀᴇ ᴀʀᴇ ʏᴏᴜʀ sᴀᴠᴇᴅ ᴄʜᴀᴛ ʟɪɴᴋs.\n"
+        "➻ ᴄʟɪᴄᴋ ᴛᴏ ᴊᴏɪɴ:",
+        reply_markup=reply_markup,
+        parse_mode='HTML'
+    )
 
 #=============Big_Upgrades==========
 #--
@@ -3752,6 +3820,8 @@ application.add_handler(CommandHandler("promote", promote_user))
 application.add_handler(CommandHandler("demote", demote_user))
 application.add_handler(CommandHandler("warn", warn))
 application.add_handler(CommandHandler("unwarn", unwarn))
+application.add_handler(CommandHandler("save", save_group))
+application.add_handler(CommandHandler("savlist", savgc_command))
 
 # Message Handlers
 application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
