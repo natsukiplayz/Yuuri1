@@ -52,23 +52,22 @@ OWNER_ID = 7139383373
 OWNER_IDS = 5773908061
 
 # ================= MONGODB =================
-client = MongoClient(MONGO_URI)
-db = client["yuuri_db"]
+# Use AsyncIOMotorClient for everything so 'await' works
+async_client = AsyncIOMotorClient(MONGO_URI)
+db = async_client["yuuri_db"]
 
+# All these now support 'await'
 users = db["users"]
 guilds = db["guilds"]
 sticker_packs = db["sticker_packs"]
 heists = db["heists"]
 redeem_col = db["redeem_codes"]
 
-#============ Management Db Collection ==========
+# Management Db Collection
 admins_db = db["admins"] 
 torture_db = db["torture_registry"]
 allowed_collection = db["allowed_users"] 
-
-async_client = AsyncIOMotorClient(MONGO_URI)
-async_db = async_client["yuuri_db"]
-groups_collection = async_db["saved_groups"]
+groups_collection = db["saved_groups"]
 
 # ================= LOG =================
 logging.basicConfig(level=logging.INFO)
