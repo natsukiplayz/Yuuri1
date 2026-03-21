@@ -713,21 +713,21 @@ from telegram.ext import ContextTypes, CommandHandler
 # ===============================
 
 KISS_GIFS = [
-    "CgACAgQAAxkBAAFEqThps851iVq2fmWNXo3sq1HTx8qP4QACggMAAp897VKT2Ktemaxp2joE",
     "CgACAgQAAxkBAAFEqUpps88XuvzJ7gKt9RgT8r3_MgpGhwACgAcAAvwpjFMTm9An_6_McToE",
+    "CgACAgQAAxkBAAFEqThps851iVq2fmWNXo3sq1HTx8qP4QACggMAAp897VKT2Ktemaxp2joE",
     "CgACAgQAAxkBAAFEqUxps89ecJSnnN0UOSk13Y6xp7ZI3QACvgQAAp-RzVId4q-39NiNDjoE"
 ]
 
 HUG_GIFS = [
-    "CgACAgQAAxkBAAFEqVRps9AQLzL3MSq0ciO-AAEzsh47bOEAAq4FAAIL_z1TzpL3e-CUa0I6BA",
     "CgACAgQAAxkBAAFEqVVps9AQMt85jqkHjtSeCzgLLfaFngAC7QUAAkWIzFF_W-zVNIr6QjoE",
-    "CgACAgQAAxkBAAFEqVZps9AQUhBv94fq6VuPvtMeifMetQACpwgAAsq9fFK5IuJw0Q6KazoE"
+    "CgACAgQAAxkBAAFEqVZps9AQUhBv94fq6VuPvtMeifMetQACpwgAAsq9fFK5IuJw0Q6KazoE",
+    "CgACAgQAAxkBAAFEqVRps9AQLzL3MSq0ciO-AAEzsh47bOEAAq4FAAIL_z1TzpL3e-CUa0I6BA"
 ]
 
 BITE_GIFS = [
-    "CgACAgQAAxkBAAFEqXdps9F3CUDP_uXjN4HWcMBiacvatQACBQMAAsV7BVM4j4JdPptQDzoE",
     "CgACAgQAAxkBAAFEqXhps9F32LDcpcXH9NOS-ktnVDG-HgACOwMAAqV6RFELerv_D_rO8joE",
-    "CgACAgQAAxkBAAFEqXlps9F3rRMKmv4PISyGVOxXs4v4EAACJQMAAudMBVPQtxclFSEtgDoE"
+    "CgACAgQAAxkBAAFEqXlps9F3rRMKmv4PISyGVOxXs4v4EAACJQMAAudMBVPQtxclFSEtgDoE",
+    "CgACAgQAAxkBAAFEqXdps9F3CUDP_uXjN4HWcMBiacvatQACBQMAAsV7BVM4j4JdPptQDzoE"
 ]
 
 SLAP_GIFS = [
@@ -754,7 +754,7 @@ MURDER_GIFS = [
     "CgACAgQAAxkBAAFEq51ps-nhCb0TEIbTPAIBrY2fjxF4cgACQQMAAhQTJVOQ4cLMXsbquToE"
 ]
 
-WARNING_TEXT = "ᴄʜᴜᴘ!! ᴡᴀʀɴᴀ ʏᴜᴜᴋɪ ᴋᴏ ʙᴀᴛᴀ ᴅᴜɴɢɪ"
+WARNING_TEXT = "Cʜᴜᴘᴘ!! Wᴀʀɴᴀ Yᴜᴜᴋɪ Kᴏ Bᴛᴀ Dᴜɴɢɪ 😒"
 
 
 # ===============================
@@ -792,7 +792,7 @@ async def kiss(update: Update, context: ContextTypes.DEFAULT_TYPE):
     gif = random.choice(KISS_GIFS)
     await update.message.reply_animation(
         gif,
-        caption=f"{sender.mention_html()} ᴋɪssᴇᴅ {target.mention_html()}",
+        caption=f"{sender.mention_html()} Kɪꜱꜱᴇᴅ {target.mention_html()}",
         parse_mode="HTML"
     )
 
@@ -803,7 +803,7 @@ async def hug(update: Update, context: ContextTypes.DEFAULT_TYPE):
     gif = random.choice(HUG_GIFS)
     await update.message.reply_animation(
         gif,
-        caption=f"{sender.mention_html()} ʜᴜɢɢᴇᴅ {target.mention_html()}",
+        caption=f"{sender.mention_html()} Hᴜɢɢᴇᴅ {target.mention_html()}",
         parse_mode="HTML"
     )
 
@@ -814,7 +814,7 @@ async def bite(update: Update, context: ContextTypes.DEFAULT_TYPE):
     gif = random.choice(BITE_GIFS)
     await update.message.reply_animation(
         gif,
-        caption=f"{sender.mention_html()} ʙɪᴛ {target.mention_html()}",
+        caption=f"{sender.mention_html()} Bɪᴛ {target.mention_html()}",
         parse_mode="HTML"
     )
 
@@ -825,7 +825,7 @@ async def slap(update: Update, context: ContextTypes.DEFAULT_TYPE):
     gif = random.choice(SLAP_GIFS)
     await update.message.reply_animation(
         gif,
-        caption=f"{sender.mention_html()} sʟᴀᴘᴘᴇᴅ {target.mention_html()}",
+        caption=f"{sender.mention_html()} Sʟᴀᴘᴘᴇᴅ {target.mention_html()}",
         parse_mode="HTML"
     )
 
@@ -836,7 +836,7 @@ async def kick(update: Update, context: ContextTypes.DEFAULT_TYPE):
     gif = random.choice(KICK_GIFS)
     await update.message.reply_animation(
         gif,
-        caption=f"{sender.mention_html()} ᴋɪᴄᴋᴇᴅ {target.mention_html()}",
+        caption=f"{sender.mention_html()} Kɪᴄᴋᴇᴅ {target.mention_html()}",
         parse_mode="HTML"
     )
 
@@ -847,7 +847,7 @@ async def punch(update: Update, context: Update):
     gif = random.choice(PUNCH_GIFS)
     await update.message.reply_animation(
         gif,
-        caption=f"{sender.mention_html()} ᴘᴜɴᴄʜᴇᴅ {target.mention_html()}",
+        caption=f"{sender.mention_html()} Pᴜɴᴄʜᴇᴅ {target.mention_html()}",
         parse_mode="HTML"
     )
 
@@ -858,7 +858,7 @@ async def murder(update: Update, context: ContextTypes.DEFAULT_TYPE):
     gif = random.choice(MURDER_GIFS)
     await update.message.reply_animation(
         gif,
-        caption=f"{sender.mention_html()} ᴍᴜʀᴅᴇʀᴇᴅ {target.mention_html()}",
+        caption=f"{sender.mention_html()} Mᴜʀᴅᴇʀᴇᴅ {target.mention_html()}",
         parse_mode="HTML"
     )
 
