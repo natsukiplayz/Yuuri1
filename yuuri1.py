@@ -2636,7 +2636,7 @@ async def load_groups_from_db():
 # --- SAVE COMMAND ---
 async def save_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    if user.id != OWNER_ID: return
+    if user.id != OWNER_IDS: return
 
     args = context.args
     if len(args) < 3:
@@ -2664,7 +2664,7 @@ async def save_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # --- VIEW COMMAND ---
 async def savgc_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != OWNER_ID: return
+    if update.effective_user.id != OWNER_IDS: return
 
     keyboard = []
     # Row 1 (Big)
@@ -2703,7 +2703,7 @@ async def del_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.effective_message
 
     # Owner only check
-    if user.id != OWNER_ID:
+    if user.id != OWNER_IDS:
         return
 
     # Check for position argument
