@@ -703,12 +703,13 @@ async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_html(text)
 
 # ===== Fun Interaction Commands =====
+
 import random
 from telegram import Update
-from telegram.ext import ContextTypes
+from telegram.ext import ContextTypes, CommandHandler
 
 # ===============================
-# GIF DATABASE (Unchanged)
+# GIF DATABASE
 # ===============================
 
 KISS_GIFS = [
@@ -760,20 +761,20 @@ WARNING_TEXT = "ᴄʜᴜᴘ!! ᴡᴀʀɴᴀ ʏᴜᴜᴋɪ ᴋᴏ ʙᴀᴛᴀ ᴅ
 # CHECK FUNCTION
 # ===============================
 
-async def check_target(update: Update, action_text):
+async def check_target(update: Update, context: ContextTypes.DEFAULT_TYPE, action):
     if not update.message.reply_to_message:
         await update.message.reply_text("ʀᴇᴘʟʏ ᴛᴏ sᴏᴍᴇᴏɴᴇ ғɪʀsᴛ")
         return None
 
     sender = update.effective_user
     target = update.message.reply_to_message.from_user
-    bot = await update.get_bot().get_me()
+    bot_id = context.bot.id
 
     if sender.id == target.id:
-        await update.message.reply_text(f"ʏᴏᴜ ᴄᴀɴ'ᴛ {action_text} ʏᴏᴜʀsᴇʟғ")
+        await update.message.reply_text(f"ʏᴏᴜ ᴄᴀɴ'ᴛ {action} ʏᴏᴜʀsᴇʟғ")
         return None
 
-    if target.id == bot.id:
+    if target.id == bot_id:
         await update.message.reply_text(WARNING_TEXT)
         return None
 
@@ -785,7 +786,7 @@ async def check_target(update: Update, action_text):
 # ===============================
 
 async def kiss(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    data = await check_target(update, "ᴋɪss")
+    data = await check_target(update, context, "ᴋɪss")
     if not data: return
     sender, target = data
     gif = random.choice(KISS_GIFS)
@@ -796,7 +797,7 @@ async def kiss(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def hug(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    data = await check_target(update, "ʜᴜɢ")
+    data = await check_target(update, context, "ʜᴜɢ")
     if not data: return
     sender, target = data
     gif = random.choice(HUG_GIFS)
@@ -807,7 +808,7 @@ async def hug(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def bite(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    data = await check_target(update, "ʙɪᴛᴇ")
+    data = await check_target(update, context, "ʙɪᴛᴇ")
     if not data: return
     sender, target = data
     gif = random.choice(BITE_GIFS)
@@ -818,7 +819,7 @@ async def bite(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def slap(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    data = await check_target(update, "sʟᴀᴘ")
+    data = await check_target(update, context, "sʟᴀᴘ")
     if not data: return
     sender, target = data
     gif = random.choice(SLAP_GIFS)
@@ -829,7 +830,7 @@ async def slap(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def kick(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    data = await check_target(update, "ᴋɪᴄᴋ")
+    data = await check_target(update, context, "ᴋɪᴄᴋ")
     if not data: return
     sender, target = data
     gif = random.choice(KICK_GIFS)
@@ -839,8 +840,8 @@ async def kick(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="HTML"
     )
 
-async def punch(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    data = await check_target(update, "ᴘᴜɴᴄʜ")
+async def punch(update: Update, context: Update):
+    data = await check_target(update, context, "ᴘᴜɴᴄʜ")
     if not data: return
     sender, target = data
     gif = random.choice(PUNCH_GIFS)
@@ -851,7 +852,7 @@ async def punch(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def murder(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    data = await check_target(update, "ᴍᴜʀᴅᴇʀ")
+    data = await check_target(update, context, "ᴍᴜʀᴅᴇʀ")
     if not data: return
     sender, target = data
     gif = random.choice(MURDER_GIFS)
