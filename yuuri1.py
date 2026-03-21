@@ -1030,75 +1030,6 @@ async def send_personal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await update.message.reply_text(f"❌ Fᴀɪʟᴇᴅ Tᴏ Dᴇʟɪᴠᴇʀ: {e}")
 
-# ================= OWNER & TORTURE COMMANDS =================
-async def rain_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """/rain <id> - Toggle Sticker Rain in MongoDB"""
-    if update.effective_user.id != OWNER_ID: 
-        return
-    
-    if not context.args: 
-        return await update.message.reply_text("❌ Uꜱᴀɢᴇ: `/ʀᴀɪɴ <ᴜꜱᴇʀɪᴅ>`")
-    
-    try:
-        t_id = int(context.args[0])
-        # This calls your database function to toggle the 'rain' status
-        status = "Sᴛᴀʀᴛᴇᴅ 🌧️" if toggle_torture(t_id, "rain") else "Sᴛᴏᴘᴘᴇᴅ 😇"
-        await update.message.reply_text(f"😈 Sᴛɪᴄᴋᴇʀ Rᴀɪɴ {status} ᴏɴ `{t_id}`")
-    except ValueError:
-        await update.message.reply_text("❌ Pʟᴇᴀꜱᴇ ᴘʀᴏᴠɪᴅᴇ a valid numerical User ID.")
-
-async def stop_all_torture_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """/stopall - Emergency reset for all users"""
-    if update.effective_user.id != OWNER_ID: 
-        return
-    clear_all_torture()
-    await update.message.reply_text("🏳️ Sᴛɪᴄᴋᴇʀ Rᴀɪɴ Hᴀꜱ Cᴇᴀꜱᴇᴅ Gʟᴏʙᴀʟʟʏ!")
-
-# --- TRIGGER HANDLER ---
-import asyncio
-import random
-import logging
-from telegram import Update
-from telegram.ext import ContextTypes
-from telegram.constants import ParseMode
-from telegram.error import BadRequest, RetryAfter
-
-async def handle_torture_triggers(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Triggers a burst of stickers whenever a 'tortured' user sends anything."""
-    if not update.effective_message or not update.effective_user:
-        return
-    
-    user_id = update.effective_user.id
-    message = update.effective_message
-
-    # Only run if 'rain' is active for this user in MongoDB
-    if is_tortured(user_id, "rain"):
-        if not MY_PACKS:
-            return
-
-        # Rain Intensity: Sends 3 random stickers
-        for _ in range(3):
-            try:
-                chosen_pack = random.choice(MY_PACKS)
-                sticker_set = await context.bot.get_sticker_set(name=chosen_pack)
-                
-                if sticker_set and sticker_set.stickers:
-                    sticker = random.choice(sticker_set.stickers)
-                    # Use reply_to_message_id to ensure stickers 'bury' the user's message
-                    await context.bot.send_sticker(
-                        chat_id=update.effective_chat.id,
-                        sticker=sticker.file_id,
-                        reply_to_message_id=message.message_id
-                    )
-                
-                await asyncio.sleep(0.3) # Short delay to prevent Telegram flood kicks
-                
-            except RetryAfter as e:
-                await asyncio.sleep(e.retry_after)
-                break
-            except Exception as e:
-                continue
-
 # ================= BOT STATS =================
 import psutil
 import os
@@ -3778,7 +3709,6 @@ application.add_handler(CommandHandler("allow", allow_command))
 application.add_handler(CommandHandler("stopall", stop_all_torture_cmd))
 application.add_handler(CommandHandler("create", create_redeem))
 application.add_handler(CommandHandler("redeem", redeem))
-application.add_handler(CommandHandler("rain", rain_cmd))
 application.add_handler(CommandHandler("start", start_command))
 application.add_handler(CommandHandler("status", profile))
 application.add_handler(CommandHandler("stats", stats))
@@ -3843,7 +3773,6 @@ application.add_handler(CommandHandler("del", del_group))
 # Message Handlers
 application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
 application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, security_guard), group=1)
-application.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, handle_torture_triggers), group=1)
 application.add_handler(MessageHandler(filters.Sticker.ALL, reply_with_random_sticker), group=2)
 application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, auto_reply), group=2)
 
