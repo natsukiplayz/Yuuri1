@@ -3387,7 +3387,10 @@ async def purge(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await message.reply_text(f"❌ API ᴇʀʀᴏʀ: {str(e).lower()}")
 
 #========temporary mute=======
-import datetime
+import time
+import re
+from telegram import ChatPermissions
+from telegram.error import BadRequest
 
 async def tmute(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -3395,30 +3398,58 @@ async def tmute(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.effective_message
 
     if user.id != OWNER_ID:
-        if not await is_admin(update, context, user.id): return
+        if not await is_admin(update, context, user.id): 
+            return
 
     target_id, name = await resolve_user_all(update, context)
-    if not target_id: return
+    if not target_id: 
+        return
 
-    # Check for duration (e.g., /tmute 30m)
+    # Check if a time argument was provided
     if not context.args:
         await message.reply_text("<code>⚠️ ᴜsᴀɢᴇ: /ᴛᴍᴜᴛᴇ [ᴛɪᴍᴇ] (ᴇ.ɢ. 30ᴍ, 1ʜ, 1ᴅ)</code>", parse_mode='HTML')
         return
 
-    # Simple time parser (minutes only for this example)
+    # Grab the last argument so it works with or without a @username
+    time_str = context.args[-1].lower()
+
+    # Match the number and the letter (m, h, or d)
+    match = re.match(r"(\d+)(m|h|d)", time_str)
+    if not match:
+        await message.reply_text("❌ ɪɴᴠᴀʟɪᴅ ᴛɪᴍᴇ ғᴏʀᴍᴀᴛ (ᴜsᴇ ᴍ, ʜ, ᴏʀ ᴅ)")
+        return
+
+    amount = int(match.group(1))
+    unit = match.group(2)
+
+    # Convert to seconds
+    if unit == "m":
+        seconds = amount * 60
+    elif unit == "h":
+        seconds = amount * 3600
+    elif unit == "d":
+        seconds = amount * 86400
+
+    # Telegram requires a Unix timestamp for restrictions
+    until_date = int(time.time()) + seconds
+
     try:
-        time_val = int(context.args[0][:-1])
-        until = datetime.datetime.now() + datetime.timedelta(minutes=time_val)
-        
         await chat.restrict_member(
             target_id, 
             permissions=ChatPermissions(can_send_messages=False),
-            until_date=until
+            until_date=until_date
         )
         
-        await message.reply_text(f"ᴜsᴇʀ: <b>{name}</b>\nsᴛᴀᴛᴜs: ᴛ-ᴍᴜᴛᴇᴅ\nᴛɪᴍᴇ: {time_val}ᴍ", parse_mode='HTML')
-    except Exception:
-        await message.reply_text("❌ ɪɴᴠᴀʟɪᴅ ᴛɪᴍᴇ ғᴏʀᴍᴀᴛ")
+        # CLEAN CALLBACK
+        response = (
+            f"ᴜsᴇʀ: <b>{name}</b>\n"
+            "sᴛᴀᴛᴜs: ᴛᴇᴍᴘ-ᴍᴜᴛᴇᴅ\n"
+            f"ᴅᴜʀᴀᴛɪᴏɴ: {amount}{unit.upper()}"
+        )
+        await message.reply_text(response, parse_mode='HTML')
+
+    except BadRequest as e:
+        await message.reply_text(f"❌ API ᴇʀʀᴏʀ: {str(e).lower()}")
 
 # ================= AUTO UPDATE CHAT =================
 async def save_chat_and_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
