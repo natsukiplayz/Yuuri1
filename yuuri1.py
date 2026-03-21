@@ -2943,179 +2943,236 @@ def get_full_permissions():
 async def ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat = update.effective_chat
+    message = update.effective_message
     
     if user.id not in OWNER_IDS:
         if not await is_admin(update, context, user.id):
-            await update.message.reply_text("🧐 Oᴘᴘs! Yᴏᴜ Nᴇᴇᴅ Tᴏ Bᴇ Aᴅᴍɪɴ Tᴏ Bᴀɴ Oᴛʜᴇʀs... 🧩")
+            await message.reply_text("🧐 ᴏᴘᴘs ʏᴏᴜ ɴᴇᴇᴅ ᴛᴏ ʙᴇ ᴀᴅᴍɪɴ ᴛᴏ ʙᴀɴ ᴏᴛʜᴇʀs")
             return
 
     target_id, name = await resolve_user_all(update, context)
-    if not target_id: return
+    if not target_id: 
+        return
 
-    # 1. Bot Owner Check
     if target_id in OWNER_IDS:
-        await update.message.reply_text("👑 Eʜᴇʜᴇ... Nɪᴄᴇ Tʀʏ, Bᴜᴛ I Wᴏɴ'ᴛ Bᴀɴ Mʏ Oᴡɴᴇʀ. 🫠")
+        await message.reply_text("👑 ɪ ᴡᴏɴ'ᴛ ʙᴀɴ ᴍʏ ᴏᴡɴᴇʀ")
         return
 
     try:
         target_member = await chat.get_member(target_id)
         
-        # 2. Group Creator Check
         if target_member.status == 'creator':
-            await update.message.reply_text("👑 Tʜᴀᴛ's Tʜᴇ Gʀᴏᴜᴘ Cʀᴇᴀᴛᴏʀ! I ᴄᴀɴ'ᴛ ᴛᴏᴜᴄʜ ᴛʜᴇ Kɪɴɢ/Qᴜᴇᴇɴ. 🙇‍♂️")
+            await message.reply_text("👑 ᴛʜᴀᴛ's ᴛʜᴇ ɢʀᴏᴜᴘ ᴄʀᴇᴀᴛᴏʀ ɪ ᴄᴀɴ'ᴛ ᴛᴏᴜᴄʜ ᴛʜᴇᴍ")
             return
             
         if target_member.status == 'administrator':
-            await update.message.reply_text("⚠️ I Cᴀɴ'ᴛ Bᴀɴ Aᴅᴍɪɴs! Dᴇᴍᴏᴛᴇ Tʜᴇᴍ Fɪʀsᴛ. 🙀")
+            await message.reply_text("⚠️ ɪ ᴄᴀɴ'ᴛ ʙᴀɴ ᴀᴅᴍɪɴs ᴅᴇᴍᴏᴛᴇ ᴛʜᴇᴍ ғɪʀsᴛ")
             return
             
         await chat.ban_member(target_id)
-        await update.message.reply_text(f"<b>🚫 {name} ʜᴀs ʙᴇᴇɴ ʙᴀɴɴᴇᴅ.</b>", parse_mode='HTML')
+
+        # NEW CALLBACK FORMAT
+        response = (
+            "🎖️ sʏsᴛᴇᴍ ᴜᴘᴅᴀᴛᴇ\n"
+            f"ᴜsᴇʀ: <b>{name}</b>\n"
+            "sᴛᴀᴛᴜs: ʙᴀɴɴᴇᴅ\n"
+            "Access: ɴᴏɴᴇ"
+        )
+        await message.reply_text(response, parse_mode='HTML')
+
     except BadRequest as e:
-        await update.message.reply_text(f"<code>❌ API Eʀʀᴏʀ: {e}</code>", parse_mode='HTML')
+        await message.reply_text(f"<code>❌ API Eʀʀᴏʀ: {e}</code>", parse_mode='HTML')
 
 # --- KICK COMMAND ---
 async def kick_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat = update.effective_chat
+    message = update.effective_message
     
     if user.id not in OWNER_IDS:
-        if not await is_admin(update, context, user.id): return
+        if not await is_admin(update, context, user.id): 
+            return
 
     target_id, name = await resolve_user_all(update, context)
-    if not target_id: return
+    if not target_id: 
+        return
 
     if target_id in OWNER_IDS:
-        await update.message.reply_text("👑 I Cᴀɴ'ᴛ Kɪᴄᴋ Tʜᴇ Boss! 🫠")
+        await message.reply_text("👑 ɪ ᴄᴀɴ'ᴛ ᴋɪᴄᴋ ᴛʜᴇ ʙᴏss")
         return
 
     try:
         target_member = await chat.get_member(target_id)
         
         if target_member.status == 'creator':
-            await update.message.reply_text("👑 Kɪᴄᴋɪɴɢ ᴛʜᴇ Gʀᴏᴜᴘ Oᴡɴᴇʀ? A ʙᴏʟᴅ ᴍᴏᴠᴇ... ʙᴜᴛ ɪᴍᴘᴏssɪʙʟᴇ. 😂")
+            await message.reply_text("👑 ᴋɪᴄᴋɪɴɢ ᴛʜᴇ ᴏᴡɴᴇʀ ɪs ɪᴍᴘᴏssɪʙʟᴇ")
             return
             
         if target_member.status == 'administrator':
-            await update.message.reply_text("⚠️ I ᴄᴀɴ'ᴛ ᴋɪᴄᴋ ᴀᴅᴍɪɴs! Tʜᴇʏ ʜᴀᴠᴇ sᴛɪᴄᴋʏ sʜᴏᴇs. 👟")
+            await message.reply_text("⚠️ ɪ ᴄᴀɴ'ᴛ ᴋɪᴄᴋ ᴀᴅᴍɪɴs")
             return
             
+        # Ban and immediately unban to perform a kick
         await chat.ban_member(target_id)
         await chat.unban_member(target_id)
-        await update.message.reply_text(f"<b>👢 {name} ʜᴀs ʙᴇᴇɴ ᴋɪᴄᴋᴇᴅ ᴏᴜᴛ!</b>", parse_mode='HTML')
+
+        # NEW CALLBACK FORMAT
+        response = (
+            "🎖️ sʏsᴛᴇᴍ ᴜᴘᴅᴀᴛᴇ\n"
+            f"ᴜsᴇʀ: <b>{name}</b>\n"
+            "sᴛᴀᴛᴜs: ᴋɪᴄᴋᴇᴅ\n"
+            "Access: ʀᴇᴍᴏᴠᴇᴅ"
+        )
+        await message.reply_text(response, parse_mode='HTML')
+
     except BadRequest as e:
-        await update.message.reply_text(f"<code>❌ API Eʀʀᴏʀ: {e}</code>", parse_mode='HTML')
+        await message.reply_text(f"<code>❌ API Eʀʀᴏʀ: {e}</code>", parse_mode='HTML')
 
 # --- UNBAN COMMAND ---
 async def unban(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat = update.effective_chat
+    message = update.effective_message
 
     if user.id not in OWNER_IDS:
-        if not await is_admin(update, context, user.id): return
+        if not await is_admin(update, context, user.id): 
+            return
 
     target_id, name = await resolve_user_all(update, context)
-    if not target_id: return
-
-    try:
-        target_member = await chat.get_member(target_id)
-        if target_member.status in ['member', 'administrator', 'creator', 'restricted']:
-            await update.message.reply_text(f"🧐 {name} ɪs ᴀʟʀᴇᴀᴅʏ ɪɴ ᴛʜᴇ ᴄʜᴀᴛ ᴀɴᴅ ɴᴏᴛ ʙᴀɴɴᴇᴅ!")
-            return
-    except: pass
+    if not target_id: 
+        return
 
     try:
         await chat.unban_member(target_id, only_if_banned=True)
-        await update.message.reply_text(f"<b>✅ {name} ʜᴀs ʙᴇᴇɴ ᴜɴʙᴀɴɴᴇᴅ! Tʜᴇʏ ᴄᴀɴ ɴᴏᴡ ʀᴇᴊᴏɪɴ.</b>", parse_mode='HTML')
+
+        # NEW CALLBACK FORMAT
+        response = (
+            "🎖️ sʏsᴛᴇᴍ ᴜᴘᴅᴀᴛᴇ\n"
+            f"ᴜsᴇʀ: <b>{name}</b>\n"
+            "sᴛᴀᴛᴜs: ᴜɴʙᴀɴɴᴇᴅ\n"
+            "Access: ʀᴇsᴛᴏʀᴇᴅ"
+        )
+        await message.reply_text(response, parse_mode='HTML')
+
     except BadRequest as e:
-        await update.message.reply_text(f"<code>❌ API Eʀʀᴏʀ: {e}</code>", parse_mode='HTML')
+        await message.reply_text(f"<code>❌ API Eʀʀᴏʀ: {e}</code>", parse_mode='HTML')
+
+from telegram import ChatPermissions
+from telegram.error import BadRequest
 
 # --- MUTE COMMAND ---
 async def mute(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat = update.effective_chat
+    message = update.effective_message
     
+    # Ensure OWNER_IDS is defined as a list in your config
     if user.id not in OWNER_IDS:
-        if not await is_admin(update, context, user.id): return
+        if not await is_admin(update, context, user.id): 
+            return
 
     target_id, name = await resolve_user_all(update, context)
-    if not target_id: return
+    if not target_id: 
+        return
 
     if target_id in OWNER_IDS:
-        await update.message.reply_text("👑 Mʏ Oᴡɴᴇʀ Is Tᴏᴏ Lᴏᴜᴅ Tᴏ Bᴇ Mᴜᴛᴇᴅ! 🔊")
+        await message.reply_text("👑 ᴍʏ ᴏᴡɴᴇʀ ɪs ᴛᴏᴏ ʟᴏᴜᴅ ᴛᴏ ʙᴇ ᴍᴜᴛᴇᴅ")
         return
     
     try:
         target_member = await chat.get_member(target_id)
         
         if target_member.status == 'creator':
-            await update.message.reply_text("👑 Yᴏᴜ ᴡᴀɴᴛ ᴍᴇ ᴛᴏ ᴍᴜᴛᴇ ᴛʜᴇ Gʀᴏᴜᴘ Oᴡɴᴇʀ? Gᴏᴏᴅ ʟᴜᴄᴋ ᴡɪᴛʜ ᴛʜᴀᴛ! 🤐")
+            await message.reply_text("👑 ʏᴏᴜ ᴡᴀɴᴛ ᴍᴇ ᴛᴏ ᴍᴜᴛᴇ ᴛʜᴇ ɢʀᴏᴜᴘ ᴏᴡɴᴇʀ")
             return
             
         if target_member.status == 'administrator':
-            await update.message.reply_text("⚠️ Aᴅᴍɪɴs Dᴏɴ'ᴛ Hᴀᴠᴇ Mᴜᴢᴢʟᴇs! Dᴇᴍᴏᴛᴇ Tʜᴇᴍ Fɪʀsᴛ. 🙀")
+            await message.reply_text("⚠️ ᴀᴅᴍɪɴs ᴅᴏɴ'ᴛ ʜᴀᴠᴇ ᴍᴜᴢᴢʟᴇs")
             return
         
-        if target_member.status == 'restricted' and not target_member.can_send_messages:
-            await update.message.reply_text(f"🔇 {name} ɪs ᴀʟʀᴇᴀᴅʏ ᴍᴜᴛᴇᴅ!")
-            return
+        # Restriction Logic
+        await chat.restrict_member(
+            target_id, 
+            permissions=ChatPermissions(can_send_messages=False)
+        )
 
-        await chat.restrict_member(target_id, permissions=ChatPermissions(can_send_messages=False))
-        await update.message.reply_text(f"<b>🔇 {name} ɪs ɴᴏᴡ ᴍᴜᴛᴇᴅ.</b>", parse_mode='HTML')
+        # NEW CALLBACK FORMAT
+        response = (
+            "🎖️ sʏsᴛᴇᴍ ᴜᴘᴅᴀᴛᴇ\n"
+            f"ᴜsᴇʀ: <b>{name}</b>\n"
+            "sᴛᴀᴛᴜs: ᴍᴜᴛᴇᴅ\n"
+            "Access: ʀᴇsᴛʀɪᴄᴛᴇᴅ"
+        )
+        await message.reply_text(response, parse_mode='HTML')
+
     except BadRequest as e:
-        await update.message.reply_text(f"<code>❌ API Eʀʀᴏʀ: {e}</code>", parse_mode='HTML')
+        await message.reply_text(f"<code>❌ API Eʀʀᴏʀ: {e}</code>", parse_mode='HTML')
 
 # --- UNMUTE COMMAND ---
 async def unmute(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat = update.effective_chat
+    message = update.effective_message
 
     if user.id not in OWNER_IDS:
-        if not await is_admin(update, context, user.id): return
+        if not await is_admin(update, context, user.id): 
+            return
 
     target_id, name = await resolve_user_all(update, context)
-    if not target_id: return
+    if not target_id: 
+        return
 
     try:
-        target_member = await chat.get_member(target_id)
-        
-        # Creator is never restricted by a bot
-        if target_member.status == 'creator':
-             await update.message.reply_text(f"👑 Tʜᴇ Gʀᴏᴜᴘ Oᴡɴᴇʀ ʜᴀs ᴀʟᴡᴀʏs ʜᴀᴅ ᴀ ᴠᴏɪᴄᴇ.")
-             return
+        # Give back all standard permissions
+        await chat.restrict_member(
+            target_id, 
+            permissions=ChatPermissions(
+                can_send_messages=True,
+                can_send_audios=True,
+                can_send_documents=True,
+                can_send_photos=True,
+                can_send_videos=True,
+                can_send_video_notes=True,
+                can_send_voice_notes=True,
+                can_send_polls=True,
+                can_send_other_messages=True,
+                can_add_web_page_previews=True,
+                can_change_info=False,
+                can_invite_users=True,
+                can_pin_messages=False
+            )
+        )
 
-        if target_member.status not in ['restricted', 'member']:
-             await update.message.reply_text(f"🧐 {name} ᴅᴏᴇsɴ'ᴛ sᴇᴇᴍ ᴛᴏ ʙᴇ ᴍᴜᴛᴇᴅ.")
-             return
+        # NEW CALLBACK FORMAT
+        response = (
+            "🎖️ sʏsᴛᴇᴍ ᴜᴘᴅᴀᴛᴇ\n"
+            f"ᴜsᴇʀ: <b>{name}</b>\n"
+            "sᴛᴀᴛᴜs: ᴜɴᴍᴜᴛᴇᴅ\n"
+            "Access: ғᴜʟʟ"
+        )
+        await message.reply_text(response, parse_mode='HTML')
 
-        await chat.restrict_member(target_id, permissions=get_full_permissions())
-        await update.message.reply_text(f"<b>🔊 {name} ᴄᴀɴ sᴘᴇᴀᴋ ᴀɢᴀɪɴ.</b>", parse_mode='HTML')
     except BadRequest as e:
-        await update.message.reply_text(f"<code>❌ API Eʀʀᴏʀ: {e}</code>", parse_mode='HTML')
+        await message.reply_text(f"<code>❌ API Eʀʀᴏʀ: {e}</code>", parse_mode='HTML')
 
 # ================= PROMOTION SYSTEM =================
 async def promote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     user = update.effective_user
     message = update.effective_message
-    
-    # Split args
-    args = context.args # PTB already gives you arguments here
+    args = context.args
 
-    # 1. Target Resolution (Ensure this function exists in your code)
     target_id, name = await resolve_user_all(update, context) 
     if not target_id:
         return await message.reply_text("<code>⚠️ Uꜱᴀɢᴇ: /promote @username or reply [1/2/3]</code>", parse_mode=ParseMode.HTML)
 
-    # 2. Level Parsing
     level = 1
     if args:
-        val = args[-1] # Take the last argument as the level
+        val = args[-1]
         if val in ("3", "full"): level = 3
         elif val in ("2", "mod"): level = 2
         elif val == "0": level = 0
-    
-    # 3. Permissions Setup
+
     perms = {
         0: {"can_pin_messages": True},
         1: {"can_change_info": True, "can_delete_messages": True, "can_invite_users": True, "can_pin_messages": True, "can_manage_chat": True, "can_manage_video_chats": True},
@@ -3123,24 +3180,34 @@ async def promote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         3: {"can_change_info": True, "can_delete_messages": True, "can_invite_users": True, "can_pin_messages": True, "can_manage_chat": True, "can_restrict_members": True, "can_promote_members": True, "can_manage_video_chats": True, "can_post_stories": True, "can_edit_stories": True, "can_delete_stories": True},
     }
 
-    # 4. Hierarchy & Bot Checks
     try:
-        # Check if SENDER is Owner or Admin
-        if user.id != OWNER_ID:
+        if user.id != OWNER_IDS:
             sender_member = await chat.get_member(user.id)
             if sender_member.status not in ["administrator", "creator"] or not sender_member.can_promote_members:
                 return await message.reply_text("🧐 Oᴘᴘs! Yᴏᴜ Nᴇᴇᴅ Tᴏ Bᴇ Aᴅᴍɪɴ Tᴏ Pʀᴏᴍᴏᴛᴇ Oᴛʜᴇʀs... 🧩")
 
-        # Check if BOT is Admin
         bot_member = await chat.get_member(context.bot.id)
         if not bot_member.can_promote_members:
             return await message.reply_text("💠 Eʜᴇʜᴇ... Cᴀɴ Gɪᴠᴇ Mᴇ Fᴜʟʟ Pᴏᴡᴇʀ Aᴅᴍɪɴ? Sᴏ I Aʟꜱᴏ Cᴀɴ... 😁🫠")
 
-        # Execute
         await context.bot.promote_chat_member(chat.id, target_id, **perms[level])
-        
-        level_names = {0: "🏅 Tᴇᴍᴘ Aᴅᴍɪɴ", 1: "🥇 Jᴜɴɪᴏʀ Aᴅᴍɪɴ", 2: "🥈 Aꜱꜱɪꜱᴛᴀɴᴛ Aᴅᴍɪɴ", 3: "🥉 Fᴜʟʟ Aᴅᴍɪɴ"}
-        await message.reply_text(f"🎖️ <b>{name}</b> ᴘʀᴏᴍᴏᴛᴇᴅ ᴛᴏ {level_names[level]}", parse_mode=ParseMode.HTML)
+
+        # Define Access Descriptions
+        access_descriptions = {
+            3: "full power",
+            2: "full power except make new admins",
+            1: "manage chat, messages & info",
+            0: "pin messages only"
+        }
+
+        # NEW CALLBACK FORMAT
+        response = (
+            "🎖️ sʏsᴛᴇᴍ ᴜᴘᴅᴀᴛᴇ\n"
+            f"ᴜsᴇʀ: <b>{name}</b>\n"
+            f"sᴛᴀᴛᴜs: ᴘʀᴏᴍᴏᴛᴇᴅ (ʟᴠʟ {level})\n"
+            f"Aᴄᴄᴇꜱꜱ: {access_descriptions[level]}"
+        )
+        await message.reply_text(response, parse_mode=ParseMode.HTML)
 
     except BadRequest as e:
         err = str(e).lower()
@@ -3154,36 +3221,30 @@ async def demote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     message = update.effective_message
 
-    # 1. Target Resolution
     target_id, name = await resolve_user_all(update, context) 
     if not target_id:
         return await message.reply_text("<code>⚠️ Uꜱᴀɢᴇ: /demote @username or reply to a user.</code>", parse_mode=ParseMode.HTML)
 
-    # 2. Hierarchy & Permission Checks
     try:
-        # Check if SENDER is Owner or Admin
-        if user.id != OWNER_ID:
+        if user.id != OWNER_IDS:
             sender_member = await chat.get_member(user.id)
             if sender_member.status not in ["administrator", "creator"] or not sender_member.can_promote_members:
                 return await message.reply_text("🧐 Nɪᴄᴇ ᴛʀʏ, ʙᴜᴛ ʏᴏᴜ ɴᴇᴇᴅ 'Aᴅᴅ Nᴇᴡ Aᴅᴍɪɴs' ᴘᴇʀᴍɪssɪᴏɴ ᴛᴏ ᴅᴇᴍᴏᴛᴇ! 🧩")
-        
+
         if target_id == context.bot.id:
             return await message.reply_text("💠 I ᴄᴀɴ'ᴛ ᴅᴇᴍᴏᴛᴇ ᴍʏsᴇʟғ, sɪʟʟʏ! 😁")
 
-        # Check Bot's own permissions
         bot_member = await chat.get_member(context.bot.id)
         if not bot_member.can_promote_members:
             return await message.reply_text("💠 I ɴᴇᴇᴅ 'Aᴅᴅ Nᴇᴡ Aᴅᴍɪɴs' ᴘᴇʀᴍɪssɪᴏɴ ᴛᴏ ʀᴇᴍᴏᴠᴇ ᴀᴅᴍɪɴs! 🫠")
 
-        # Check Target's current status
         target_member = await chat.get_member(target_id)
         if target_member.status == 'creator':
             return await message.reply_text("👑 Tʜᴀᴛ's ᴛʜᴇ Gʀᴏᴜᴘ Oᴡɴᴇʀ. I ʜᴀᴠᴇ ɴᴏ ᴘᴏᴡᴇʀ ʜᴇʀᴇ.")
-        
+
         if target_member.status != 'administrator':
             return await message.reply_text(f"⚠️ <b>{name}</b> ɪs ɴᴏᴛ ᴀɴ ᴀᴅᴍɪɴ anyway! 🤷‍♂️", parse_mode=ParseMode.HTML)
 
-        # 4. Execute Demotion (Strip all admin rights)
         await context.bot.promote_chat_member(
             chat.id, 
             target_id,
@@ -3197,7 +3258,14 @@ async def demote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
             can_manage_video_chats=False
         )
 
-        await message.reply_text(f"📉 <b>ᴅᴇᴍᴏᴛɪᴏɴ sᴜᴄᴄᴇssғᴜʟ</b>\n👤 ᴜsᴇʀ: <b>{name}</b>", parse_mode=ParseMode.HTML)
+        # NEW CALLBACK FORMAT
+        response = (
+            "🎖️ sʏsᴛᴇᴍ ᴜᴘᴅᴀᴛᴇ\n"
+            f"ᴜsᴇʀ: <b>{name}</b>\n"
+            "sᴛᴀᴛᴜs: ᴅᴇᴍᴏᴛᴇᴅ\n"
+            "Aᴄᴄᴇꜱꜱ: ɴᴏɴᴇ"
+        )
+        await message.reply_text(response, parse_mode=ParseMode.HTML)
 
     except BadRequest as e:
         err = str(e).lower()
