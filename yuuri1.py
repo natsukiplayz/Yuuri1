@@ -74,12 +74,12 @@ logging.basicConfig(level=logging.INFO)
 
 #===========Systems========
 #--
-# ================= MONGODB (ASYNC ONLY) =================
-# We use ONLY AsyncIOMotorClient so 'await' works everywhere
+# ================= MONGODB (FIXED) =================
+# We use AsyncIOMotorClient to ensure 'await' works in your profile
 async_client = AsyncIOMotorClient(MONGO_URI)
 db = async_client["yuuri_db"]
 
-# Define all collections once using the async 'db'
+# Define all collections once
 users = db["users"]
 guilds = db["guilds"]
 sticker_packs = db["sticker_packs"]
@@ -90,9 +90,9 @@ torture_db = db["torture_registry"]
 allowed_collection = db["allowed_users"] 
 groups_collection = db["saved_groups"]
 
-# ================= USER SYSTEM (CORRECT ASYNC) =================
+# ================= USER SYSTEM (FIXED) =================
 async def get_user(user):
-    # Notice the 'await' here
+    # This MUST be awaited to get the dictionary data
     data = await users.find_one({"id": user.id})
 
     default_data = {
@@ -111,28 +111,27 @@ async def get_user(user):
     }
 
     if not data:
-        await users.insert_one(default_data) # Use 'await'
+        await users.insert_one(default_data)
         return default_data
 
+    # Sync name and missing fields
     updated_fields = {}
     if data.get("name") != user.first_name:
-        data["name"] = user.first_name
         updated_fields["name"] = user.first_name
+        data["name"] = user.first_name
 
     for key, value in default_data.items():
         if key not in data:
-            data[key] = value
             updated_fields[key] = value
+            data[key] = value
 
     if updated_fields:
-        # Use 'await' here. Do NOT await the RESULT of update_one, 
-        # await the update_one call itself.
         await users.update_one({"id": user.id}, {"$set": updated_fields})
 
     return data
 
 async def save_user(data):
-    # Correct Async usage for Motor
+    # This ensures your 'profile' and 'add_xp' changes actually hit the DB
     await users.update_one({"id": data["id"]}, {"$set": data}, upsert=True)
 
 # ======Broadcast_System======
