@@ -338,6 +338,62 @@ def clear_all_torture():
 
 #============ Side_Features ========
 #--
+
+async def set_png(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Usage: Reply to any media with /setpng <name>
+    Example: /setpng start
+    """
+    user_id = update.effective_user.id
+    
+    # 1. OWNER ONLY (Replace with your actual Owner ID variable)
+    if user_id != OWNER_IDS:
+        return
+
+    # 2. VALIDATION: Check for reply and name
+    if not update.message.reply_to_message:
+        return await update.message.reply_text("❌ ᴘʟᴇᴀsᴇ ʀᴇᴘʟʏ ᴛᴏ ᴀ ᴘʜᴏᴛᴏ, sᴛɪᴄᴋᴇʀ, ᴏʀ ɢɪғ!")
+
+    if not context.args:
+        return await update.message.reply_text("❌ ᴘʟᴇᴀsᴇ ᴘʀᴏᴠɪᴅᴇ ᴀ ɴᴀᴍᴇ.\nᴇx: <code>/sᴇᴛᴘɴɢ sᴛᴀʀᴛ</code>", parse_mode='HTML')
+
+    img_name = context.args[0].lower()
+    replied = update.message.reply_to_message
+    file_id = None
+
+    # 3. EXTRACT FILE ID (Handles all media types)
+    if replied.photo:
+        file_id = replied.photo[-1].file_id
+    elif replied.sticker:
+        file_id = replied.sticker.file_id
+    elif replied.animation:
+        file_id = replied.animation.file_id
+    elif replied.document:
+        file_id = replied.document.file_id
+    
+    if not file_id:
+        return await update.message.reply_text("❌ ɪ ᴄᴀɴ'ᴛ ꜰɪɴᴅ ᴀ ᴠᴀʟɪᴅ ꜰɪʟᴇ ɪᴅ ɪɴ ᴛʜᴀᴛ ᴍᴇssᴀɢᴇ.")
+
+    # 4. SAVE TO YOUR SYNC MONGO (image_db)
+    # This uses 'upsert=True' so it creates the entry if it doesn't exist
+    image_db.update_one(
+        {"name": img_name},
+        {"$set": {
+            "file_id": file_id, 
+            "set_by": user_id,
+            "updated_at": datetime.now()
+        }},
+        upsert=True
+    )
+
+    await update.message.reply_text(
+        f"✅ <b>ꜱᴜᴄᴄᴇꜱꜱꜰᴜʟʟʏ ꜱᴇᴛ!</b>\n\n"
+        f"ᴛᴀɢ: <code>{img_name}</code>\n"
+        f"ᴛʏᴘᴇ: <code>{replied.type if hasattr(replied, 'type') else 'Media'}</code>\n\n"
+        f"ʏᴏᴜ ᴄᴀɴ ɴᴏᴡ ᴜsᴇ ᴛʜɪs ɪɴ ʏᴏᴜʀ ᴄᴏᴍᴍᴀɴᴅs.",
+        parse_mode='HTML'
+    )
+
 # ================= REDEEM SYSTEM =================
 async def create_redeem(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """/create <code> <limit> <type:value> - Owner Only"""
@@ -3897,6 +3953,8 @@ application.add_handler(CommandHandler("save", save_group))
 application.add_handler(CommandHandler("del", del_group))
 application.add_handler(CommandHandler("inform", inform_user))
 application.add_handler(CommandHandler("feedback", feedback_command))
+application.add_handler(CommandHandler("setpng", set_png))
+
 
 # Message Handlers
 application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
