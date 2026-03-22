@@ -74,14 +74,12 @@ logging.basicConfig(level=logging.INFO)
 
 #===========Systems========
 #--
-# ================= MONGODB (SYNC FIX) =================
-# We switch back to MongoClient so 'await' is NOT required
-from pymongo import MongoClient
+# ================= MONGODB (ASYNC ONLY) =================
+# We use ONLY AsyncIOMotorClient so 'await' works everywhere
+async_client = AsyncIOMotorClient(MONGO_URI)
+db = async_client["yuuri_db"]
 
-client = MongoClient(MONGO_URI)
-db = client["yuuri_db"]
-
-# Collections
+# Define all collections once using the async 'db'
 users = db["users"]
 guilds = db["guilds"]
 sticker_packs = db["sticker_packs"]
