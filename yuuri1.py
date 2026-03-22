@@ -1163,77 +1163,60 @@ async def owner_cmds(update: Update, context: ContextTypes.DEFAULT_TYPE):
 #==================Main StartUp Of Yuuri==================
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
-
-# --- 1. DYNAMIC IMAGE HELPER (Sync) ---
-def get_img(command_name, default_url="https://graph.org/file/f46487e49202167d58151.jpg"):
-    """Sync logic to fetch the image you set via /setpng or return default"""
-    doc = image_db.find_one({"command": command_name})
-    return doc["file_id"] if doc else default_url
-
-# --- 2. HELP DATA (Categorized to match your 2800+ line script) ---
+# --- 1. HELP MENU DATA (Mapped to your 2800+ line functionality) ---
 HELP_TEXTS = {
     "help_manage": (
         "🛡️ <b>𝐆𝐫𝐨𝐮𝐩 𝐌𝐚𝐧𝐚𝐠𝐞𝐦𝐞𝐧𝐭</b>\n"
-        "ᴄᴏᴍᴍᴀɴᴅs ғᴏʀ ɢʀᴏᴜᴘ ᴀᴅᴍɪɴs.\n\n"
-        "• <code>/ban</code> | <code>/unban</code> : ʙᴀɴ sʏsᴛᴇᴍ.\n"
-        "• <code>/mute</code> | <code>/unmute</code> : ᴍᴜᴛᴇ sʏsᴛᴇᴍ.\n"
-        "• <code>/tmute</code> : ᴛᴇᴍᴘᴏʀᴀʀʏ ᴍᴜᴛᴇ.\n"
-        "• <code>/promote</code> | <code>/demote</code> : ᴀᴅᴍɪɴ ᴘᴏᴡᴇʀs.\n"
-        "• <code>/warn</code> | <code>/unwarn</code> : ᴡᴀʀɴɪɴɢ ʟᴏɢs.\n"
-        "• <code>/purge</code> | <code>/dlt</code> : ᴄʟᴇᴀɴ ᴄʜᴀᴛ.\n"
-        "• <code>/pin</code> | <code>/unpin</code> : ᴍᴇssᴀɢᴇ ᴄᴏɴᴛʀᴏʟ."
+        "ᴘᴏᴡᴇʀꜰᴜʟ ᴛᴏᴏʟs ꜰᴏʀ ᴄʜᴀᴛ ᴀᴅᴍɪɴs.\n\n"
+        "• <code>/ban</code> | <code>/unban</code> : ʀᴇsᴛʀɪᴄᴛ ᴜsᴇʀs.\n"
+        "• <code>/mute</code> | <code>/unmute</code> : sɪʟᴇɴᴄᴇ ᴄʜᴀᴛ.\n"
+        "• <code>/warn</code> | <code>/unwarn</code> : ᴍᴀɴᴀɢᴇ ᴡᴀʀɴɪɴɢs.\n"
+        "• <code>/purge</code> | <code>/dlt</code> : ᴄʟᴇᴀɴ ᴍᴇssᴀɢᴇs.\n"
+        "• <code>/promote</code> | <code>/demote</code> : sᴇᴛ ᴀᴅᴍɪɴs."
     ),
     "help_eco": (
         "💰 <b>𝐄𝐜𝐨𝐧𝐨𝐦𝐲 & 𝐖𝐞𝐚𝐥𝐭𝐡</b>\n"
-        "ᴀᴄᴄᴜᴍᴜʟᴀᴛᴇ ᴡᴇᴀʟᴛʜ ᴀɴᴅ ᴘᴏᴡᴇʀ.\n\n"
-        "• <code>/daily</code> : ᴄʟᴀɪᴍ ᴅᴀɪʟʏ ᴄᴏɪɴs.\n"
-        "• <code>/status</code> : ᴠɪᴇᴡ ʏᴏᴜʀ ᴘʀᴏғɪʟᴇ.\n"
-        "• <code>/shop</code> | <code>/purchase</code> : ʙᴜʏ ɪᴛᴇᴍs.\n"
-        "• <code>/givee</code> : sᴇɴᴅ ᴄᴏɪɴs.\n"
-        "• <code>/redeem</code> : ᴜsᴇ ᴘʀᴏᴍᴏ ᴄᴏᴅᴇs.\n"
-        "• <code>/work</code> : (ᴄᴏᴍɪɴɢ sᴏᴏɴ)."
+        "ʏᴏᴜʀ ꜰɪɴᴀɴᴄɪᴀʟ sᴛᴀᴛᴜs ᴀɴᴅ ɢʀᴏᴡᴛʜ.\n\n"
+        "• <code>/daily</code> : ᴄʟᴀɪᴍ ʏᴏᴜʀ ᴄᴏɪɴs.\n"
+        "• <code>/status</code> : ᴄʜᴇᴄᴋ ʟᴇᴠᴇʟ & ʀᴀɴᴋ.\n"
+        "• <code>/givee</code> : ᴛʀᴀɴsꜰᴇʀ ᴡᴇᴀʟᴛʜ.\n"
+        "• <code>/redeem</code> : ᴜsᴇ ɢɪꜰᴛ ᴄᴏᴅᴇs.\n"
+        "• <code>/shop</code> : ʙᴜʏ ɪᴛᴇᴍs."
     ),
     "help_game": (
         "🕹️ <b>𝐆𝐚𝐦𝐞 & 𝐂𝐨𝐦𝐛𝐚𝐭</b>\n"
-        "ʜᴜɴᴛ, ғɪɢʜᴛ, ᴀɴᴅ sᴜʀᴠɪᴠᴇ.\n\n"
+        "ʜᴜɴᴛ ᴏᴛʜᴇʀs ᴀɴᴅ ᴇᴀʀɴ ʙᴏᴜɴᴛɪᴇs.\n\n"
         "• <code>/kill</code> | <code>/murder</code> : ᴀᴛᴛᴀᴄᴋ ᴜsᴇʀs.\n"
-        "• <code>/steal</code> : ʀᴏʙ ᴢ-ᴄᴏɪɴs.\n"
-        "• <code>/heist</code> | <code>/joinheist</code> : ʙᴀɴᴋ ʀᴏʙʙᴇʀʏ.\n"
-        "• <code>/revive</code> : ʀᴇsᴜʀʀᴇᴄᴛ ᴘʟᴀʏᴇʀ.\n"
+        "• <code>/steal</code> : ʀᴏʙ ᴄᴏɪɴs.\n"
+        "• <code>/heist</code> : ᴊᴏɪɴ ᴛʜᴇ ʀᴏʙʙᴇʀʏ.\n"
         "• <code>/protect</code> : ᴀᴄᴛɪᴠᴀᴛᴇ sʜɪᴇʟᴅ.\n"
-        "• <code>/rankers</code> : ᴛᴏᴘ ᴋɪʟʟᴇʀs."
+        "• <code>/revive</code> : ᴄᴏᴍᴇ ʙᴀᴄᴋ ᴛᴏ ʟɪꜰᴇ."
     ),
     "help_ai": (
         "🧠 <b>𝐀𝐈 & 𝐔𝐭𝐢𝐥𝐢𝐭𝐢𝐞𝐬</b>\n"
-        "ᴀʀᴛɪғɪᴄɪᴀʟ ɪɴᴛᴇʟʟɪɢᴇɴᴄᴇ ᴀɴᴅ ᴛᴏᴏʟs.\n\n"
-        "• <code>/q</code> : ǫᴜᴏᴛᴇ sᴛɪᴄᴋᴇʀ.\n"
-        "• <code>/font</code> : sᴛʏʟɪsʜ ᴛᴇxᴛ.\n"
-        "• <code>/inform</code> : ᴜsᴇʀ ɪɴғᴏ.\n"
-        "• <code>/obt</code> : sᴀᴠᴇ sᴛɪᴄᴋᴇʀs.\n"
-        "• <code>/id</code> : ɢᴇᴛ ᴛᴇʟᴇɢʀᴀᴍ ɪᴅs."
+        "ᴀᴅᴠᴀɴᴄᴇᴅ ꜰᴇᴀᴛᴜʀᴇs ᴀᴛ ʏᴏᴜʀ ꜰɪɴɢᴇʀᴛɪᴘs.\n\n"
+        "• <code>/q</code> : ᴄʀᴇᴀᴛᴇ ʜᴅ ǫᴜᴏᴛᴇ sᴛɪᴄᴋᴇʀs.\n"
+        "• <code>/font</code> : sᴛʏʟɪsʜ ᴛᴇxᴛ ɢᴇɴᴇʀᴀᴛᴏʀ.\n"
+        "• <code>/obt</code> : sᴀᴠᴇ sᴛɪᴄᴋᴇʀ ᴘᴀᴄᴋs.\n"
+        "• <code>/id</code> : ɢᴇᴛ ᴛᴇʟᴇɢʀᴀᴍ ɪᴅs.\n"
+        "• <code>/feedback</code> : ʀᴇᴘᴏʀᴛ ʙᴜɢs."
     ),
     "help_social": (
         "🚩 <b>𝐒𝐨𝐜𝐢𝐚𝐥 & 𝐅𝐮𝐧</b>\n"
-        "ɪɴᴛᴇʀᴀᴄᴛ ᴡɪᴛʜ ᴛʜᴇ ᴄᴏᴍᴍᴜɴɪᴛʏ.\n\n"
         "• <code>/kiss</code> | <code>/hug</code> | <code>/slap</code>\n"
-        "• <code>/bite</code> | <code>/kick</code> | <code>/punch</code>\n"
-        "• <code>/referral</code> : ɪɴᴠɪᴛᴇ sʏsᴛᴇᴍ."
-    ),
-    "help_soon": (
-        "🚀 <b>𝐂𝐨𝐦𝐢𝐧𝐠 𝐒𝐨𝐨𝐧</b>\n"
-        "ᴛʜᴇsᴇ ғᴇᴀᴛᴜʀᴇs ᴀʀᴇ ᴜɴᴅᴇʀ ᴅᴇᴠᴇʟᴏᴘᴍᴇɴᴛ.\n\n"
-        "• 🎭 <b>ᴄʟᴀɴ sʏsᴛᴇᴍ</b> : ᴛᴇᴀᴍ ᴜᴘ ᴡɪᴛʜ ғʀɪᴇɴᴅs.\n"
-        "• 🎰 <b>ᴄᴀsɪɴᴏ</b> : ɢᴀᴍʙʟᴇ ʏᴏᴜʀ ʟᴜᴄᴋ.\n"
-        "• 🛠️ <b>ᴀᴅᴠᴀɴᴄᴇᴅ ʟᴏɢs</b> : ᴅᴇᴛᴀɪʟᴇᴅ ɢʀᴏᴜᴘ ᴛʀᴀᴄᴋɪɴɢ."
+        "• <code>/bite</code> | <code>/punch</code> | <code>/kick</code>\n"
+        "• <code>/referral</code> : ɪɴᴠɪᴛᴇ ꜰʀɪᴇɴᴅs."
     )
 }
 
-# --- 3. START COMMAND ---
+# --- 2. START COMMAND ---
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    get_user(user) # Sync DB Logic
+    # Ensure user exists in your sync DB system
+    get_user(user) 
     
-    current_img = get_img("start")
+    # Using your existing get_img helper
+    start_img = get_img("start", "https://graph.org/file/f46487e49202167d58151.jpg")
 
     caption = (
         f"<b>ᴡᴇʟᴄᴏᴍᴇ, {user.first_name}!</b> 👋\n\n"
@@ -1244,40 +1227,39 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [InlineKeyboardButton("➕ ᴀᴅᴅ ᴛᴏ ᴄʜᴀᴛ", url=f"https://t.me/{context.bot.username}?startgroup=true")],
         [InlineKeyboardButton("📚 ʜᴇʟᴘ & ᴄᴏᴍᴍᴀɴᴅs", callback_data="help_main")],
-        [InlineKeyboardButton("ꜱᴜᴘᴘᴏʀᴛ ↗️", url="https://t.me/your_support"),
-         InlineKeyboardButton("ᴄʜᴀɴɴᴇʟ ↗️", url="https://t.me/your_channel")]
+        [InlineKeyboardButton("ꜱᴜᴘᴘᴏʀᴛ ↗️", url="https://t.me/your_support_channel"),
+         InlineKeyboardButton("ᴄʜᴀɴɴᴇʟ ↗️", url="https://t.me/your_main_channel")]
     ]
 
     await update.message.reply_photo(
-        photo=current_img,
+        photo=start_img,
         caption=caption,
-        parse_mode='HTML',
+        parse_mode=ParseMode.HTML,
         has_spoiler=True,
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-# --- 4. CALLBACK HANDLER (MENU NAVIGATION) ---
+# --- 3. CALLBACK HANDLER (MENU NAVIGATION) ---
 async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     data = query.data
     await query.answer()
 
     if data == "help_main":
-        text = "✨ <b>ᴍɪᴋᴋᴜ ᴍᴇɴᴜ</b>\n\n<i>sᴇʟᴇᴄᴛ ᴀ ᴍᴏᴅᴜʟᴇ ʙᴇʟᴏᴡ ᴛᴏ ᴇxᴘʟᴏʀᴇ:</i>"
+        text = "✨ <b>ʏᴜᴜʀɪ ᴍᴇɴᴜ</b>\n\n<i>sᴇʟᴇᴄᴛ ᴀ ᴍᴏᴅᴜʟᴇ ʙᴇʟᴏᴡ ᴛᴏ ᴇxᴘʟᴏʀᴇ:</i>"
         keyboard = [
             [InlineKeyboardButton("🧠 ᴀɪ & ᴛᴏᴏʟs", callback_data="help_ai"),
              InlineKeyboardButton("💰 ᴇᴄᴏɴᴏᴍʏ", callback_data="help_eco")],
             [InlineKeyboardButton("🕹️ ɢᴀᴍᴇ", callback_data="help_game"),
              InlineKeyboardButton("🚩 sᴏᴄɪᴀʟ", callback_data="help_social")],
             [InlineKeyboardButton("🛡️ ᴍᴀɴᴀɢᴇ", callback_data="help_manage")],
-            [InlineKeyboardButton("🚀 ᴄᴏᴍɪɴɢ sᴏᴏɴ", callback_data="help_soon")],
             [InlineKeyboardButton("🔙 ʙᴀᴄᴋ", callback_data="back_to_start")]
         ]
-        await query.edit_message_caption(caption=text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
+        await query.edit_message_caption(caption=text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode=ParseMode.HTML)
 
     elif data in HELP_TEXTS:
         keyboard = [[InlineKeyboardButton("🔙 ʙᴀᴄᴋ", callback_data="help_main")]]
-        await query.edit_message_caption(caption=HELP_TEXTS[data], reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
+        await query.edit_message_caption(caption=HELP_TEXTS[data], reply_markup=InlineKeyboardMarkup(keyboard), parse_mode=ParseMode.HTML)
 
     elif data == "back_to_start":
         user = update.effective_user
@@ -1286,29 +1268,35 @@ async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("➕ ᴀᴅᴅ ᴛᴏ ᴄʜᴀᴛ", url=f"https://t.me/{context.bot.username}?startgroup=true")],
             [InlineKeyboardButton("📚 ʜᴇʟᴘ & ᴄᴏᴍᴍᴀɴᴅs", callback_data="help_main")]
         ]
-        await query.edit_message_caption(caption=caption, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
+        await query.edit_message_caption(caption=caption, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode=ParseMode.HTML)
 
-# --- 5. FEEDBACK COMMAND ---
+# --- 4. FEEDBACK COMMAND ---
 async def feedback_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if not context.args:
-        await update.message.reply_text("<code>⚠️ ᴜsᴀɢᴇ: /ғᴇᴇᴅʙᴀᴄᴋ [ʏᴏᴜʀ ᴍᴇssᴀɢᴇ]</code>", parse_mode='HTML')
+        await update.message.reply_text("<code>⚠️ ᴜsᴀɢᴇ: /ғᴇᴇᴅʙᴀᴄᴋ [ʏᴏᴜʀ ᴍᴇssᴀɢᴇ]</code>", parse_mode=ParseMode.HTML)
         return
 
     fb_text = " ".join(context.args)
-    feedback_db.insert_one({"user_id": user.id, "username": user.username, "msg": fb_text, "date": datetime.now()})
+    # Using your defined feedback_db (Sync)
+    feedback_db.insert_one({
+        "user_id": user.id, 
+        "username": user.username, 
+        "msg": fb_text, 
+        "date": datetime.now()
+    })
     
-    # Notify Developer (Ensure OWNER_ID is defined)
+    # Notify Owner (Using your OWNER_ID)
     try:
         await context.bot.send_message(
             OWNER_ID, 
             f"📩 <b>ɴᴇᴡ ғᴇᴇᴅʙᴀᴄᴋ!</b>\n\nғʀᴏᴍ: {user.first_name} (<code>{user.id}</code>)\nᴍsɢ: {fb_text}", 
-            parse_mode='HTML'
+            parse_mode=ParseMode.HTML
         )
-    except:
+    except Exception:
         pass
 
-    await update.message.reply_text("✅ <b>ᴛʜᴀɴᴋ ʏᴏᴜ! ʏᴏᴜʀ ғᴇᴇᴅʙᴀᴄᴋ ʜᴀs ʙᴇᴇɴ sᴇɴᴛ.</b>", parse_mode='HTML')
+    await update.message.reply_text("✅ <b>ᴛʜᴀɴᴋ ʏᴏᴜ! ʏᴏᴜʀ ғᴇᴇᴅʙᴀᴄᴋ ʜᴀs ʙᴇᴇɴ sᴇɴᴛ.</b>", parse_mode=ParseMode.HTML)
 
 # =======Daily=======
 from datetime import datetime
