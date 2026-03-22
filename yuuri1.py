@@ -74,25 +74,29 @@ logging.basicConfig(level=logging.INFO)
 
 #===========Systems========
 #--
-# ================= MONGODB (FIXED) =================
-# We use AsyncIOMotorClient to ensure 'await' works in your profile
-async_client = AsyncIOMotorClient(MONGO_URI)
-db = async_client["yuuri_db"]
+# ================= MONGODB (STRICT SYNC) =================
+# Use MongoClient ONLY to avoid 'coroutine' errors
+from pymongo import MongoClient
 
-# Define all collections once
+# Initialize the sync client
+client = MongoClient(MONGO_URI)
+db = client["yuuri_db"]
+
+# Define all collections
 users = db["users"]
 guilds = db["guilds"]
 sticker_packs = db["sticker_packs"]
 heists = db["heists"]
 redeem_col = db["redeem_codes"]
 admins_db = db["admins"] 
+torture_db = db["torture_registry"]
 allowed_collection = db["allowed_users"] 
 groups_collection = db["saved_groups"]
 
-# ================= USER SYSTEM (FIXED) =================
-async def get_user(user):
-    # This MUST be awaited to get the dictionary data
-    data = await users.find_one({"id": user.id})
+# ================= USER SYSTEM (STRICT SYNC) =================
+def get_user(user):
+    """Fetches user data synchronously. No await needed."""
+    data = users.find_one({"id": user.id})
 
     default_data = {
         "id": user.id,
@@ -110,10 +114,10 @@ async def get_user(user):
     }
 
     if not data:
-        await users.insert_one(default_data)
+        users.insert_one(default_data)
         return default_data
 
-    # Sync name and missing fields
+    # Check for missing fields or name changes
     updated_fields = {}
     if data.get("name") != user.first_name:
         updated_fields["name"] = user.first_name
@@ -125,13 +129,15 @@ async def get_user(user):
             data[key] = value
 
     if updated_fields:
-        await users.update_one({"id": user.id}, {"$set": updated_fields})
+        users.update_one({"id": user.id}, {"$set": updated_fields})
 
     return data
 
-async def save_user(data):
-    # This ensures your 'profile' and 'add_xp' changes actually hit the DB
-    await users.update_one({"id": data["id"]}, {"$set": data}, upsert=True)
+def save_user(data):
+    """Saves user data synchronously. This fixes the /save issues."""
+    if not data or "id" not in data:
+        return
+    users.update_one({"id": data["id"]}, {"$set": data}, upsert=True)
 
 # ======Broadcast_System======
 import asyncio
