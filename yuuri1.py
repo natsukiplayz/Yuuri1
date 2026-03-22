@@ -95,7 +95,8 @@ groups_collection = db["saved_groups"]
 
 # ================= USER SYSTEM (STRICT SYNC) =================
 def get_user(user):
-    """Fetches user data synchronously. No await needed."""
+    """Fetches user data synchronously with Auto-Name Update and History tracking."""
+    # 1. Fetch from MongoDB (Sync - No await)
     data = users.find_one({"id": user.id})
 
     default_data = {
@@ -110,31 +111,46 @@ def get_user(user):
         "inventory": [],
         "referred_by": None,
         "blocked": False,
-        "premium": False
+        "premium": False,
+        "old_names": []  # 🧩 Store previous names here
     }
 
     if not data:
         users.insert_one(default_data)
         return default_data
 
-    # Check for missing fields or name changes
+    # 2. ✨ AUTO-UPDATE & NAME TRACKING LOGIC
     updated_fields = {}
+    
+    # Check if the Telegram name has changed since the last time the bot saw them
     if data.get("name") != user.first_name:
+        current_db_name = data.get("name")
+        old_names_list = data.get("old_names", [])
+        
+        # Move the existing name to history before updating
+        if current_db_name and current_db_name not in old_names_list:
+            old_names_list.append(current_db_name)
+            updated_fields["old_names"] = old_names_list
+            data["old_names"] = old_names_list
+
+        # Update to the NEW name immediately in local dictionary and DB
         updated_fields["name"] = user.first_name
         data["name"] = user.first_name
 
+    # 3. SYNC MISSING FIELDS
     for key, value in default_data.items():
         if key not in data:
             updated_fields[key] = value
             data[key] = value
 
+    # 4. PUSH CHANGES TO DB (Sync)
     if updated_fields:
         users.update_one({"id": user.id}, {"$set": updated_fields})
 
     return data
 
 def save_user(data):
-    """Saves user data synchronously. This fixes the /save issues."""
+    """Saves user data synchronously. Works for /save and profile updates."""
     if not data or "id" not in data:
         return
     users.update_one({"id": data["id"]}, {"$set": data}, upsert=True)
@@ -3468,6 +3484,59 @@ async def tmute(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except BadRequest as e:
         await message.reply_text(f"❌ API ᴇʀʀᴏʀ: {str(e).lower()}")
 
+#===========information command=========
+async def inform_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = update.effective_message
+    if not msg: return
+
+    # 1. Target User Logic
+    target_user = None
+    if msg.reply_to_message:
+        target_user = msg.reply_to_message.from_user
+    elif context.args:
+        try:
+            user_id = int(context.args[0])
+            target_user = await context.bot.get_chat(user_id)
+        except:
+            await msg.reply_text("<code>❌ ɪɴᴠᴀʟɪᴅ ᴜsᴇʀ ɪᴅ</code>", parse_mode='HTML')
+            return
+    else:
+        target_user = update.effective_user
+
+    # 2. Get Sync DB Data (For Old Names)
+    data = get_user(target_user)
+    
+    # 3. Fetch Full Chat/User Info for Premium & Status
+    chat_info = await context.bot.get_chat(target_user.id)
+    
+    # 4. Premium Check
+    is_premium = "ʏᴇs" if getattr(target_user, 'is_premium', False) else "ɴᴏ"
+    
+    # 5. Profile Photo
+    photos = await context.bot.get_user_profile_photos(target_user.id, limit=1)
+    pfp = photos.photos[0][-1].file_id if photos.total_count > 0 else None
+
+    # 6. Old Names Formatting
+    old_names = data.get("old_names", [])
+    names_list = "\n".join([f"  ├ <code>{n}</code>" for n in old_names]) if old_names else "  └ <code>ɴᴏɴᴇ</code>"
+
+    # 7. Font Formatting (Manual strings to avoid extra helpers)
+    caption = (
+        f"🧩 ɴᴀᴍᴇ: <code>{target_user.first_name}</code>\n"
+        f"🧩 ᴜꜱᴇʀ ɪᴅ: <code>{target_user.id}</code>\n"
+        f"🧩 ᴜꜱᴇʀɴᴀᴍᴇ: <code>@{target_user.username or 'ɴᴏɴᴇ'}</code>\n"
+        f"🧩 ᴛᴇʟᴇɢʀᴀᴍ ᴘʀᴇᴍɪᴜᴍ: <code>{is_premium}</code>\n"
+        f"🧩 ʙɪᴏ: <code>{getattr(chat_info, 'bio', 'ɴᴏɴᴇ')}</code>\n"
+        f"🧩 ᴅᴄ ɪᴅ: <code>{getattr(target_user, 'dc_id', 'ᴜɴᴋɴᴏᴡɴ')}</code>\n\n"
+        f"📜 ᴏʟᴅ ɴᴀᴍᴇ ʟɪꜱᴛ 🧩:\n"
+        f"{names_list}"
+    )
+
+    if pfp:
+        await msg.reply_photo(photo=pfp, caption=caption, parse_mode='HTML')
+    else:
+        await msg.reply_text(caption, parse_mode='HTML')
+
 # ================= AUTO UPDATE CHAT =================
 async def save_chat_and_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -3769,6 +3838,7 @@ application.add_handler(CommandHandler("warn", warn))
 application.add_handler(CommandHandler("unwarn", unwarn))
 application.add_handler(CommandHandler("save", save_group))
 application.add_handler(CommandHandler("del", del_group))
+application.add_handler(CommandHandler("inform", inform_user))
 
 # Message Handlers
 application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
