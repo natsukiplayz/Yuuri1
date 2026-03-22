@@ -1231,99 +1231,138 @@ async def owner_cmds(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(help_text, parse_mode='HTML')
 
 #==================Main StartUp Of Yuuri==================
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
 from telegram.constants import ParseMode
-from telegram.ext import ContextTypes
-import asyncio
-from datetime import datetime
+from telegram.ext import ContextTypes, CallbackQueryHandler
 
-# --- 1. THE HELP DATA ---
+# --- 1. CONFIGURATION & IMAGES ---
+IMG_MAIN = "https://i.ibb.co/sJvdmLDR/x.jpg"
+IMG_HELP = "https://i.ibb.co/HT6fHBP9/x.jpg"
+
+# --- 2. THE DYNAMIC HELP DATA ---
 HELP_TEXTS = {
-    "help_manage": "🛡️ <b>𝐆𝐫𝐨𝐮𝐩 𝐌𝐚𝐧𝐚𝐠𝐞𝐦𝐞𝐧𝐭</b>\n<i>ᴀᴅᴍɪɴ ᴘᴏᴡᴇʀs ᴛᴏ ᴋᴇᴇᴘ ʏᴏᴜʀ ᴄʜᴀᴛ ᴄʟᴇᴀɴ.</i>\n\n• <code>/ban [ʀᴇᴘʟʏ]</code> : ʀᴇᴍᴏᴠᴇ ᴜsᴇʀ ғᴏʀᴇᴠᴇʀ.\n• <code>/unban [ɪᴅ]</code> : ʟɪғᴛ ᴀ ʙᴀɴ.\n• <code>/mute [ʀᴇᴘʟʏ]</code> : sɪʟᴇɴᴄᴇ ᴀ ᴜsᴇʀ.\n• <code>/unmute [ʀᴇᴘʟʏ]</code> : ʟᴇᴛ ᴛʜᴇᴍ sᴘᴇᴀᴋ.\n• <code>/warn [ʀᴇᴘʟʏ]</code> : ɢɪᴠᴇ ᴀ ғᴏʀᴍᴀʟ ᴡᴀʀɴɪɴɢ.\n• <code>/unwarn [ʀᴇᴘʟʏ]</code> : ʀᴇᴍᴏᴠᴇ ʟᴀsᴛ ᴡᴀʀɴɪɴɢ.\n• <code>/purge [ʀᴇᴘʟʏ]</code> : ᴅᴇʟᴇᴛᴇ ᴍᴇssᴀɢᴇs ɪɴ ʙᴜʟᴋ.\n• <code>/dlt [ʀᴇᴘʟʏ]</code> : ᴅᴇʟᴇᴛᴇ ᴀ sɪɴɢʟᴇ ᴍsɢ.\n• <code>/promote [ʀᴇᴘʟʏ]</code> : ᴍᴀᴋᴇ ᴜsᴇʀ ᴀᴅᴍɪɴ.\n• <code>/demote [ʀᴇᴘʟʏ]</code> : ʀᴇᴍᴏᴠᴇ ᴀᴅᴍɪɴ sᴛᴀᴛᴜs.",
-    "help_eco": "💰 <b>𝐄𝐜𝐨𝐧𝐨𝐦𝐲 & 𝐖𝐞𝐚𝐥𝐭𝐡</b>\n<i>ᴍᴀɴᴀɢᴇ ʏᴏᴜʀ ᴄᴏɪɴs ᴀɴᴅ ɢʀᴏᴡ ʏᴏᴜʀ ᴀssᴇᴛs.</i>\n\n• <code>/daily</code> : ᴄʟᴀɪᴍ ʏᴏᴜʀ ᴅᴀɪʟʏ ʀᴇᴡᴀʀᴅ.\n• <code>/status</code> : ᴠɪᴇᴡ ʏᴏᴜʀ ʙᴀʟᴀɴᴄᴇ & ʟᴇᴠᴇʟ.\n• <code>/givee [ɪᴅ/ʀᴇᴘʟʏ] [ᴀᴍᴛ]</code> : sᴇɴᴅ ᴄᴏɪɴs.\n• <code>/redeem [ᴄᴏᴅᴇ]</code> : ᴜsᴇ ᴀ ᴘʀᴏᴍᴏ ᴄᴏᴅᴇ.\n• <code>/shop</code> : ʙʀᴏᴡsᴇ ɪᴛᴇᴍs ᴛᴏ ʙᴜʏ.",
-    "help_game": "🕹️ <b>𝐆𝐚𝐦𝐞 & 𝐂𝐨𝐦𝐛𝐚𝐭</b>\n<i>ʜᴜɴᴛ, sᴛᴇᴀʟ, ᴀɴᴅ sᴜʀᴠɪᴠᴇ ɪɴ ᴛʜᴇ ᴡɪʟᴅ.</i>\n\n• <code>/kill [ʀᴇᴘʟʏ]</code> : ᴀᴛᴛᴇᴍᴘᴛ ᴀ ʜɪᴛ ᴏɴ ᴀ ᴜsᴇʀ.\n• <code>/murder [ʀᴇᴘʟʏ]</code> : ʜɪɢʜ-ʀɪsᴋ ᴀssᴀssɪɴᴀᴛɪᴏɴ.\n• <code>/steal [ʀᴇᴘʟʏ]</code> : ʀᴏʙ ᴀ ᴜsᴇʀ's ᴘᴏᴄᴋᴇᴛ.\n• <code>/heist</code> : sᴛᴀʀᴛ/ᴊᴏɪɴ ᴀ ɢʀᴏᴜᴘ ʀᴏʙʙᴇʀʏ.\n• <code>/protect</code> : ʙᴜʏ ᴀ ᴛᴇᴍᴘᴏʀᴀʀʏ sʜɪᴇʟᴅ.\n• <code>/revive [ʀᴇᴘʟʏ]</code> : ʙʀɪɴɢ ᴀ ᴅᴇᴀᴅ ᴜsᴇʀ ʙᴀᴄᴋ.",
-    "help_ai": "🧠 <b>𝐀𝐈 & 𝐔𝐭𝐢𝐥𝐢𝐭𝐢𝐞𝐬</b>\n<i>ᴘᴏᴡᴇʀғᴜʟ ᴛᴏᴏʟs ᴀᴛ ʏᴏᴜʀ ғɪɴɢᴇʀᴛɪᴘs.</i>\n\n• <code>/q [ʀᴇᴘʟʏ]</code> : ᴛᴜʀɴ ᴛᴇxᴛ ɪɴᴛᴏ ᴀ ǫᴜᴏᴛᴇ sᴛɪᴄᴋᴇʀ.\n• <code>/font [ᴛᴇxᴛ]</code> : ɢᴇɴᴇʀᴀᴛᴇ sᴛʏʟɪsʜ ғᴏɴᴛs.\n• <code>/obt [ʀᴇᴘʟʏ]</code> : sᴀᴠᴇ sᴛɪᴄᴋᴇʀ ᴘᴀᴄᴋs.\n• <code>/id [ʀᴇᴘʟʏ]</code> : ɢᴇᴛ ᴜsᴇʀ/ᴄʜᴀᴛ ᴜɴɪǫᴜᴇ ɪᴅ.\n• <code>/feedback [ᴍsɢ]</code> : sᴇɴᴅ ᴀ ʙᴜɢ ʀᴇᴘᴏʀᴛ.",
-    "help_social": "🚩 <b>𝐒𝐨𝐜𝐢𝐚𝐥 & 𝐅𝐮𝐧</b>\n<i>ɪɴᴛᴇʀᴀᴄᴛ ᴡɪᴛʜ ʏᴏᴜʀ ғʀɪᴇɴᴅs ɪɴ ᴛʜᴇ ᴄʜᴀᴛ.</i>\n\n• <code>/kiss [ʀᴇᴘʟʏ]</code> | <code>/hug [ʀᴇᴘʟʏ]</code>\n• <code>/slap [ʀᴇᴘʟʏ]</code> | <code>/bite [ʀᴇᴘʟʏ]</code>\n• <code>/punch [ʀᴇᴘʟʏ]</code> | <code>/kick [ʀᴇᴘʟʏ]</code>\n• <code>/referral</code> : ɢᴇᴛ ʏᴏᴜʀ ɪɴᴠɪᴛᴇ ʟɪɴᴋ."
+    "help_manage": (
+        "🛡️ <b>𝐆𝐫𝐨𝐮𝐩 𝐌𝐚𝐧𝐚𝐠𝐞𝐦𝐞𝐧𝐭</b>\n"
+        "<i>ᴀᴅᴍɪɴ ᴛᴏᴏʟs ᴛᴏ ᴇɴғᴏʀᴄᴇ ᴛʜᴇ ʟᴀᴡ.</i>\n\n"
+        "• <code>/ban</code> | <code>/unban</code> : ᴍᴀɴᴀɢᴇ ʙᴀɴs\n"
+        "• <code>/mute</code> | <code>/unmute</code> : sɪʟᴇɴᴄᴇ ᴜsᴇʀs\n"
+        "• <code>/tmute</code> : ᴛᴇᴍᴘᴏʀᴀʀʏ ᴍᴜᴛᴇ\n"
+        "• <code>/warn</code> | <code>/unwarn</code> : ᴡᴀʀɴɪɴɢ sʏsᴛᴇᴍ\n"
+        "• <code>/promote</code> | <code>/demote</code> : ᴀᴅᴍɪɴ ʀᴏʟᴇs\n"
+        "• <code>/pin</code> | <code>/unpin</code> : sᴛɪᴄᴋʏ ᴍsɢs\n"
+        "• <code>/purge</code> | <code>/dlt</code> : ᴄʟᴇᴀɴ ᴄʜᴀᴛ\n"
+        "• <code>/kick</code> : ʀᴇᴍᴏᴠᴇ ᴜsᴇʀ"
+    ),
+    "help_eco": (
+        "💰 <b>𝐄𝐜𝐨𝐧𝐨𝐦𝐲 & 𝐖𝐞𝐚𝐥𝐭𝐡</b>\n"
+        "<i>ɢʀɪɴᴅ, ᴛʀᴀᴅᴇ, ᴀɴᴅ sᴛᴀᴄᴋ ᴄᴀsʜ.</i>\n\n"
+        "• <code>/daily</code> : ᴄʟᴀɪᴍ ᴅᴀɪʟʏ ᴄᴏɪɴs\n"
+        "• <code>/givee [ɪᴅ] [ᴀᴍᴛ]</code> : ᴛʀᴀɴsғᴇʀ ꜰᴜɴᴅs\n"
+        "• <code>/shop</code> | <code>/purchase</code> : ʙᴜʏ ɪᴛᴇᴍs\n"
+        "• <code>/redeem [ᴄᴏᴅᴇ]</code> : ᴜsᴇ ᴘʀᴏᴍᴏ ᴄᴏᴅᴇ\n"
+        "• <code>/richest</code> : ᴡᴇᴀʟᴛʜ ʟᴇᴀᴅᴇʀʙᴏᴀʀᴅ\n"
+        "• <code>/create</code> : ᴍᴀᴋᴇ ʀᴇᴅᴇᴇᴍ ᴄᴏᴅᴇ (ᴀᴅᴍɪɴ)"
+    ),
+    "help_game": (
+        "🕹️ <b>𝐆𝐚𝐦𝐞 & 𝐂𝐨𝐦𝐛𝐚𝐭</b>\n"
+        "<i>ʜᴜɴᴛ, ꜰɪɢʜᴛ, ᴀɴᴅ sᴜʀᴠɪᴠᴇ.</i>\n\n"
+        "⚔️ <b>ᴄᴏᴍʙᴀᴛ</b>\n"
+        "• <code>/kill</code> | <code>/murder</code> : ᴀᴛᴛᴀᴄᴋ ᴜsᴇʀs\n"
+        "• <code>/steal</code> : ʀᴏʙ ᴢ-ᴄᴏɪɴs\n"
+        "• <code>/revive</code> : ʙʀɪɴɢ ʙᴀᴄᴋ ᴛʜᴇ ᴅᴇᴀᴅ\n"
+        "• <code>/protect</code> : ʜɪʀᴇ ᴀʀᴍᴏʀ\n\n"
+        "📊 <b>sᴛᴀᴛs & ʀᴀɴᴋ</b>\n"
+        "• <code>/status</code> : ᴠɪᴇᴡ ᴘʀᴏꜰɪʟᴇ\n"
+        "• <code>/rankers</code> | <code>/rullrank</code> : ɢʟᴏʙᴀʟ ʀᴀɴᴋs\n"
+        "• <code>/heist</code> | <code>/joinheist</code> : ɢʀᴏᴜᴘ ʀᴏʙʙᴇʀʏ"
+    ),
+    "help_ai": (
+        "🧠 <b>𝐀𝐈 & 𝐔𝐭𝐢𝐥𝐢𝐭𝐢𝐞𝐬</b>\n"
+        "<i>sᴍᴀʀᴛ ᴛᴏᴏʟs ꜰᴏʀ ᴇᴠᴇʀʏᴅᴀʏ ᴜsᴇ.</i>\n\n"
+        "• <code>/q</code> : ᴍᴀᴋᴇ ᴀ ǫᴜᴏᴛᴇ sᴛɪᴄᴋᴇʀ\n"
+        "• <code>/font [ᴛᴇxᴛ]</code> : sᴛʏʟɪsʜ ᴛᴇxᴛ\n"
+        "• <code>/obt</code> : sᴀᴠᴇ sᴛɪᴄᴋᴇʀs\n"
+        "• <code>/id</code> : ɢᴇᴛ ᴜɴɪǫᴜᴇ ɪᴅs\n"
+        "• <code>/setpng</code> : ᴄᴏɴᴠᴇʀᴛ ᴛᴏ ᴘɴɢ\n"
+        "• <code>/feedback</code> : ʀᴇᴘᴏʀᴛ ɪssᴜᴇs"
+    ),
+    "help_social": (
+        "🚩 <b>𝐒𝐨𝐜𝐢𝐚𝐥 & 𝐅𝐮𝐧</b>\n"
+        "<i>ɪɴᴛᴇʀᴀᴄᴛ ᴡɪᴛʜ ᴛʜᴇ ᴄᴏᴍᴍᴜɴɪᴛʏ.</i>\n\n"
+        "• <code>/kiss</code> | <code>/hug</code> | <code>/slap</code>\n"
+        "• <code>/bite</code> | <code>/kick</code> | <code>/punch</code>\n"
+        "• <code>/referral</code> : ɪɴᴠɪᴛᴇ ꜰʀɪᴇɴᴅs\n"
+        "• <code>/stats</code> : ᴄʜᴀᴛ sᴛᴀᴛɪsᴛɪᴄs"
+    )
 }
 
-# --- HELPER: YOUR EXACT REQUESTED LAYOUT ---
+# --- 3. KEYBOARDS ---
 def get_main_keyboard(bot_username):
-    return [
+    return InlineKeyboardMarkup([
         [InlineKeyboardButton("👨‍💻 ᴅᴇᴠᴇʟᴏᴘᴇʀ", url="tg://user?id=5773908061")],
         [
             InlineKeyboardButton("✨ sᴜᴘᴘᴏʀᴛ", url="https://t.me/dreamspacez"),
             InlineKeyboardButton("📢 ᴜᴘᴅᴀᴛᴇs", url="https://t.me/yuuriXupdates")
         ],
-        [InlineKeyboardButton("📚 ʜᴇʟᴘ", callback_data="help_main")],
+        [InlineKeyboardButton("📚 ʜᴇʟᴘ & ᴄᴏᴍᴍᴀɴᴅs", callback_data="help_main")],
         [InlineKeyboardButton("➕ ᴀᴅᴅ ᴍᴇ ᴛᴏ ʏᴏᴜʀ ɢʀᴏᴜᴘ", url=f"https://t.me/{bot_username}?startgroup=true")]
-    ]
+    ])
 
-# --- 2. ASYNC IMAGE FETCHER ---
-async def get_img(command_name, default_url="https://graph.org/file/f46487e49202167d58151.jpg"):
-    try:
-        doc = await image_db.find_one({"command": command_name})
-        if doc and "file_id" in doc:
-            return str(doc["file_id"])
-        return default_url
-    except Exception:
-        return default_url
+def get_help_keyboard():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("🛡️ ᴍᴀɴᴀɢᴇ", callback_data="help_manage"), InlineKeyboardButton("💰 ᴇᴄᴏɴᴏᴍʏ", callback_data="help_eco")],
+        [InlineKeyboardButton("🕹️ ɢᴀᴍᴇ", callback_data="help_game"), InlineKeyboardButton("🚩 sᴏᴄɪᴀʟ", callback_data="help_social")],
+        [InlineKeyboardButton("🧠 ᴀɪ & ᴛᴏᴏʟs", callback_data="help_ai")],
+        [InlineKeyboardButton("🔙 ʙᴀᴄᴋ ᴛᴏ ᴍᴇɴᴜ", callback_data="back_to_start")]
+    ])
 
-# --- 3. START COMMAND ---
+# --- 4. START COMMAND ---
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    try:
-        get_user(user) # Your sync user registration
-    except:
-        pass
-
-    start_img = await get_img("start")
     caption = (
         f"<b>ᴡᴇʟᴄᴏᴍᴇ, {user.first_name}!</b> 👋\n\n"
         f"<blockquote>ɪ ᴀᴍ <b>ʏᴜᴜʀɪ</b> — ᴀɴ ᴀᴅᴠᴀɴᴄᴇᴅ ᴀɪ ᴀssɪsᴛᴀɴᴛ ᴅᴇsɪɢɴᴇᴅ ᴛᴏ ᴇɴʜᴀɴᴄᴇ ʏᴏᴜʀ ᴛᴇʟᴇɢʀᴀᴍ ᴇxᴘᴇʀɪᴇɴᴄᴇ.</blockquote>\n\n"
         f"ᴀᴅᴅ ᴍᴇ ᴛᴏ ʏᴏᴜʀ ɢʀᴏᴜᴘ ᴀɴᴅ ʟᴇᴛ ᴍᴇ ᴛᴀᴋᴇ ᴄᴀʀᴇ ᴏғ ᴛʜᴇ ʀᴇsᴛ."
     )
+    await update.message.reply_photo(
+        photo=IMG_MAIN,
+        caption=caption,
+        parse_mode=ParseMode.HTML,
+        reply_markup=get_main_keyboard(context.bot.username)
+    )
 
-    keyboard = get_main_keyboard(context.bot.username)
-
-    try:
-        await update.message.reply_photo(photo=start_img, caption=caption, parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup(keyboard))
-    except Exception:
-        await update.message.reply_text(text=f"🖼️ (ɪᴍᴀɢᴇ ᴜɴᴀᴠᴀɪʟᴀʙʟᴇ)\n\n{caption}", parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup(keyboard))
-
-# --- 4. CALLBACK HANDLER (THE ENGINE THAT MAKES IT WORK) ---
+# --- 5. CALLBACK HANDLER ---
 async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     data = query.data
     await query.answer()
 
     try:
-        # STEP 1: They click "Help" on the main menu -> Show Categories
         if data == "help_main":
-            text = "✨ <b>ʏᴜᴜʀɪ ʜᴇʟᴘ ᴍᴇɴᴜ</b>\n\n<i>sᴇʟᴇᴄᴛ ᴀ ᴄᴀᴛᴇɢᴏʀʏ ʙᴇʟᴏᴡ:</i>"
-            keyboard = [
-                [InlineKeyboardButton("🛡️ ᴍᴀɴᴀɢᴇ", callback_data="help_manage"), InlineKeyboardButton("💰 ᴇᴄᴏɴᴏᴍʏ", callback_data="help_eco")],
-                [InlineKeyboardButton("🕹️ ɢᴀᴍᴇ", callback_data="help_game"), InlineKeyboardButton("🚩 sᴏᴄɪᴀʟ", callback_data="help_social")],
-                [InlineKeyboardButton("🧠 ᴀɪ & ᴛᴏᴏʟs", callback_data="help_ai")],
-                [InlineKeyboardButton("🔙 ʙᴀᴄᴋ", callback_data="back_to_start")]
-            ]
-            await query.edit_message_caption(caption=text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode=ParseMode.HTML)
+            text = "✨ <b>ʏᴜᴜʀɪ ʜᴇʟᴘ ᴍᴇɴᴜ</b>\n\n<i>sᴇʟᴇᴄᴛ ᴀ ᴍᴏᴅᴜʟᴇ ᴛᴏ ᴠɪᴇᴡ ᴜsᴀɢᴇ:</i>"
+            await query.edit_message_media(
+                media=InputMediaPhoto(media=IMG_HELP, caption=text, parse_mode=ParseMode.HTML),
+                reply_markup=get_help_keyboard()
+            )
 
-        # STEP 2: They click a specific category (e.g. Manage) -> Show Commands
         elif data in HELP_TEXTS:
-            # The back button here goes back to the module list
-            keyboard = [[InlineKeyboardButton("🔙 ʙᴀᴄᴋ", callback_data="help_main")]]
-            await query.edit_message_caption(caption=HELP_TEXTS[data], reply_markup=InlineKeyboardMarkup(keyboard), parse_mode=ParseMode.HTML)
+            keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 ʙᴀᴄᴋ", callback_data="help_main")]])
+            await query.edit_message_caption(
+                caption=HELP_TEXTS[data],
+                reply_markup=keyboard,
+                parse_mode=ParseMode.HTML
+            )
 
-        # STEP 3: They click Back to Start -> Show your exact requested layout
         elif data == "back_to_start":
             user = update.effective_user
             caption = (
                 f"<b>ᴡᴇʟᴄᴏᴍᴇ, {user.first_name}!</b> 👋\n\n"
-                f"<blockquote>ɪ ᴀᴍ <b>ʏᴜᴜʀɪ</b> — ᴀɴ ᴀᴅᴠᴀɴᴄᴇᴅ ᴀɪ ᴀssɪsᴛᴀɴᴛ.</blockquote>\n\n"
-                f"ᴀᴅᴅ ᴍᴇ ᴛᴏ ʏᴏᴜʀ ɢʀᴏᴜᴘ ᴀɴᴅ ʟᴇᴛ ᴍᴇ ᴛᴀᴋᴇ ᴄᴀʀᴇ ᴏғ ᴛʜᴇ ʀᴇsᴛ."
+                f"<blockquote>ɪ ᴀᴍ <b>ʏᴜᴜʀɪ</b>.</blockquote>"
             )
-            keyboard = get_main_keyboard(context.bot.username)
-            await query.edit_message_caption(caption=caption, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode=ParseMode.HTML)
+            await query.edit_message_media(
+                media=InputMediaPhoto(media=IMG_MAIN, caption=caption, parse_mode=ParseMode.HTML),
+                reply_markup=get_main_keyboard(context.bot.username)
+            )
 
     except Exception as e:
         print(f"Callback Error: {e}")
@@ -3935,14 +3974,22 @@ application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, auto_rep
 
 # ---------------- CALLBACKS & ERROR HANDLING ----------------
 
-# 1. Handle Game/Heist clicks first (Specific patterns)
+# 1. Handle Game/Heist clicks first 
+# This ensures game logic is checked before the help menu logic
 application.add_handler(CallbackQueryHandler(heist_choice, pattern="^heist_"))
 
-# 2. Handle Menu/Help clicks second (Specific patterns)
-# Added 'help_main' to the pattern so the 📚 HELP button works
-application.add_handler(CallbackQueryHandler(handle_callbacks, pattern="^(help_|back_to_start|help_main)"))
+# 2. Handle Menu/Help clicks second
+# Added 'help_' as a prefix to catch 'help_main', 'help_manage', 'help_eco', etc.
+# Added 'back_to_start' to handle the return button
+application.add_handler(
+    CallbackQueryHandler(
+        handle_callbacks, 
+        pattern="^(help_|back_to_start)"
+    )
+)
 
 # 3. Log errors instead of crashing
+# Ensure 'error_handler' is defined in your code to catch network blips
 application.add_error_handler(error_handler)
 
 # --- 3. FASTAPI WEBHOOK LOGIC ---
