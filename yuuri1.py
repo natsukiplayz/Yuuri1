@@ -2572,22 +2572,25 @@ async def allow_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         allowed_collection.update_one({"user_id": target_id}, {"$set": {"allowed": True}}, upsert=True)
         await update.message.reply_text(f"✅ Usᴇʀ `{target_id}` ɪs ɴᴏᴡ ᴀʟʟᴏᴡᴇᴅ ᴛᴏ ʙʏᴘᴀss sᴇᴄᴜʀɪᴛʏ.")
 
-# ================= SAVED GROUPS DB SETUP =================
-# Use your existing 'db' (AsyncIOMotorClient)
-groups_collection = db["saved_groups"]
+# ================= CONFIG ===============
+#---
+# ================= SAVED GROUPS (SYNC) =================
 SAVED_GROUPS = {}
 
-async def load_groups_from_db():
+def load_groups_from_db():
+    """Sync: Loads groups into memory"""
     global SAVED_GROUPS
-    cursor = groups_collection.find({})
-    async for doc in cursor:
-        # Convert 'pos' to int to ensure layout works
-        SAVED_GROUPS[int(doc["pos"])] = {"name": doc["name"], "url": doc["url"]}
+    try:
+        SAVED_GROUPS.clear()
+        cursor = groups_collection.find({})
+        for doc in cursor:
+            SAVED_GROUPS[int(doc["pos"])] = {"name": doc["name"], "url": doc["url"]}
+    except Exception as e:
+        logging.error(f"DB Load Error: {e}")
 
 # --- SAVE COMMAND ---
 async def save_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    if user.id != OWNER_IDS: return
+    if update.effective_user.id != OWNER_IDS: return
 
     args = context.args
     if len(args) < 3:
@@ -2599,16 +2602,14 @@ async def save_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
         url = args[-2]
         name = " ".join(args[:-2])
 
-        # 1. Update MongoDB
-        await groups_collection.update_one(
+        # Sync DB Update (No await)
+        groups_collection.update_one(
             {"pos": pos},
             {"$set": {"name": name, "url": url}},
             upsert=True
         )
 
-        # 2. Sync Local Memory
         SAVED_GROUPS[pos] = {"name": name, "url": url}
-        
         await update.message.reply_text(f"✅ sᴀᴠᴇᴅ ᴛᴏ ᴘᴏsɪᴛɪᴏɴ {pos}")
     except Exception as e:
         await update.message.reply_text(f"❌ ᴇʀʀᴏʀ: {e}")
@@ -2618,23 +2619,20 @@ async def savgc_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != OWNER_IDS: return
 
     keyboard = []
-    # Row 1 (Big)
+    # Layout logic
     if 1 in SAVED_GROUPS:
         keyboard.append([InlineKeyboardButton(SAVED_GROUPS[1]["name"], url=SAVED_GROUPS[1]["url"])])
-    
-    # Row 2 (Small Small)
+
     row2 = []
-    if 2 in SAVED_GROUPS: row2.append(InlineKeyboardButton(SAVED_GROUPS[2]["name"], url=SAVED_GROUPS[2]["url"]))
-    if 3 in SAVED_GROUPS: row2.append(InlineKeyboardButton(SAVED_GROUPS[3]["name"], url=SAVED_GROUPS[3]["url"]))
+    for p in [2, 3]:
+        if p in SAVED_GROUPS: row2.append(InlineKeyboardButton(SAVED_GROUPS[p]["name"], url=SAVED_GROUPS[p]["url"]))
     if row2: keyboard.append(row2)
 
-    # Row 3 (Small Small)
     row3 = []
-    if 4 in SAVED_GROUPS: row3.append(InlineKeyboardButton(SAVED_GROUPS[4]["name"], url=SAVED_GROUPS[4]["url"]))
-    if 5 in SAVED_GROUPS: row3.append(InlineKeyboardButton(SAVED_GROUPS[5]["name"], url=SAVED_GROUPS[5]["url"]))
+    for p in [4, 5]:
+        if p in SAVED_GROUPS: row3.append(InlineKeyboardButton(SAVED_GROUPS[p]["name"], url=SAVED_GROUPS[p]["url"]))
     if row3: keyboard.append(row3)
 
-    # Row 4 (Big)
     if 6 in SAVED_GROUPS:
         keyboard.append([InlineKeyboardButton(SAVED_GROUPS[6]["name"], url=SAVED_GROUPS[6]["url"])])
 
@@ -2650,44 +2648,23 @@ async def savgc_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # --- DELETE COMMAND ---
 async def del_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    message = update.effective_message
+    if update.effective_user.id != OWNER_IDS: return
 
-    # Owner only check
-    if user.id != OWNER_IDS:
-        return
-
-    # Check for position argument
     if not context.args:
-        await message.reply_text("<code>⚠️ ᴜsᴀɢᴇ: /ᴅᴇʟ [ᴘᴏsɪᴛɪᴏɴ 1-6]</code>", parse_mode='HTML')
+        await update.message.reply_text("<code>⚠️ ᴜsᴀɢᴇ: /ᴅᴇʟ [ᴘᴏsɪᴛɪᴏɴ 1-6]</code>", parse_mode='HTML')
         return
 
     try:
         pos = int(context.args[0])
-        
-        # 1. Remove from MongoDB
-        result = await groups_collection.delete_one({"pos": pos})
-        
-        # 2. Remove from Local Memory
-        if pos in SAVED_GROUPS:
-            name_deleted = SAVED_GROUPS[pos]["name"]
-            del SAVED_GROUPS[pos]
-            
-            # CLEAN CALLBACK
-            response = (
-                f"ᴜsᴇʀ: <b>{user.first_name}</b>\n"
-                "sᴛᴀᴛᴜs: ɢʀᴏᴜᴘ ʀᴇᴍᴏᴠᴇᴅ\n"
-                f"ᴘᴏsɪᴛɪᴏɴ: {pos}\n"
-                f"ɴᴀᴍᴇ: {name_deleted}"
-            )
-            await message.reply_text(response, parse_mode='HTML')
-        else:
-            await message.reply_text(f"🧐 ɴᴏᴛʜɪɴɢ ɪs sᴀᴠᴇᴅ ᴀᴛ ᴘᴏsɪᴛɪᴏɴ {pos}")
+        groups_collection.delete_one({"pos": pos}) # Sync
 
-    except ValueError:
-        await message.reply_text("❌ ᴘʟᴇᴀsᴇ ᴘʀᴏᴠɪᴅᴇ ᴀ ᴠᴀʟɪᴅ ᴘᴏsɪᴛɪᴏɴ ɴᴜᴍʙᴇʀ")
+        if pos in SAVED_GROUPS:
+            del SAVED_GROUPS[pos]
+            await update.message.reply_text(f"✅ ɢʀᴏᴜᴘ ʀᴇᴍᴏᴠᴇᴅ ғʀᴏᴍ ᴘᴏsɪᴛɪᴏɴ {pos}")
+        else:
+            await update.message.reply_text("🧐 ɴᴏᴛʜɪɴɢ sᴀᴠᴇᴅ ᴛʜᴇʀᴇ.")
     except Exception as e:
-        await message.reply_text(f"❌ ᴅʙ ᴇʀʀᴏʀ: {str(e).lower()}")
+        await update.message.reply_text(f"❌ ᴇʀʀᴏʀ: {e}")
 
 #=============Big_Upgrades==========
 #--
