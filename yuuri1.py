@@ -1272,15 +1272,16 @@ HELP_TEXTS = {
 # --- 2. START COMMAND ---
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    get_user(user) # Sync DB check
+    get_user(user) # Sync DB check (ensure this exists in your main code)
     
-    # CRITICAL: Added 'await' to fix the subscriptable error
     try:
+        # Awaiting get_img to resolve any Asyncio Futures
         start_img = await get_img("start", "https://graph.org/file/f46487e49202167d58151.jpg")
+        if not isinstance(start_img, str):
+            start_img = "https://graph.org/file/f46487e49202167d58151.jpg"
     except Exception:
         start_img = "https://graph.org/file/f46487e49202167d58151.jpg"
 
-    # CRITICAL: Corrected <blockquote> closing tag
     caption = (
         f"<b>ᴡᴇʟᴄᴏᴍᴇ, {user.first_name}!</b> 👋\n\n"
         f"<blockquote>ɪ ᴀᴍ <b>ʏᴜᴜʀɪ</b> — ᴀɴ ᴀᴅᴠᴀɴᴄᴇᴅ ᴀɪ ᴀssɪsᴛᴀɴᴛ ᴅᴇsɪɢɴᴇᴅ ᴛᴏ ᴇɴʜᴀɴᴄᴇ ʏᴏᴜʀ ᴛᴇʟᴇɢʀᴀᴍ ᴇxᴘᴇʀɪᴇɴᴄᴇ.</blockquote>\n\n"
@@ -1289,7 +1290,8 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     keyboard = [
         [InlineKeyboardButton("➕ ᴀᴅᴅ ᴛᴏ ᴄʜᴀᴛ", url=f"https://t.me/{context.bot.username}?startgroup=true")],
-        [InlineKeyboardButton("📚 ʜᴇʟᴘ & ᴄᴏᴍᴍᴀɴᴅs", callback_data="help_main")],
+        [InlineKeyboardButton("📚 ʜᴇʟᴘ & ᴄᴏᴍᴍᴀɴᴅs", callback_data="help_main"),
+         InlineKeyboardButton("👨‍💻 ᴅᴇᴠᴇʟᴏᴘᴇʀ", callback_data="help_dev")],
         [InlineKeyboardButton("ꜱᴜᴘᴘᴏʀᴛ ↗️", url="https://t.me/your_support"),
          InlineKeyboardButton("ᴄʜᴀɴɴᴇʟ ↗️", url="https://t.me/your_channel")]
     ]
@@ -1301,36 +1303,52 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-# --- 3. CALLBACK HANDLER (The "All Logic" Part) ---
+# --- 3. CALLBACK HANDLER ---
 async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     data = query.data
     await query.answer()
 
-    if data == "help_main":
-        text = "✨ <b>ʏᴜᴜʀɪ ᴍᴇɴᴜ</b>\n\n<i>sᴇʟᴇᴄᴛ ᴀ ᴍᴏᴅᴜʟᴇ ʙᴇʟᴏᴡ ᴛᴏ ᴇxᴘʟᴏʀᴇ:</i>"
-        keyboard = [
-            [InlineKeyboardButton("🧠 ᴀɪ & ᴛᴏᴏʟs", callback_data="help_ai"),
-             InlineKeyboardButton("💰 ᴇᴄᴏɴᴏᴍʏ", callback_data="help_eco")],
-            [InlineKeyboardButton("🕹️ ɢᴀᴍᴇ", callback_data="help_game"),
-             InlineKeyboardButton("🚩 sᴏᴄɪᴀʟ", callback_data="help_social")],
-            [InlineKeyboardButton("🛡️ ᴍᴀɴᴀɢᴇ", callback_data="help_manage")],
-            [InlineKeyboardButton("🔙 ʙᴀᴄᴋ", callback_data="back_to_start")]
-        ]
-        await query.edit_message_caption(caption=text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode=ParseMode.HTML)
+    try:
+        if data == "help_main":
+            text = "✨ <b>ʏᴜᴜʀɪ ᴍᴇɴᴜ</b>\n\n<i>sᴇʟᴇᴄᴛ ᴀ ᴍᴏᴅᴜʟᴇ ʙᴇʟᴏᴡ ᴛᴏ ᴇxᴘʟᴏʀᴇ:</i>"
+            keyboard = [
+                [InlineKeyboardButton("🧠 ᴀɪ & ᴛᴏᴏʟs", callback_data="help_ai"),
+                 InlineKeyboardButton("💰 ᴇᴄᴏɴᴏᴍʏ", callback_data="help_eco")],
+                [InlineKeyboardButton("🕹️ ɢᴀᴍᴇ", callback_data="help_game"),
+                 InlineKeyboardButton("🚩 sᴏᴄɪᴀʟ", callback_data="help_social")],
+                [InlineKeyboardButton("🛡️ ᴍᴀɴᴀɢᴇ", callback_data="help_manage")],
+                [InlineKeyboardButton("🔙 ʙᴀᴄᴋ", callback_data="back_to_start")]
+            ]
+            await query.edit_message_caption(caption=text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode=ParseMode.HTML)
 
-    elif data in HELP_TEXTS:
-        keyboard = [[InlineKeyboardButton("🔙 ʙᴀᴄᴋ", callback_data="help_main")]]
-        await query.edit_message_caption(caption=HELP_TEXTS[data], reply_markup=InlineKeyboardMarkup(keyboard), parse_mode=ParseMode.HTML)
+        elif data == "help_dev":
+            dev_text = (
+                "👨‍💻 <b>𝐃𝐞𝐯𝐞𝐥𝐨𝐩𝐞𝐫 𝐈𝐧𝐟𝐨𝐫𝐦𝐚𝐭𝐢𝐨𝐧</b>\n\n"
+                "<blockquote>ʏᴜᴜʀɪ ɪs ᴍᴀɪɴᴛᴀɪɴᴇᴅ ᴀɴᴅ ᴅᴇᴠᴇʟᴏᴘᴇᴅ ʙʏ ᴀ sᴏʟᴏ ᴅᴇᴠᴇʟᴏᴘᴇʀ. ɪꜰ ʏᴏᴜ ʜᴀᴠᴇ ǫᴜᴇsᴛɪᴏɴs ᴏʀ ᴡᴀɴᴛ ᴛᴏ ᴄᴏʟʟᴀʙᴏʀᴀᴛᴇ, ᴄᴏɴᴛᴀᴄᴛ ʙᴇʟᴏᴡ.</blockquote>\n\n"
+                "• <b>ᴅᴇᴠ:</b> [ʏᴏᴜʀ ɴᴀᴍᴇ/ʜᴀɴᴅʟᴇ]\n"
+                "• <b>ʟᴀɴɢᴜᴀɢᴇ:</b> ᴘʏᴛʜᴏɴ (ᴘʏᴛɢʙᴏᴛ)\n"
+                "• <b>ᴅᴀᴛᴀʙᴀsᴇ:</b> ᴍᴏɴɢᴏᴅʙ"
+            )
+            keyboard = [[InlineKeyboardButton("🔙 ʙᴀᴄᴋ", callback_data="back_to_start")]]
+            await query.edit_message_caption(caption=dev_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode=ParseMode.HTML)
 
-    elif data == "back_to_start":
-        user = update.effective_user
-        caption = f"<b>ᴡᴇʟᴄᴏᴍᴇ, {user.first_name}!</b> 👋\n\n<blockquote>ɪ ᴀᴍ <b>ʏᴜᴜʀɪ</b>.</blockquote>"
-        keyboard = [
-            [InlineKeyboardButton("➕ ᴀᴅᴅ ᴛᴏ ᴄʜᴀᴛ", url=f"https://t.me/{context.bot.username}?startgroup=true")],
-            [InlineKeyboardButton("📚 ʜᴇʟᴘ & ᴄᴏᴍᴍᴀɴᴅs", callback_data="help_main")]
-        ]
-        await query.edit_message_caption(caption=caption, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode=ParseMode.HTML)
+        elif data in HELP_TEXTS:
+            keyboard = [[InlineKeyboardButton("🔙 ʙᴀᴄᴋ", callback_data="help_main")]]
+            await query.edit_message_caption(caption=HELP_TEXTS[data], reply_markup=InlineKeyboardMarkup(keyboard), parse_mode=ParseMode.HTML)
+
+        elif data == "back_to_start":
+            user = update.effective_user
+            caption = f"<b>ᴡᴇʟᴄᴏᴍᴇ, {user.first_name}!</b> 👋\n\n<blockquote>ɪ ᴀᴍ <b>ʏᴜᴜʀɪ</b>.</blockquote>"
+            keyboard = [
+                [InlineKeyboardButton("➕ ᴀᴅᴅ ᴛᴏ ᴄʜᴀᴛ", url=f"https://t.me/{context.bot.username}?startgroup=true")],
+                [InlineKeyboardButton("📚 ʜᴇʟᴘ & ᴄᴏᴍᴍᴀɴᴅs", callback_data="help_main"),
+                 InlineKeyboardButton("👨‍💻 ᴅᴇᴠᴇʟᴏᴘᴇʀ", callback_data="help_dev")]
+            ]
+            await query.edit_message_caption(caption=caption, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode=ParseMode.HTML)
+            
+    except Exception as e:
+        print(f"Callback Error: {e}")
 
 # --- 4. FEEDBACK COMMAND ---
 async def feedback_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1339,6 +1357,7 @@ async def feedback_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await update.message.reply_text("<code>⚠️ ᴜsᴀɢᴇ: /ғᴇᴇᴅʙᴀᴄᴋ [ʏᴏᴜʀ ᴍᴇssᴀɢᴇ]</code>", parse_mode=ParseMode.HTML)
 
     fb_text = " ".join(context.args)
+    
     feedback_db.insert_one({
         "user_id": user.id, 
         "username": user.username, 
@@ -1346,14 +1365,14 @@ async def feedback_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "date": datetime.now()
     })
     
-    # Notify Owner (OWNER_ID should be defined in your vars)
     try:
         await context.bot.send_message(
-            OWNER_ID, 
+            int(OWNER_ID), 
             f"📩 <b>ɴᴇᴡ ғᴇᴇᴅʙᴀᴄᴋ!</b>\n\nғʀᴏᴍ: {user.first_name} (<code>{user.id}</code>)\nᴍsɢ: {fb_text}", 
             parse_mode=ParseMode.HTML
         )
-    except: pass
+    except Exception as e:
+        print(f"Failed to notify owner: {e}")
 
     await update.message.reply_text("✅ <b>ᴛʜᴀɴᴋ ʏᴏᴜ! ʏᴏᴜʀ ғᴇᴇᴅʙᴀᴄᴋ ʜᴀs ʙᴇᴇɴ sᴇɴᴛ.</b>", parse_mode=ParseMode.HTML)
 
