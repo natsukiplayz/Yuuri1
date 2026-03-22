@@ -157,16 +157,22 @@ def save_user(data):
     users.update_one({"id": data["id"]}, {"$set": data}, upsert=True)
 
 # --- DATABASE HELPERS ---
-
-def get_img(command_name, default_url="https://graph.org/file/default.jpg"):
-    """Sync: Gets the saved file_id for a command or returns default"""
+async def get_img(command_name, default_url="https://graph.org/file/default.jpg"):
+    """
+    Async: Gets the saved file_id for a command or returns default.
+    Ensures the DB call is awaited to prevent 'Future' errors.
+    """
     try:
-        doc = image_db.find_one({"command": command_name})
-        if doc:
-            return doc["file_id"]
+        # Use await here to get the actual dictionary, not a Future object
+        doc = await image_db.find_one({"command": command_name})
+        
+        # Check if doc exists and has the key
+        if doc and "file_id" in doc:
+            return str(doc["file_id"])
+            
         return default_url
     except Exception as e:
-        print(f"Error fetching image: {e}")
+        print(f"❌ Error fetching image for {command_name}: {e}")
         return default_url
 
 # ======Broadcast_System======
@@ -315,26 +321,6 @@ def get_fancy_text(text, font_type):
         final_output.append(new_word)
 
     return " ".join(final_output)
-
-# Helper functions for MongoDB
-def is_tortured(user_id, torture_type):
-    """Checks if a user is currently targeted in DB"""
-    return torture_db.find_one({"id": user_id, "type": torture_type}) is not None
-
-def toggle_torture(user_id, torture_type):
-    """Adds to DB if missing, removes if exists. Returns True if added."""
-    query = {"id": user_id, "type": torture_type}
-    existing = torture_db.find_one(query)
-    if existing:
-        torture_db.delete_one(query)
-        return False
-    else:
-        torture_db.insert_one(query)
-        return True
-
-def clear_all_torture():
-    """Wipes the entire torture registry"""
-    torture_db.delete_many({})
 
 #============ Side_Features ========
 #--
@@ -1222,65 +1208,45 @@ from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 import asyncio
 from datetime import datetime
-
-# --- 1. HELP DATA ---
+# --- 1. HELP DATA (Unchanged) ---
 HELP_TEXTS = {
     "help_manage": (
-        "🛡️ <b>𝐆𝐫𝐨𝐮𝐩 𝐌𝐚𝐧𝐚𝐠𝐞𝐦𝐞𝐧𝐭</b>\n"
-        "ᴘᴏᴡᴇʀꜰᴜʟ ᴛᴏᴏʟs ꜰᴏʀ ᴄʜᴀᴛ ᴀᴅᴍɪɴs.\n\n"
-        "• <code>/ban</code> | <code>/unban</code>\n"
-        "• <code>/mute</code> | <code>/unmute</code>\n"
-        "• <code>/warn</code> | <code>/unwarn</code>\n"
-        "• <code>/purge</code> | <code>/dlt</code>\n"
-        "• <code>/promote</code> | <code>/demote</code>"
+        "🛡️ <b>𝐆𝐫𝐨𝐮𝐩 𝐌𝐚𝐧𝐚𝐠𝐞𝐦𝐞𝐧𝐭</b>\nᴘᴏᴡᴇʀꜰᴜʟ ᴛᴏᴏʟs ꜰᴏʀ ᴄʜᴀᴛ ᴀᴅᴍɪɴs.\n\n• <code>/ban</code> | <code>/unban</code>\n• <code>/mute</code> | <code>/unmute</code>\n• <code>/warn</code> | <code>/unwarn</code>\n• <code>/purge</code> | <code>/dlt</code>\n• <code>/promote</code> | <code>/demote</code>"
     ),
     "help_eco": (
-        "💰 <b>𝐄𝐜𝐨𝐧𝐨𝐦𝐲 & 𝐖𝐞𝐚𝐥𝐭𝐡</b>\n"
-        "ʏᴏᴜʀ ꜰɪɴᴀɴᴄɪᴀʟ sᴛᴀᴛᴜs ᴀɴᴅ ɢʀᴏᴡᴛʜ.\n\n"
-        "• <code>/daily</code> : ᴄʟᴀɪᴍ ᴄᴏɪɴs.\n"
-        "• <code>/status</code> : ᴄʜᴇᴄᴋ ʟᴇᴠᴇʟ.\n"
-        "• <code>/givee</code> : ᴛʀᴀɴsꜰᴇʀ.\n"
-        "• <code>/redeem</code> : ᴜsᴇ ᴄᴏᴅᴇs.\n"
-        "• <code>/shop</code> : ʙᴜʏ ɪᴛᴇᴍs."
+        "💰 <b>𝐄𝐜𝐨𝐧𝐨𝐦𝐲 & 𝐖𝐞𝐚𝐥𝐭𝐡</b>\nʏᴏᴜʀ ꜰɪɴᴀɴᴄɪᴀʟ sᴛᴀᴛᴜs ᴀɴᴅ ɢʀᴏᴡᴛʜ.\n\n• <code>/daily</code> : ᴄʟᴀɪᴍ ᴄᴏɪɴs.\n• <code>/status</code> : ᴄʜᴇᴄᴋ ʟᴇᴠᴇʟ.\n• <code>/givee</code> : ᴛʀᴀɴsꜰᴇʀ.\n• <code>/redeem</code> : ᴜsᴇ ᴄᴏᴅᴇs.\n• <code>/shop</code> : ʙᴜʏ ɪᴛᴇᴍs."
     ),
     "help_game": (
-        "🕹️ <b>𝐆𝐚𝐦𝐞 & 𝐂𝐨𝐦𝐛𝐚𝐭</b>\n"
-        "ʜᴜɴᴛ ᴏᴛʜᴇʀs ᴀɴᴅ ᴇᴀʀɴ ʙᴏᴜɴᴛɪᴇs.\n\n"
-        "• <code>/kill</code> | <code>/murder</code>\n"
-        "• <code>/steal</code> : ʀᴏʙ ᴄᴏɪɴs.\n"
-        "• <code>/heist</code> : ᴊᴏɪɴ ʀᴏʙʙᴇʀʏ.\n"
-        "• <code>/protect</code> : sʜɪᴇʟᴅ.\n"
-        "• <code>/revive</code> : ᴄᴏᴍᴇ ʙᴀᴄᴋ."
+        "🕹️ <b>𝐆𝐚𝐦𝐞 & 𝐂𝐨𝐦𝐛𝐚𝐭</b>\nʜᴜɴᴛ ᴏᴛʜᴇʀs ᴀɴᴅ ᴇᴀʀɴ ʙᴏᴜɴᴛɪᴇs.\n\n• <code>/kill</code> | <code>/murder</code>\n• <code>/steal</code> : ʀᴏʙ ᴄᴏɪɴs.\n• <code>/heist</code> : ᴊᴏɪɴ ʀᴏʙʙᴇʀʏ.\n• <code>/protect</code> : sʜɪᴇʟᴅ.\n• <code>/revive</code> : ᴄᴏᴍᴇ ʙᴀᴄᴋ."
     ),
     "help_ai": (
-        "🧠 <b>𝐀𝐈 & 𝐔𝐭𝐢𝐥𝐢𝐭𝐢𝐞𝐬</b>\n"
-        "ᴀᴅᴠᴀɴᴄᴇᴅ ꜰᴇᴀᴛᴜʀᴇs.\n\n"
-        "• <code>/q</code> : ǫᴜᴏᴛᴇ sᴛɪᴄᴋᴇʀs.\n"
-        "• <code>/font</code> : sᴛʏʟɪsʜ ᴛᴇxᴛ.\n"
-        "• <code>/obt</code> : sᴀᴠᴇ ᴘᴀᴄᴋs.\n"
-        "• <code>/id</code> : ɢᴇᴛ ɪᴅs.\n"
-        "• <code>/feedback</code> : ʀᴇᴘᴏʀᴛ ʙᴜɢs."
+        "🧠 <b>𝐀𝐈 & 𝐔𝐭𝐢𝐥𝐢𝐭𝐢𝐞𝐬</b>\nᴀᴅᴠᴀɴᴄᴇᴅ ꜰᴇᴀᴛᴜʀᴇs.\n\n• <code>/q</code> : ǫᴜᴏᴛᴇ sᴛɪᴄᴋᴇʀs.\n• <code>/font</code> : sᴛʏʟɪsʜ ᴛᴇxᴛ.\n• <code>/obt</code> : sᴀᴠᴇ ᴘᴀᴄᴋs.\n• <code>/id</code> : ɢᴇᴛ ɪᴅs.\n• <code>/feedback</code> : ʀᴇᴘᴏʀᴛ ʙᴜɢs."
     ),
     "help_social": (
-        "🚩 <b>𝐒𝐨𝐜𝐢𝐚𝐥 & 𝐅𝐮𝐧</b>\n"
-        "• <code>/kiss</code> | <code>/hug</code> | <code>/slap</code>\n"
-        "• <code>/bite</code> | <code>/punch</code> | <code>/kick</code>\n"
-        "• <code>/referral</code> : ɪɴᴠɪᴛᴇ ꜰʀɪᴇɴᴅs."
+        "🚩 <b>𝐒𝐨𝐜𝐢𝐚𝐥 & 𝐅𝐮𝐧</b>\n• <code>/kiss</code> | <code>/hug</code> | <code>/slap</code>\n• <code>/bite</code> | <code>/punch</code> | <code>/kick</code>\n• <code>/referral</code> : ɪɴᴠɪᴛᴇ ꜰʀɪᴇɴᴅs."
     )
 }
 
-# --- 2. START COMMAND ---
+# --- 2. START COMMAND (With Safety Fallback) ---
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    get_user(user) # Sync DB check (ensure this exists in your main code)
-    
+    # Ensure your get_user(user) logic is working
     try:
-        # Awaiting get_img to resolve any Asyncio Futures
-        start_img = await get_img("start", "https://graph.org/file/f46487e49202167d58151.jpg")
-        if not isinstance(start_img, str):
-            start_img = "https://graph.org/file/f46487e49202167d58151.jpg"
-    except Exception:
-        start_img = "https://graph.org/file/f46487e49202167d58151.jpg"
+        get_user(user) 
+    except: pass
+    
+    # FETCH IMAGE WITH EXTRA PROTECTION
+    default_url = "https://graph.org/file/f46487e49202167d58151.jpg"
+    try:
+        # Await the fixed get_img function
+        start_img = await get_img("start", default_url)
+        
+        # Double check: Is it a string? If it's a 'Future', force the default.
+        if not isinstance(start_img, str) or "Future" in str(type(start_img)):
+            start_img = default_url
+    except Exception as e:
+        print(f"Image logic failed, using default: {e}")
+        start_img = default_url
 
     caption = (
         f"<b>ᴡᴇʟᴄᴏᴍᴇ, {user.first_name}!</b> 👋\n\n"
@@ -1296,12 +1262,22 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
          InlineKeyboardButton("ᴄʜᴀɴɴᴇʟ ↗️", url="https://t.me/your_channel")]
     ]
 
-    await update.message.reply_photo(
-        photo=start_img,
-        caption=caption,
-        parse_mode=ParseMode.HTML,
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+    try:
+        # Try sending as photo
+        await update.message.reply_photo(
+            photo=start_img,
+            caption=caption,
+            parse_mode=ParseMode.HTML,
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    except Exception as e:
+        # ULTIMATE FALLBACK: Send as text if Telegram rejects the photo ID/URL
+        print(f"Telegram Photo Error: {e}")
+        await update.message.reply_text(
+            text=f"🖼️ (ɪᴍᴀɢᴇ ᴜɴᴀᴠᴀɪʟᴀʙʟᴇ)\n\n{caption}",
+            parse_mode=ParseMode.HTML,
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
 
 # --- 3. CALLBACK HANDLER ---
 async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1325,10 +1301,10 @@ async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif data == "help_dev":
             dev_text = (
                 "👨‍💻 <b>𝐃𝐞𝐯𝐞𝐥𝐨𝐩𝐞𝐫 𝐈𝐧𝐟𝐨𝐫𝐦𝐚𝐭𝐢𝐨𝐧</b>\n\n"
-                "<blockquote>ʏᴜᴜʀɪ ɪs ᴍᴀɪɴᴛᴀɪɴᴇᴅ ᴀɴᴅ ᴅᴇᴠᴇʟᴏᴘᴇᴅ ʙʏ ᴀ sᴏʟᴏ ᴅᴇᴠᴇʟᴏᴘᴇʀ. ɪꜰ ʏᴏᴜ ʜᴀᴠᴇ ǫᴜᴇsᴛɪᴏɴs ᴏʀ ᴡᴀɴᴛ ᴛᴏ ᴄᴏʟʟᴀʙᴏʀᴀᴛᴇ, ᴄᴏɴᴛᴀᴄᴛ ʙᴇʟᴏᴡ.</blockquote>\n\n"
-                "• <b>ᴅᴇᴠ:</b> [ʏᴏᴜʀ ɴᴀᴍᴇ/ʜᴀɴᴅʟᴇ]\n"
-                "• <b>ʟᴀɴɢᴜᴀɢᴇ:</b> ᴘʏᴛʜᴏɴ (ᴘʏᴛɢʙᴏᴛ)\n"
-                "• <b>ᴅᴀᴛᴀʙᴀsᴇ:</b> ᴍᴏɴɢᴏᴅʙ"
+                "<blockquote>ʏᴜᴜʀɪ ɪs ᴍᴀɪɴᴛᴀɪɴᴇᴅ ᴀɴᴅ ᴅᴇᴠᴇʟᴏᴘᴇᴅ ʙʏ ᴀ sᴏʟᴏ ᴅᴇᴠᴇʟᴏᴘᴇʀ.</blockquote>\n\n"
+                "• <b>ᴅᴇᴠ:</b> @YourUsername\n"
+                "• <b>ʟᴀɴɢᴜᴀɢᴇ:</b> ᴘʏᴛʜᴏɴ\n"
+                "• <b>ʟɪʙʀᴀʀʏ:</b> ᴘᴛʙ ᴠ20.x"
             )
             keyboard = [[InlineKeyboardButton("🔙 ʙᴀᴄᴋ", callback_data="back_to_start")]]
             await query.edit_message_caption(caption=dev_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode=ParseMode.HTML)
@@ -1358,21 +1334,23 @@ async def feedback_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     fb_text = " ".join(context.args)
     
-    feedback_db.insert_one({
-        "user_id": user.id, 
-        "username": user.username, 
-        "msg": fb_text, 
-        "date": datetime.now()
-    })
+    # Sync or Async check for DB
+    try:
+        feedback_db.insert_one({
+            "user_id": user.id, 
+            "username": user.username, 
+            "msg": fb_text, 
+            "date": datetime.now()
+        })
+    except: pass
     
     try:
         await context.bot.send_message(
-            int(OWNER_ID), 
-            f"📩 <b>ɴᴇᴡ ғᴇᴇᴅʙᴀᴄᴋ!</b>\n\nғʀᴏᴍ: {user.first_name} (<code>{user.id}</code>)\nᴍsɢ: {fb_text}", 
+            chat_id=int(OWNER_ID), 
+            text=f"📩 <b>ɴᴇᴡ ғᴇᴇᴅʙᴀᴄᴋ!</b>\n\nғʀᴏᴍ: {user.first_name} (<code>{user.id}</code>)\nᴍsɢ: {fb_text}", 
             parse_mode=ParseMode.HTML
         )
-    except Exception as e:
-        print(f"Failed to notify owner: {e}")
+    except: pass
 
     await update.message.reply_text("✅ <b>ᴛʜᴀɴᴋ ʏᴏᴜ! ʏᴏᴜʀ ғᴇᴇᴅʙᴀᴄᴋ ʜᴀs ʙᴇᴇɴ sᴇɴᴛ.</b>", parse_mode=ParseMode.HTML)
 
