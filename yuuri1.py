@@ -1117,6 +1117,34 @@ async def send_personal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await update.message.reply_text(f"❌ Fᴀɪʟᴇᴅ Tᴏ Dᴇʟɪᴠᴇʀ: {e}")
 
+# 1. DEFINE THE FUNCTION FIRST
+async def feedback_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    if not context.args:
+        return await update.message.reply_text("<code>⚠️ ᴜsᴀɢᴇ: /ғᴇᴇᴅʙᴀᴄᴋ [ʏᴏᴜʀ ᴍᴇssᴀɢᴇ]</code>", parse_mode=ParseMode.HTML)
+
+    fb_text = " ".join(context.args)
+    
+    # Ensure feedback_db is defined earlier in your script
+    feedback_db.insert_one({
+        "user_id": user.id, 
+        "username": user.username, 
+        "msg": fb_text, 
+        "date": datetime.now()
+    })
+    
+    try:
+        # OWNER_ID should be 5773908061
+        await context.bot.send_message(
+            chat_id=5773908061, 
+            text=f"📩 <b>ɴᴇᴡ ғᴇᴇᴅʙᴀᴄᴋ!</b>\n\nғʀᴏᴍ: {user.first_name} (<code>{user.id}</code>)\nᴍsɢ: {fb_text}", 
+            parse_mode=ParseMode.HTML
+        )
+    except Exception as e:
+        logging.error(f"Failed to notify owner: {e}")
+
+    await update.message.reply_text("✅ <b>ᴛʜᴀɴᴋ ʏᴏᴜ! ʏᴏᴜʀ ғᴇᴇᴅʙᴀᴄᴋ ʜᴀs ʙᴇᴇɴ sᴇɴᴛ.</b>", parse_mode=ParseMode.HTML)
+
 # ================= BOT STATS =================
 import psutil
 import os
@@ -3967,6 +3995,7 @@ application.add_handler(MessageHandler(filters.Sticker.ALL, reply_with_random_st
 application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, auto_reply), group=2)
 
 # Callbacks & Errors
+application.add_handler(CallbackQueryHandler(handle_callbacks))
 application.add_handler(CallbackQueryHandler(heist_choice, pattern="^heist_"))
 application.add_handler(CallbackQueryHandler(handle_callbacks, pattern="^(help_|back_to_start)"))
 application.add_error_handler(error_handler)
