@@ -92,10 +92,10 @@ torture_db = db["torture_registry"]
 allowed_collection = db["allowed_users"] 
 groups_collection = db["saved_groups"]
 
-# ================= USER SYSTEM (SYNC FIX) =================
-def get_user(user):
-    # No 'await' here. Returns a dictionary immediately.
-    data = users.find_one({"id": user.id})
+# ================= USER SYSTEM (CORRECT ASYNC) =================
+async def get_user(user):
+    # Notice the 'await' here
+    data = await users.find_one({"id": user.id})
 
     default_data = {
         "id": user.id,
@@ -113,7 +113,7 @@ def get_user(user):
     }
 
     if not data:
-        users.insert_one(default_data)
+        await users.insert_one(default_data) # Use 'await'
         return default_data
 
     updated_fields = {}
@@ -125,15 +125,17 @@ def get_user(user):
         if key not in data:
             data[key] = value
             updated_fields[key] = value
-    
+
     if updated_fields:
-        users.update_one({"id": user.id}, {"$set": updated_fields})
+        # Use 'await' here. Do NOT await the RESULT of update_one, 
+        # await the update_one call itself.
+        await users.update_one({"id": user.id}, {"$set": updated_fields})
 
     return data
 
-def save_user(data):
-    # No 'await' here.
-    users.update_one({"id": data["id"]}, {"$set": data}, upsert=True)
+async def save_user(data):
+    # Correct Async usage for Motor
+    await users.update_one({"id": data["id"]}, {"$set": data}, upsert=True)
 
 # ======Broadcast_System======
 import asyncio
