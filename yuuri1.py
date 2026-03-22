@@ -1162,43 +1162,47 @@ async def owner_cmds(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 #==================Main StartUp Of Yuuri==================
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
-# --- 1. HELP MENU DATA (Mapped to your 2800+ line functionality) ---
+import asyncio
+from datetime import datetime
+
+# --- 1. HELP DATA ---
 HELP_TEXTS = {
     "help_manage": (
         "🛡️ <b>𝐆𝐫𝐨𝐮𝐩 𝐌𝐚𝐧𝐚𝐠𝐞𝐦𝐞𝐧𝐭</b>\n"
         "ᴘᴏᴡᴇʀꜰᴜʟ ᴛᴏᴏʟs ꜰᴏʀ ᴄʜᴀᴛ ᴀᴅᴍɪɴs.\n\n"
-        "• <code>/ban</code> | <code>/unban</code> : ʀᴇsᴛʀɪᴄᴛ ᴜsᴇʀs.\n"
-        "• <code>/mute</code> | <code>/unmute</code> : sɪʟᴇɴᴄᴇ ᴄʜᴀᴛ.\n"
-        "• <code>/warn</code> | <code>/unwarn</code> : ᴍᴀɴᴀɢᴇ ᴡᴀʀɴɪɴɢs.\n"
-        "• <code>/purge</code> | <code>/dlt</code> : ᴄʟᴇᴀɴ ᴍᴇssᴀɢᴇs.\n"
-        "• <code>/promote</code> | <code>/demote</code> : sᴇᴛ ᴀᴅᴍɪɴs."
+        "• <code>/ban</code> | <code>/unban</code>\n"
+        "• <code>/mute</code> | <code>/unmute</code>\n"
+        "• <code>/warn</code> | <code>/unwarn</code>\n"
+        "• <code>/purge</code> | <code>/dlt</code>\n"
+        "• <code>/promote</code> | <code>/demote</code>"
     ),
     "help_eco": (
         "💰 <b>𝐄𝐜𝐨𝐧𝐨𝐦𝐲 & 𝐖𝐞𝐚𝐥𝐭𝐡</b>\n"
         "ʏᴏᴜʀ ꜰɪɴᴀɴᴄɪᴀʟ sᴛᴀᴛᴜs ᴀɴᴅ ɢʀᴏᴡᴛʜ.\n\n"
-        "• <code>/daily</code> : ᴄʟᴀɪᴍ ʏᴏᴜʀ ᴄᴏɪɴs.\n"
-        "• <code>/status</code> : ᴄʜᴇᴄᴋ ʟᴇᴠᴇʟ & ʀᴀɴᴋ.\n"
-        "• <code>/givee</code> : ᴛʀᴀɴsꜰᴇʀ ᴡᴇᴀʟᴛʜ.\n"
-        "• <code>/redeem</code> : ᴜsᴇ ɢɪꜰᴛ ᴄᴏᴅᴇs.\n"
+        "• <code>/daily</code> : ᴄʟᴀɪᴍ ᴄᴏɪɴs.\n"
+        "• <code>/status</code> : ᴄʜᴇᴄᴋ ʟᴇᴠᴇʟ.\n"
+        "• <code>/givee</code> : ᴛʀᴀɴsꜰᴇʀ.\n"
+        "• <code>/redeem</code> : ᴜsᴇ ᴄᴏᴅᴇs.\n"
         "• <code>/shop</code> : ʙᴜʏ ɪᴛᴇᴍs."
     ),
     "help_game": (
         "🕹️ <b>𝐆𝐚𝐦𝐞 & 𝐂𝐨𝐦𝐛𝐚𝐭</b>\n"
         "ʜᴜɴᴛ ᴏᴛʜᴇʀs ᴀɴᴅ ᴇᴀʀɴ ʙᴏᴜɴᴛɪᴇs.\n\n"
-        "• <code>/kill</code> | <code>/murder</code> : ᴀᴛᴛᴀᴄᴋ ᴜsᴇʀs.\n"
+        "• <code>/kill</code> | <code>/murder</code>\n"
         "• <code>/steal</code> : ʀᴏʙ ᴄᴏɪɴs.\n"
-        "• <code>/heist</code> : ᴊᴏɪɴ ᴛʜᴇ ʀᴏʙʙᴇʀʏ.\n"
-        "• <code>/protect</code> : ᴀᴄᴛɪᴠᴀᴛᴇ sʜɪᴇʟᴅ.\n"
-        "• <code>/revive</code> : ᴄᴏᴍᴇ ʙᴀᴄᴋ ᴛᴏ ʟɪꜰᴇ."
+        "• <code>/heist</code> : ᴊᴏɪɴ ʀᴏʙʙᴇʀʏ.\n"
+        "• <code>/protect</code> : sʜɪᴇʟᴅ.\n"
+        "• <code>/revive</code> : ᴄᴏᴍᴇ ʙᴀᴄᴋ."
     ),
     "help_ai": (
         "🧠 <b>𝐀𝐈 & 𝐔𝐭𝐢𝐥𝐢𝐭𝐢𝐞𝐬</b>\n"
-        "ᴀᴅᴠᴀɴᴄᴇᴅ ꜰᴇᴀᴛᴜʀᴇs ᴀᴛ ʏᴏᴜʀ ꜰɪɴɢᴇʀᴛɪᴘs.\n\n"
-        "• <code>/q</code> : ᴄʀᴇᴀᴛᴇ ʜᴅ ǫᴜᴏᴛᴇ sᴛɪᴄᴋᴇʀs.\n"
-        "• <code>/font</code> : sᴛʏʟɪsʜ ᴛᴇxᴛ ɢᴇɴᴇʀᴀᴛᴏʀ.\n"
-        "• <code>/obt</code> : sᴀᴠᴇ sᴛɪᴄᴋᴇʀ ᴘᴀᴄᴋs.\n"
-        "• <code>/id</code> : ɢᴇᴛ ᴛᴇʟᴇɢʀᴀᴍ ɪᴅs.\n"
+        "ᴀᴅᴠᴀɴᴄᴇᴅ ꜰᴇᴀᴛᴜʀᴇs.\n\n"
+        "• <code>/q</code> : ǫᴜᴏᴛᴇ sᴛɪᴄᴋᴇʀs.\n"
+        "• <code>/font</code> : sᴛʏʟɪsʜ ᴛᴇxᴛ.\n"
+        "• <code>/obt</code> : sᴀᴠᴇ ᴘᴀᴄᴋs.\n"
+        "• <code>/id</code> : ɢᴇᴛ ɪᴅs.\n"
         "• <code>/feedback</code> : ʀᴇᴘᴏʀᴛ ʙᴜɢs."
     ),
     "help_social": (
@@ -1212,34 +1216,36 @@ HELP_TEXTS = {
 # --- 2. START COMMAND ---
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    # Ensure user exists in your sync DB system
-    get_user(user) 
+    get_user(user) # Sync DB check
     
-    # Using your existing get_img helper
-    start_img = get_img("start", "https://graph.org/file/f46487e49202167d58151.jpg")
+    # CRITICAL: Added 'await' to fix the subscriptable error
+    try:
+        start_img = await get_img("start", "https://graph.org/file/f46487e49202167d58151.jpg")
+    except Exception:
+        start_img = "https://graph.org/file/f46487e49202167d58151.jpg"
 
+    # CRITICAL: Corrected <blockquote> closing tag
     caption = (
         f"<b>ᴡᴇʟᴄᴏᴍᴇ, {user.first_name}!</b> 👋\n\n"
-        f"<blockquote><i>ɪ ᴀᴍ <b>ʏᴜᴜʀɪ</b> — ᴀɴ ᴀᴅᴠᴀɴᴄᴇᴅ ᴀɪ ᴀssɪsᴛᴀɴᴛ ᴅᴇsɪɢɴᴇᴅ ᴛᴏ ᴇɴʜᴀɴᴄᴇ ʏᴏᴜʀ ᴛᴇʟᴇɢʀᴀᴍ ᴇxᴘᴇʀɪᴇɴᴄᴇ.</i> ❞\n\n"
+        f"<blockquote>ɪ ᴀᴍ <b>ʏᴜᴜʀɪ</b> — ᴀɴ ᴀᴅᴠᴀɴᴄᴇᴅ ᴀɪ ᴀssɪsᴛᴀɴᴛ ᴅᴇsɪɢɴᴇᴅ ᴛᴏ ᴇɴʜᴀɴᴄᴇ ʏᴏᴜʀ ᴛᴇʟᴇɢʀᴀᴍ ᴇxᴘᴇʀɪᴇɴᴄᴇ.</blockquote>\n\n"
         f"ᴀᴅᴅ ᴍᴇ ᴛᴏ ʏᴏᴜʀ ɢʀᴏᴜᴘ ᴀɴᴅ ʟᴇᴛ ᴍᴇ ᴛᴀᴋᴇ ᴄᴀʀᴇ ᴏғ ᴛʜᴇ ʀᴇsᴛ."
     )
 
     keyboard = [
         [InlineKeyboardButton("➕ ᴀᴅᴅ ᴛᴏ ᴄʜᴀᴛ", url=f"https://t.me/{context.bot.username}?startgroup=true")],
         [InlineKeyboardButton("📚 ʜᴇʟᴘ & ᴄᴏᴍᴍᴀɴᴅs", callback_data="help_main")],
-        [InlineKeyboardButton("ꜱᴜᴘᴘᴏʀᴛ ↗️", url="https://t.me/your_support_channel"),
-         InlineKeyboardButton("ᴄʜᴀɴɴᴇʟ ↗️", url="https://t.me/your_main_channel")]
+        [InlineKeyboardButton("ꜱᴜᴘᴘᴏʀᴛ ↗️", url="https://t.me/your_support"),
+         InlineKeyboardButton("ᴄʜᴀɴɴᴇʟ ↗️", url="https://t.me/your_channel")]
     ]
 
     await update.message.reply_photo(
         photo=start_img,
         caption=caption,
         parse_mode=ParseMode.HTML,
-        has_spoiler=True,
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-# --- 3. CALLBACK HANDLER (MENU NAVIGATION) ---
+# --- 3. CALLBACK HANDLER (The "All Logic" Part) ---
 async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     data = query.data
@@ -1263,7 +1269,7 @@ async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif data == "back_to_start":
         user = update.effective_user
-        caption = f"<b>ᴡᴇʟᴄᴏᴍᴇ, {user.first_name}!</b> 👋\n\n<blockquote><i>ɪ ᴀᴍ <b>ʏᴜᴜʀɪ</b>.</i> ❞"
+        caption = f"<b>ᴡᴇʟᴄᴏᴍᴇ, {user.first_name}!</b> 👋\n\n<blockquote>ɪ ᴀᴍ <b>ʏᴜᴜʀɪ</b>.</blockquote>"
         keyboard = [
             [InlineKeyboardButton("➕ ᴀᴅᴅ ᴛᴏ ᴄʜᴀᴛ", url=f"https://t.me/{context.bot.username}?startgroup=true")],
             [InlineKeyboardButton("📚 ʜᴇʟᴘ & ᴄᴏᴍᴍᴀɴᴅs", callback_data="help_main")]
@@ -1274,11 +1280,9 @@ async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def feedback_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if not context.args:
-        await update.message.reply_text("<code>⚠️ ᴜsᴀɢᴇ: /ғᴇᴇᴅʙᴀᴄᴋ [ʏᴏᴜʀ ᴍᴇssᴀɢᴇ]</code>", parse_mode=ParseMode.HTML)
-        return
+        return await update.message.reply_text("<code>⚠️ ᴜsᴀɢᴇ: /ғᴇᴇᴅʙᴀᴄᴋ [ʏᴏᴜʀ ᴍᴇssᴀɢᴇ]</code>", parse_mode=ParseMode.HTML)
 
     fb_text = " ".join(context.args)
-    # Using your defined feedback_db (Sync)
     feedback_db.insert_one({
         "user_id": user.id, 
         "username": user.username, 
@@ -1286,15 +1290,14 @@ async def feedback_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "date": datetime.now()
     })
     
-    # Notify Owner (Using your OWNER_ID)
+    # Notify Owner (OWNER_ID should be defined in your vars)
     try:
         await context.bot.send_message(
             OWNER_ID, 
             f"📩 <b>ɴᴇᴡ ғᴇᴇᴅʙᴀᴄᴋ!</b>\n\nғʀᴏᴍ: {user.first_name} (<code>{user.id}</code>)\nᴍsɢ: {fb_text}", 
             parse_mode=ParseMode.HTML
         )
-    except Exception:
-        pass
+    except: pass
 
     await update.message.reply_text("✅ <b>ᴛʜᴀɴᴋ ʏᴏᴜ! ʏᴏᴜʀ ғᴇᴇᴅʙᴀᴄᴋ ʜᴀs ʙᴇᴇɴ sᴇɴᴛ.</b>", parse_mode=ParseMode.HTML)
 
