@@ -3123,25 +3123,36 @@ async def promote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not target_id:
         return await message.reply_text("<code>⚠️ Uꜱᴀɢᴇ: /promote @username or reply [1/2/3]</code>", parse_mode=ParseMode.HTML)
 
-    level = 1
-    if args:
-        val = args[-1]
-        if val in ("3", "full"): level = 3
-        elif val in ("2", "mod"): level = 2
-        elif val == "0": level = 0
-
-    perms = {
-        0: {"can_pin_messages": True},
-        1: {"can_change_info": True, "can_delete_messages": True, "can_invite_users": True, "can_pin_messages": True, "can_manage_chat": True, "can_manage_video_chats": True},
-        2: {"can_change_info": True, "can_delete_messages": True, "can_invite_users": True, "can_pin_messages": True, "can_manage_chat": True, "can_restrict_members": True, "can_manage_video_chats": True, "can_post_stories": True, "can_edit_stories": True, "can_delete_stories": True},
-        3: {"can_change_info": True, "can_delete_messages": True, "can_invite_users": True, "can_pin_messages": True, "can_manage_chat": True, "can_restrict_members": True, "can_promote_members": True, "can_manage_video_chats": True, "can_post_stories": True, "can_edit_stories": True, "can_delete_stories": True},
-    }
-
     try:
-        if user.id != OWNER_IDS:
+        # Check target current status
+        target_member = await chat.get_member(target_id)
+        
+        if target_member.status == 'creator':
+            return await message.reply_text("👑 Gʀᴏᴜᴘ Oᴡɴᴇʀ Cᴀɴ'ᴛ Bᴇ Pʀᴏᴍᴏᴛᴇᴅ.")
+
+        # Logic for "Already an Admin"
+        if target_member.status == 'administrator':
+            return await message.reply_text("👀 Yᴏᴜ'ʀᴇ Aʟʀᴇᴀᴅʏ Aʀᴇ Aɴ Aᴅᴍɪɴ 😮‍💨")
+
+        level = 1
+        if args:
+            val = args[-1]
+            if val in ("3", "full"): level = 3
+            elif val in ("2", "mod"): level = 2
+            elif val == "0": level = 0
+
+        perms = {
+            0: {"can_pin_messages": True},
+            1: {"can_change_info": True, "can_delete_messages": True, "can_invite_users": True, "can_pin_messages": True, "can_manage_chat": True, "can_manage_video_chats": True},
+            2: {"can_change_info": True, "can_delete_messages": True, "can_invite_users": True, "can_pin_messages": True, "can_manage_chat": True, "can_restrict_members": True, "can_manage_video_chats": True, "can_post_stories": True, "can_edit_stories": True, "can_delete_stories": True},
+            3: {"can_change_info": True, "can_delete_messages": True, "can_invite_users": True, "can_pin_messages": True, "can_manage_chat": True, "can_restrict_members": True, "can_promote_members": True, "can_manage_video_chats": True, "can_post_stories": True, "can_edit_stories": True, "can_delete_stories": True},
+        }
+
+        # Auth check for the person sending the command
+        if user.id not in OWNER_IDS:
             sender_member = await chat.get_member(user.id)
             if sender_member.status not in ["administrator", "creator"] or not sender_member.can_promote_members:
-                return await message.reply_text("🧐 Oᴘᴘs! Yᴏᴜ Nᴇᴇᴅ Tᴏ Bᴇ Aᴅᴍɪɴ Tᴏ Pʀᴏᴍᴏᴛᴇ Oᴛʜᴇʀs... 🧩")
+                return await message.reply_text("🧐 Oᴏᴘs! Yᴏᴜ Nᴇᴇᴅ Tᴏ Bᴇ Aᴅᴍɪɴ Tᴏ Pʀᴏᴍᴏᴛᴇ Oᴛʜᴇʀs... 🧩")
 
         bot_member = await chat.get_member(context.bot.id)
         if not bot_member.can_promote_members:
@@ -3149,15 +3160,13 @@ async def promote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await context.bot.promote_chat_member(chat.id, target_id, **perms[level])
 
-        # Define Access Descriptions
         access_descriptions = {
-            3: "full power",
-            2: "full power except make new admins",
-            1: "manage chat, messages & info",
-            0: "pin messages only"
+            3: "Fᴜʟʟ Pᴏᴡᴇʀ",
+            2: "Fᴜʟʟ Pᴏᴡᴇʀ Exᴄᴇᴘᴛ Mᴀᴋᴇ Nᴇᴡ Aᴅᴍɪɴꜱ",
+            1: "Mᴀɴᴀɢᴇ Cʜᴀᴛ, Mᴇꜱꜱᴀɢᴇꜱ & Iɴꜰᴏ",
+            0: "Pɪɴ Mᴇꜱꜱᴀɢᴇꜱ Oɴʟʏ"
         }
 
-        # NEW CALLBACK FORMAT
         response = (
             "🎖️ sʏsᴛᴇᴍ ᴜᴘᴅᴀᴛᴇ\n"
             f"ᴜsᴇʀ: <b>{name}</b>\n"
@@ -3183,7 +3192,7 @@ async def demote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await message.reply_text("<code>⚠️ Uꜱᴀɢᴇ: /demote @username or reply to a user.</code>", parse_mode=ParseMode.HTML)
 
     try:
-        if user.id != OWNER_IDS:
+        if user.id not in OWNER_IDS:
             sender_member = await chat.get_member(user.id)
             if sender_member.status not in ["administrator", "creator"] or not sender_member.can_promote_members:
                 return await message.reply_text("🧐 Nɪᴄᴇ ᴛʀʏ, ʙᴜᴛ ʏᴏᴜ ɴᴇᴇᴅ 'Aᴅᴅ Nᴇᴡ Aᴅᴍɪɴs' ᴘᴇʀᴍɪssɪᴏɴ ᴛᴏ ᴅᴇᴍᴏᴛᴇ! 🧩")
@@ -3197,7 +3206,7 @@ async def demote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         target_member = await chat.get_member(target_id)
         if target_member.status == 'creator':
-            return await message.reply_text("👑 Tʜᴀᴛ's ᴛʜᴇ Gʀᴏᴜᴘ Oᴡɴᴇʀ. I ʜᴀᴠᴇ ɴᴏ ᴘᴏᴡᴇʀ ʜᴇʀᴇ.")
+            return await message.reply_text("👑 Gʀᴏᴜᴘ Oᴡɴᴇʀ Cᴀɴ'ᴛ Bᴇ Dᴇᴍᴏᴛᴇᴅ.")
 
         if target_member.status != 'administrator':
             return await message.reply_text(f"⚠️ <b>{name}</b> ɪs ɴᴏᴛ ᴀɴ ᴀᴅᴍɪɴ anyway! 🤷‍♂️", parse_mode=ParseMode.HTML)
@@ -3215,7 +3224,6 @@ async def demote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
             can_manage_video_chats=False
         )
 
-        # NEW CALLBACK FORMAT
         response = (
             "🎖️ sʏsᴛᴇᴍ ᴜᴘᴅᴀᴛᴇ\n"
             f"ᴜsᴇʀ: <b>{name}</b>\n"
@@ -3227,7 +3235,7 @@ async def demote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except BadRequest as e:
         err = str(e).lower()
         if "not enough rights" in err or "forbidden" in err:
-            await message.reply_text(f"⚠️ I ᴄᴀɴ'ᴛ ᴅᴇᴍᴏᴛᴇ {name}! Tʜᴇʏ ᴍɪɢʜᴛ ʙᴇ ᴛʜᴇ ᴄʀᴇᴀᴛᴏʀ ᴏʀ ᴡᴇʀᴇ ᴘʀᴏᴍᴏᴛᴇᴅ ʙʏ sᴏᴍᴇᴏɴᴇ ʜɪɢʜᴇʀ ᴛʜᴀɴ ᴍᴇ.")
+            await message.reply_text(f"⚠️ I ᴄᴀɴ'ᴛ ᴅᴇᴍᴏᴛᴇ {name}! Tʜᴇʏ ᴡᴇʀᴇ ᴘʀᴏᴍᴏᴛᴇᴅ ʙʏ sᴏᴍᴇᴏɴᴇ ʜɪɢʜᴇʀ ᴛʜᴀɴ ᴍᴇ.")
         else:
             await message.reply_text(f"❌ API Eʀʀᴏʀ: {e}")
 
