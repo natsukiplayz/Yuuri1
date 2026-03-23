@@ -3269,7 +3269,7 @@ async def promote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         }
 
         # Auth check: bypass if sender is OWNER_ID, otherwise check admin perms
-        if str(user.id) != str(OWNER_ID):
+        if str(user.id) != str(OWNER_IDS):
             sender_member = await chat.get_member(user.id)
             if sender_member.status not in ["administrator", "creator"] or not sender_member.can_promote_members:
                 return await message.reply_text("🧐 Oᴏᴘs! Yᴏᴜ Nᴇᴇᴅ Tᴏ Bᴇ Aᴅᴍɪɴ Tᴏ Pʀᴏᴍᴏᴛᴇ Oᴛʜᴇʀs... 🧩")
@@ -3313,7 +3313,7 @@ async def demote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         # Auth check: bypass if sender is OWNER_ID, otherwise check admin perms
-        if str(user.id) != str(OWNER_ID):
+        if str(user.id) != str(OWNER_IDS):
             sender_member = await chat.get_member(user.id)
             if sender_member.status not in ["administrator", "creator"] or not sender_member.can_promote_members:
                 return await message.reply_text("🧐 Nɪᴄᴇ ᴛʀʏ, ʙᴜᴛ ʏᴏᴜ ɴᴇᴇᴅ 'Aᴅᴅ Nᴇᴡ Aᴅᴍɪɴs' ᴘᴇʀᴍɪssɪᴏɴ ᴛᴏ ᴅᴇᴍᴏᴛᴇ! 🧩")
