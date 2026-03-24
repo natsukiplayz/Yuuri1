@@ -23,7 +23,8 @@ from telegram.ext import (
     MessageHandler,
     CallbackQueryHandler,
     ContextTypes,
-    filters
+    filters,
+    JobQueue
 )
 from motor.motor_asyncio import AsyncIOMotorClient
 
@@ -281,9 +282,12 @@ def is_allowed(user_id):
 SMALL_CAPS = {"a": "ᴀ", "b": "ʙ", "c": "ᴄ", "d": "ᴅ", "e": "ᴇ", "f": "ꜰ", "g": "ɢ", "h": "ʜ", "i": "ɪ", "j": "ᴊ", "k": "ᴋ", "l": "ʟ", "m": "ᴍ", "n": "ɴ", "o": "ᴏ", "p": "ᴘ", "q": "ǫ", "r": "ʀ", "s": "ꜱ", "t": "ᴛ", "u": "ᴜ", "v": "ᴠ", "w": "ᴡ", "x": "x", "y": "ʏ", "z": "ᴢ"}
 
 BOLD_SERIF = {
-    "a": "𝐚", "b": "𝐛", "c": "𝐜", "d": "𝐝", "e": "𝐞", "f": "𝐟", "g": "𝐠", "h": "𝐡", "i": "𝐢", "j": "𝐣", "k": "𝐤", "l": "𝐥", "m": "𝐦", "n": "𝐧", "o": "𝐨", "p": "𝐩", "q": "𝐪", "r": "𝐫", "s": "𝐬", "t": "𝐭", "u": "𝐮", "v": "𝐯", "w": "𝐰", "x": "𝐱", "y": "𝐲", "z": "𝐳",
-    "A": "𝐀", "B": "𝐁", "C": "𝐂", "D": "𝐃", "E": "𝐄", "F": "𝐅", "G": "𝐆", "H": "𝐇", "I": "𝐈", "J": "𝐉", "K": "𝐊", "L": "𝐋", "M": "𝐌", "N": "𝐍", "O": "𝐎", "P": "𝐏", "Q": "𝐐", "R": "𝐑", "S": "𝐒", "T": "𝐓", "U": "𝐔", "V": "𝐕", "W": "𝐖", "X": "𝐗", "Y": "𝐘", "Z": "𝐙"
+    # Capitals
+    "A": "𝐀", "B": "𝐛", "C": "𝐜", "D": "𝐝", "E": "𝐞", "F": "𝐟", "G": "𝐠", "H": "𝐡", "I": "𝐢", "J": "𝐣", "K": "𝐤", "L": "𝐥", "M": "𝐦", "N": "𝐧", "O": "𝐨", "P": "𝐩", "Q": "𝐪", "R": "𝐫", "S": "𝐬", "T": "𝐭", "U": "𝐮", "V": "𝐯", "W": "𝐰", "X": "𝐱", "Y": "𝐲", "Z": "𝐳",
+    # Small
+    "a": "𝐚", "b": "𝐛", "c": "𝐜", "d": "𝐝", "e": "𝐞", "f": "𝐟", "g": "𝐠", "h": "𝐡", "i": "𝐢", "j": "𝐣", "k": "𝐤", "l": "𝐥", "m": "𝐦", "n": "𝐧", "o": "𝐨", "p": "𝐩", "q": "𝐪", "r": "𝐫", "s": "𝐬", "t": "𝐭", "u": "𝐮", "v": "𝐯", "w": "𝐰", "x": "𝐱", "y": "𝐲", "z": "𝐳"
 }
+
 
 def get_fancy_text(text, font_type):
     words = text.split(" ")
@@ -324,7 +328,6 @@ def get_fancy_text(text, font_type):
 
 #============ Side_Features ========
 #--
-
 async def set_png(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Usage: Reply to any media with /setpng <name>
@@ -3887,6 +3890,7 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
 application = (
     ApplicationBuilder()
     .token(BOT_TOKEN)
+    .job_queue(JobQueue())
     .connect_timeout(40.0)
     .read_timeout(40.0)
     .write_timeout(40.0)
@@ -3993,6 +3997,19 @@ application.add_handler(
 # Ensure 'error_handler' is defined in your code to catch network blips
 application.add_error_handler(error_handler)
 
+#===== auto r
+async def auto_revive_free(context: ContextTypes.DEFAULT_TYPE):
+    """Background task: Revives all dead players for free every 6 hours."""
+    try:
+        # Use your 'users' variable from your Motor setup
+        result = await users.update_many(
+            {"dead": True}, 
+            {"$set": {"dead": False}}
+        )
+        print(f"✨ [AUTO-REVIVE] {result.modified_count} players resurrected.")
+    except Exception as e:
+        print(f"⚠️ Auto-revive error: {e}")
+
 # --- 3. FASTAPI WEBHOOK LOGIC ---
 from fastapi import FastAPI, Request
 import uvicorn
@@ -4017,6 +4034,7 @@ async def on_startup():
     await application.bot.set_webhook(url=webhook_url, drop_pending_updates=True)
     await application.initialize()
     await application.start()
+  application.job_queue.run_repeating(auto_revive_free, interval=21600, first=10)
     print(f"🚀 Webhook set to {webhook_url}")
 
 @app.on_event("shutdown")
