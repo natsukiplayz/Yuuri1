@@ -277,6 +277,17 @@ def is_allowed(user_id):
     user = allowed_collection.find_one({"user_id": user_id})
     return True if user else False
 
+#======= user info =========
+def get_user(user):
+    # ... your existing fetching logic ...
+    data = users.find_one({"id": user.id}) # Or your specific fetcher
+    
+    if data:
+        # Ensure the new claim list exists so the bot doesn't error out
+        if "claimed_groups" not in data:
+            data["claimed_groups"] = []
+            
+    return data
 
 #========fonts-command========
 # Small Caps and Bold Mappings
@@ -1110,6 +1121,73 @@ async def font_converter(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 5. Process and send
     converted_text = get_fancy_text(target_text, font_choice)
     await update.message.reply_text(converted_text)
+
+#========== Claim =========
+async def claim(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat = update.effective_chat
+    user = update.effective_user
+    msg = update.effective_message
+
+    # 1. Block private messages
+    if chat.type == "private":
+        return await msg.reply_text("⚠️ Tʜɪꜱ Cᴏᴍᴍᴀɴᴅ Cᴀɴ Oɴʟʏ Bᴇ Uꜱᴇᴅ Iɴ Gʀᴏᴜᴘꜱ.")
+
+    # 2. Get the player's data using your async database call
+    data = await users.find_one({"id": user.id})
+    if not data:
+        return await msg.reply_text("❌ Yᴏᴜ Aʀᴇ Nᴏᴛ Rᴇɢɪꜱᴛᴇʀᴇᴅ Iɴ Tʜᴇ Dᴀᴛᴀʙᴀꜱᴇ.")
+
+    # 3. Check if they already claimed the reward for THIS specific group
+    claimed_groups = data.get("claimed_groups", [])
+    if chat.id in claimed_groups:
+        return await msg.reply_text("❌ Yᴏᴜ Hᴀᴠᴇ Aʟʀᴇᴀᴅʏ Cʟᴀɪᴍᴇᴅ Tʜᴇ Rᴇᴡᴀʀᴅ Fᴏʀ Tʜɪꜱ Gʀᴏᴜᴘ!")
+
+    # 4. Get the current member count of the group
+    try:
+        member_count = await chat.get_member_count()
+    except Exception as e:
+        print(f"Error getting member count: {e}")
+        return await msg.reply_text("⚠️ Eʀʀᴏʀ Rᴇᴀᴅɪɴɢ Gʀᴏᴜᴘ Sɪᴢᴇ. Tʀʏ Aɢᴀɪɴ Lᴀᴛᴇʀ.")
+
+    # 5. Determine the reward using your exact tiers
+    reward = 0
+    tiers = [
+        (10000, 5000000), (9000, 2500000), (8000, 1900000), (7000, 1500000),
+        (6000, 1000000), (5000, 900000), (4000, 650000), (3000, 500000),
+        (2500, 300000), (2000, 250000), (1500, 200000), (1000, 150000),
+        (900, 120000), (800, 100000), (700, 80000), (600, 65000),
+        (500, 50000), (400, 40000), (300, 30000), (200, 20000), (100, 10000)
+    ]
+
+    for req_mems, payout in tiers:
+        if member_count >= req_mems:
+            reward = payout
+            break
+
+    # 6. If the group is too small
+    if reward == 0:
+        return await msg.reply_text(f"⚠️ Yᴏᴜʀ Gʀᴏᴜᴘ Oɴʟʏ Hᴀꜱ {member_count} Mᴇᴍʙᴇʀꜱ.\nYᴏᴜ Nᴇᴇᴅ Aᴛ Lᴇᴀꜱᴛ 100 Mᴇᴍʙᴇʀꜱ Tᴏ Uꜱᴇ /claim.")
+
+    # 7. Add coins to profile AND log the group ID to prevent spamming
+    # Using update_one directly modifies the database, meaning /status will see it immediately
+    await users.update_one(
+        {"id": user.id},
+        {
+            "$inc": {"coins": reward},
+            "$push": {"claimed_groups": chat.id} 
+        }
+    )
+
+    display_reward = f"{reward:,}"
+
+    # 8. Send the stylized success message
+    await msg.reply_text(
+        f"🎁 <b>Gʀᴏᴜᴘ Cʟᴀɪᴍ Sᴜᴄᴄᴇꜱꜱꜰᴜʟ!</b>\n\n"
+        f"👥 <b>Gʀᴏᴜᴘ Sɪᴢᴇ:</b> {member_count} Mᴇᴍʙᴇʀꜱ\n"
+        f"💰 <b>Rᴇᴡᴀʀᴅ:</b> {display_reward} Cᴏɪɴꜱ\n\n"
+        f"<i>Yᴏᴜ Cᴀɴ Oɴʟʏ Cʟᴀɪᴍ Oɴᴄᴇ Pᴇʀ Gʀᴏᴜᴘ. Eɴᴊᴏʏ Tʜᴇ Lᴏᴏᴛ.</i>",
+        parse_mode="HTML"
+    )
 
 # ================= OWNER COMMANDS =================
 
@@ -4027,7 +4105,7 @@ application.add_handler(CommandHandler("data", inform_user))
 application.add_handler(CommandHandler("feedback", feedback_command))
 application.add_handler(CommandHandler("voice", voice_msg_handler))
 application.add_handler(CommandHandler("setpng", set_png))
-
+application.add_handler(CommandHandler("claim", claim))
 
 # Message Handlers
 application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
