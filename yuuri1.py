@@ -61,6 +61,7 @@ db = async_client["yuuri_db"]
 # All these now support 'await'
 users = db["users"]
 guilds = db["guilds"]
+chat = db["chats"]
 sticker_packs = db["sticker_packs"]
 heists = db["heists"]
 redeem_col = db["redeem_codes"]
@@ -1133,25 +1134,31 @@ async def claim(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if chat.type == "private":
         return await msg.reply_text("⚠️ Tʜɪꜱ Cᴏᴍᴍᴀɴᴅ Cᴀɴ Oɴʟʏ Bᴇ Uꜱᴇᴅ Iɴ Gʀᴏᴜᴘꜱ.")
 
-    # 2. Get the player's data using your SYNC function (No await here!)
-    data = get_user(user)
+    # 2. Check if the GROUP has already been claimed (Sync DB call)
+    # We check the "chats" collection to see if this group is 'used up'
+    chat_data = db["chats"].find_one({"id": chat.id})
     
+    if chat_data and chat_data.get("is_claimed"):
+        claimed_by_name = chat_data.get("claimed_by_name", "Sᴏᴍᴇᴏɴᴇ")
+        return await msg.reply_text(
+            f"❌ <b>Tʜɪꜱ Gʀᴏᴜᴘ Rᴇᴡᴀʀᴅ Hᴀꜱ Aʟʀᴇᴀᴅʏ Bᴇᴇɴ Cʟᴀɪᴍᴇᴅ!</b>\n\n"
+            f"👤 <b>Wɪɴɴᴇʀ:</b> {claimed_by_name}\n"
+            f"<i>Bᴇ ꜰᴀꜱᴛᴇʀ ɪɴ ᴛʜᴇ ɴᴇxᴛ ɢʀᴏᴜᴘ!</i>",
+            parse_mode="HTML"
+        )
+
+    # 3. Get the player's data (Sync)
+    data = get_user(user)
     if not data:
         return await msg.reply_text("❌ Yᴏᴜ Aʀᴇ Nᴏᴛ Rᴇɢɪꜱᴛᴇʀᴇᴅ Iɴ Tʜᴇ Dᴀᴛᴀʙᴀꜱᴇ.")
 
-    # 3. Check if they already claimed the reward
-    claimed_groups = data.get("claimed_groups", [])
-    if chat.id in claimed_groups:
-        return await msg.reply_text("❌ Yᴏᴜ Hᴀᴠᴇ Aʟʀᴇᴀᴅʏ Cʟᴀɪᴍᴇᴅ Tʜᴇ Rᴇᴡᴀʀᴅ Fᴏʀ Tʜɪꜱ Gʀᴏᴜᴘ!")
-
-    # 4. Get the current member count (This IS an async Telegram method, so keep await)
+    # 4. Get member count (Async Telegram method - MUST use await)
     try:
         member_count = await chat.get_member_count()
-    except Exception as e:
-        print(f"Error getting member count: {e}")
+    except Exception:
         return await msg.reply_text("⚠️ Eʀʀᴏʀ Rᴇᴀᴅɪɴɢ Gʀᴏᴜᴘ Sɪᴢᴇ. Tʀʏ Aɢᴀɪɴ Lᴀᴛᴇʀ.")
 
-    # 5. Determine the reward
+    # 5. Reward Tiers Logic
     reward = 0
     tiers = [
         (10000, 5000000), (9000, 2500000), (8000, 1900000), (7000, 1500000),
@@ -1169,7 +1176,9 @@ async def claim(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if reward == 0:
         return await msg.reply_text(f"⚠️ Yᴏᴜʀ Gʀᴏᴜᴘ Oɴʟʏ Hᴀꜱ {member_count} Mᴇᴍʙᴇʀꜱ.\nYᴏᴜ Nᴇᴇᴅ Aᴛ Lᴇᴀꜱᴛ 100 Mᴇᴍʙᴇʀꜱ Tᴏ Uꜱᴇ /claim.")
 
-    # 6. Update database synchronously (No await here!)
+    # 6. UPDATE DATABASE (Sync - No await)
+    
+    # A) Update User: Add coins AND add this group ID to their "claimed_groups" list
     users.update_one(
         {"id": user.id},
         {
@@ -1178,12 +1187,25 @@ async def claim(update: Update, context: ContextTypes.DEFAULT_TYPE):
         }
     )
 
-    # 7. Send the success message (Keep await for Telegram)
+    # B) Update Group: Mark as claimed forever
+    db["chats"].update_one(
+        {"id": chat.id},
+        {"$set": {
+            "is_claimed": True, 
+            "claimed_by_id": user.id,
+            "claimed_by_name": user.first_name,
+            "claim_date": datetime.now()
+        }},
+        upsert=True
+    )
+
+    # 7. Final Success Message
     await msg.reply_text(
         f"🎁 <b>Gʀᴏᴜᴘ Cʟᴀɪᴍ Sᴜᴄᴄᴇꜱꜱꜰᴜʟ!</b>\n\n"
+        f"👤 <b>Wɪɴɴᴇʀ:</b> {user.first_name}\n"
         f"👥 <b>Gʀᴏᴜᴘ Sɪᴢᴇ:</b> {member_count} Mᴇᴍʙᴇʀꜱ\n"
         f"💰 <b>Rᴇᴡᴀʀᴅ:</b> {reward:,} Cᴏɪɴꜱ\n\n"
-        f"<i>Yᴏᴜ Cᴀɴ Oɴʟʏ Cʟᴀɪᴍ Oɴᴄᴇ Pᴇʀ Gʀᴏᴜᴘ. Eɴᴊᴏʏ Tʜᴇ Lᴏᴏᴛ.</i>",
+        f"<i>Tʜɪꜱ ɢʀᴏᴜᴘ's ʀᴇᴡᴀʀᴅ ʜᴀꜱ ʙᴇᴇɴ ᴇxʜᴀᴜꜱᴛᴇᴅ. Nᴏ ᴏɴᴇ ᴇʟꜱᴇ ᴄᴀɴ ᴄʟᴀɪᴍ ʜᴇʀᴇ!</i>",
         parse_mode="HTML"
     )
 
