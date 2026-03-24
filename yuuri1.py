@@ -1274,8 +1274,8 @@ HELP_TEXTS = {
         "📊 <b>sᴛᴀᴛs & ʀᴀɴᴋ</b>\n"
         "• <code>/status</code> : ᴠɪᴇᴡ ᴘʀᴏꜰɪʟᴇ\n"
         "• <code>/rankers</code> | <code>/rullrank</code> : ɢʟᴏʙᴀʟ ʀᴀɴᴋs\n"
-        "• <code>/rullate [amount] | <code>/join [amount]<code>
-        "• <code>/heist</code> | <code>/joinheist</code> : ɢʀᴏᴜᴘ ʀᴏʙʙᴇʀʏ(under maintenance)"
+        "• <code>/rullate [amount]</code> | <code>/join [amount]</code>\n"
+        "• <code>/heist</code> | <code>/joinheist</code> : ɢʀᴏᴜᴘ ʀᴏʙʙᴇʀʏ <i>(ᴜɴᴅᴇʀ ᴍᴀɪɴᴛᴇɴᴀɴᴄᴇ)</i>"
     ),
     "help_ai": (
         "🧠 <b>𝐀𝐈 & 𝐔𝐭𝐢𝐥𝐢𝐭𝐢𝐞𝐬</b>\n"
