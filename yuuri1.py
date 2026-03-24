@@ -113,6 +113,7 @@ def get_user(user):
         "dead": False,
         "inventory": [],
         "referred_by": None,
+        "claimed_groups": [],
         "blocked": False,
         "premium": False,
         "old_names": []  # 🧩 Store previous names here
