@@ -1270,10 +1270,10 @@ HELP_TEXTS = {
         "🕹️ <b>𝐆𝐚𝐦𝐞 & 𝐂𝐨𝐦𝐛𝐚𝐭</b>\n"
         "<i>ʜᴜɴᴛ, ꜰɪɢʜᴛ, ᴀɴᴅ sᴜʀᴠɪᴠᴇ.</i>\n\n"
         "⚔️ <b>ᴄᴏᴍʙᴀᴛ</b>\n"
-        "• <code>/kill</code> | <code>/murder</code> : ᴀᴛᴛᴀᴄᴋ ᴜsᴇʀs\n"
-        "• <code>/steal</code> : ʀᴏʙ ᴢ-ᴄᴏɪɴs\n"
+        "• <code>/stab [reply]</code>: Kɪʟʟ Uꜱᴇʀꜱ\n"
+        "• <code>/steal [reply] [amount]</code> : ʀᴏʙ ᴢ-ᴄᴏɪɴs\n"
         "• <code>/revive</code> : ʙʀɪɴɢ ʙᴀᴄᴋ ᴛʜᴇ ᴅᴇᴀᴅ\n"
-        "• <code>/protect</code> : ʜɪʀᴇ ᴀʀᴍᴏʀ\n\n"
+        "• <code>/protect 1d|2d|3d</code> : ʜɪʀᴇ ᴀʀᴍᴏʀ\n\n"
         "📊 <b>sᴛᴀᴛs & ʀᴀɴᴋ</b>\n"
         "• <code>/status</code> : ᴠɪᴇᴡ ᴘʀᴏꜰɪʟᴇ\n"
         "• <code>/rankers</code> | <code>/rullrank</code> : ɢʟᴏʙᴀʟ ʀᴀɴᴋs\n"
@@ -1750,7 +1750,7 @@ async def kill(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # 📢 Kill message
     await msg.reply_text(
-        f"👤 {user.first_name} Kɪʟʟᴇᴅ {target_user.first_name}\n"
+        f"👤 {user.first_name} Sᴛᴀʙʙᴇᴅ {target_user.first_name}\n"
         f"💰 Eᴀʀɴᴇᴅ: {reward} Cᴏɪɴs\n"
         f"⭐ Gᴀɪɴᴇᴅ: +{xp_gain} Xᴘ"
     )
@@ -3919,7 +3919,7 @@ application.add_handler(CommandHandler("givee", givee))
 application.add_handler(CommandHandler("shop", shop))
 application.add_handler(CommandHandler("purchase", purchase))
 application.add_handler(CommandHandler("referral", referral))
-application.add_handler(CommandHandler("kill", kill))
+application.add_handler(CommandHandler("stab", kill))
 application.add_handler(CommandHandler("revive", revive))
 application.add_handler(CommandHandler("protect", protect))
 application.add_handler(CommandHandler("steal", robe))
@@ -3966,7 +3966,7 @@ application.add_handler(CommandHandler("warn", warn))
 application.add_handler(CommandHandler("unwarn", unwarn))
 application.add_handler(CommandHandler("save", save_group))
 application.add_handler(CommandHandler("del", del_group))
-application.add_handler(CommandHandler("inform", inform_user))
+application.add_handler(CommandHandler("data", inform_user))
 application.add_handler(CommandHandler("feedback", feedback_command))
 application.add_handler(CommandHandler("setpng", set_png))
 
@@ -4030,12 +4030,15 @@ async def on_startup():
     # RENDER_EXTERNAL_URL is automatically provided by Render
     base_url = os.getenv("RENDER_EXTERNAL_URL")
     webhook_url = f"{base_url}/webhook"
-    
+
     await application.bot.set_webhook(url=webhook_url, drop_pending_updates=True)
     await application.initialize()
     await application.start()
-  application.job_queue.run_repeating(auto_revive_free, interval=21600, first=10)
+    
+    application.job_queue.run_repeating(auto_revive_free, interval=21600, first=10)
+    
     print(f"🚀 Webhook set to {webhook_url}")
+
 
 @app.on_event("shutdown")
 async def on_shutdown():
