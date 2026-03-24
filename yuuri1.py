@@ -1248,9 +1248,9 @@ HELP_TEXTS = {
         "• <code>/mute</code> | <code>/unmute</code> : sɪʟᴇɴᴄᴇ ᴜsᴇʀs\n"
         "• <code>/tmute</code> : ᴛᴇᴍᴘᴏʀᴀʀʏ ᴍᴜᴛᴇ\n"
         "• <code>/warn</code> | <code>/unwarn</code> : ᴡᴀʀɴɪɴɢ sʏsᴛᴇᴍ\n"
-        "• <code>/promote</code> | <code>/demote</code> : ᴀᴅᴍɪɴ ʀᴏʟᴇs\n"
+        "• <code>/promote 1|2|3</code> | <code>/demote</code> : ᴀᴅᴍɪɴ ʀᴏʟᴇs\n"
         "• <code>/pin</code> | <code>/unpin</code> : sᴛɪᴄᴋʏ ᴍsɢs\n"
-        "• <code>/purge</code> | <code>/dlt</code> : ᴄʟᴇᴀɴ ᴄʜᴀᴛ\n"
+        "• <code>/dlt</code> : ᴄʟᴇᴀɴ ᴄʜᴀᴛ\n"
         "• <code>/kick</code> : ʀᴇᴍᴏᴠᴇ ᴜsᴇʀ"
     ),
     "help_eco": (
@@ -1274,7 +1274,8 @@ HELP_TEXTS = {
         "📊 <b>sᴛᴀᴛs & ʀᴀɴᴋ</b>\n"
         "• <code>/status</code> : ᴠɪᴇᴡ ᴘʀᴏꜰɪʟᴇ\n"
         "• <code>/rankers</code> | <code>/rullrank</code> : ɢʟᴏʙᴀʟ ʀᴀɴᴋs\n"
-        "• <code>/heist</code> | <code>/joinheist</code> : ɢʀᴏᴜᴘ ʀᴏʙʙᴇʀʏ"
+        "• <code>/rullate [amount] | <code>/join [amount]<code>
+        "• <code>/heist</code> | <code>/joinheist</code> : ɢʀᴏᴜᴘ ʀᴏʙʙᴇʀʏ(under maintenance)"
     ),
     "help_ai": (
         "🧠 <b>𝐀𝐈 & 𝐔𝐭𝐢𝐥𝐢𝐭𝐢𝐞𝐬</b>\n"
@@ -1283,7 +1284,7 @@ HELP_TEXTS = {
         "• <code>/font [ᴛᴇxᴛ]</code> : sᴛʏʟɪsʜ ᴛᴇxᴛ\n"
         "• <code>/obt</code> : sᴀᴠᴇ sᴛɪᴄᴋᴇʀs\n"
         "• <code>/id</code> : ɢᴇᴛ ᴜɴɪǫᴜᴇ ɪᴅs\n"
-        "• <code>/setpng</code> : ᴄᴏɴᴠᴇʀᴛ ᴛᴏ ᴘɴɢ\n"
+        "• <code>/data</code> : ɢᴇᴛ ɪɴꜰᴏʀᴍᴀᴛɪᴏɴ ᴀʙᴏᴜᴛ ᴜꜱᴇʀ\n"
         "• <code>/feedback</code> : ʀᴇᴘᴏʀᴛ ɪssᴜᴇs"
     ),
     "help_social": (
@@ -1301,7 +1302,7 @@ def get_main_keyboard(bot_username):
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("👨‍💻 ᴅᴇᴠᴇʟᴏᴘᴇʀ", url="tg://user?id=5773908061")],
         [
-            InlineKeyboardButton("✨ sᴜᴘᴘᴏʀᴛ", url="https://t.me/dreamspacez"),
+            InlineKeyboardButton("✨ sᴜᴘᴘᴏʀᴛ", url="https://t.me/+wlkvrPKG8wdkMDNl"),
             InlineKeyboardButton("📢 ᴜᴘᴅᴀᴛᴇs", url="https://t.me/yuuriXupdates")
         ],
         [InlineKeyboardButton("📚 ʜᴇʟᴘ & ᴄᴏᴍᴍᴀɴᴅs", callback_data="help_main")],
