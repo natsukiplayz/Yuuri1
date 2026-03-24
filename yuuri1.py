@@ -1133,24 +1133,25 @@ async def claim(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if chat.type == "private":
         return await msg.reply_text("⚠️ Tʜɪꜱ Cᴏᴍᴍᴀɴᴅ Cᴀɴ Oɴʟʏ Bᴇ Uꜱᴇᴅ Iɴ Gʀᴏᴜᴘꜱ.")
 
-    # 2. Get the player's data using your async database call
-    data = await users.find_one({"id": user.id})
+    # 2. Get the player's data using your SYNC function (No await here!)
+    data = get_user(user)
+    
     if not data:
         return await msg.reply_text("❌ Yᴏᴜ Aʀᴇ Nᴏᴛ Rᴇɢɪꜱᴛᴇʀᴇᴅ Iɴ Tʜᴇ Dᴀᴛᴀʙᴀꜱᴇ.")
 
-    # 3. Check if they already claimed the reward for THIS specific group
+    # 3. Check if they already claimed the reward
     claimed_groups = data.get("claimed_groups", [])
     if chat.id in claimed_groups:
         return await msg.reply_text("❌ Yᴏᴜ Hᴀᴠᴇ Aʟʀᴇᴀᴅʏ Cʟᴀɪᴍᴇᴅ Tʜᴇ Rᴇᴡᴀʀᴅ Fᴏʀ Tʜɪꜱ Gʀᴏᴜᴘ!")
 
-    # 4. Get the current member count of the group
+    # 4. Get the current member count (This IS an async Telegram method, so keep await)
     try:
         member_count = await chat.get_member_count()
     except Exception as e:
         print(f"Error getting member count: {e}")
         return await msg.reply_text("⚠️ Eʀʀᴏʀ Rᴇᴀᴅɪɴɢ Gʀᴏᴜᴘ Sɪᴢᴇ. Tʀʏ Aɢᴀɪɴ Lᴀᴛᴇʀ.")
 
-    # 5. Determine the reward using your exact tiers
+    # 5. Determine the reward
     reward = 0
     tiers = [
         (10000, 5000000), (9000, 2500000), (8000, 1900000), (7000, 1500000),
@@ -1165,13 +1166,11 @@ async def claim(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reward = payout
             break
 
-    # 6. If the group is too small
     if reward == 0:
         return await msg.reply_text(f"⚠️ Yᴏᴜʀ Gʀᴏᴜᴘ Oɴʟʏ Hᴀꜱ {member_count} Mᴇᴍʙᴇʀꜱ.\nYᴏᴜ Nᴇᴇᴅ Aᴛ Lᴇᴀꜱᴛ 100 Mᴇᴍʙᴇʀꜱ Tᴏ Uꜱᴇ /claim.")
 
-    # 7. Add coins to profile AND log the group ID to prevent spamming
-    # Using update_one directly modifies the database, meaning /status will see it immediately
-    await users.update_one(
+    # 6. Update database synchronously (No await here!)
+    users.update_one(
         {"id": user.id},
         {
             "$inc": {"coins": reward},
@@ -1179,13 +1178,11 @@ async def claim(update: Update, context: ContextTypes.DEFAULT_TYPE):
         }
     )
 
-    display_reward = f"{reward:,}"
-
-    # 8. Send the stylized success message
+    # 7. Send the success message (Keep await for Telegram)
     await msg.reply_text(
         f"🎁 <b>Gʀᴏᴜᴘ Cʟᴀɪᴍ Sᴜᴄᴄᴇꜱꜱꜰᴜʟ!</b>\n\n"
         f"👥 <b>Gʀᴏᴜᴘ Sɪᴢᴇ:</b> {member_count} Mᴇᴍʙᴇʀꜱ\n"
-        f"💰 <b>Rᴇᴡᴀʀᴅ:</b> {display_reward} Cᴏɪɴꜱ\n\n"
+        f"💰 <b>Rᴇᴡᴀʀᴅ:</b> {reward:,} Cᴏɪɴꜱ\n\n"
         f"<i>Yᴏᴜ Cᴀɴ Oɴʟʏ Cʟᴀɪᴍ Oɴᴄᴇ Pᴇʀ Gʀᴏᴜᴘ. Eɴᴊᴏʏ Tʜᴇ Lᴏᴏᴛ.</i>",
         parse_mode="HTML"
     )
