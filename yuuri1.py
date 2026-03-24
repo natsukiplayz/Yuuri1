@@ -337,8 +337,10 @@ from telegram import Update
 from telegram.ext import ContextTypes, CommandHandler
 
 async def voice_msg_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    usage_msg = "🎙️ Uꜱᴀɢᴇ: <code>/ᴠᴏɪᴄᴇ 1|2 Rᴇᴘʟʏ/Tᴇxᴛ.</code>"
+    
     if not context.args and not update.message.reply_to_message:
-        await update.message.reply_text("✨ ᴜsᴀɢᴇ:\n/voice 1 [ᴛᴇxᴛ] — ᴇɴɢʟɪsʜ\n/voice 2 [ᴛᴇxᴛ] — ʜɪɴɢʟɪsʜ")
+        await update.message.reply_text(usage_msg, parse_mode="HTML")
         return
 
     choice = context.args[0] if context.args else "1"
@@ -362,7 +364,7 @@ async def voice_msg_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text = " ".join(context.args[1:]) if len(context.args) > 1 else ""
 
     if not text:
-        await update.message.reply_text("✨ ᴘʟᴇᴀsᴇ ᴘʀᴏᴠɪᴅᴇ ᴛᴇxᴛ ᴏʀ ʀᴇᴘʟʏ ᴛᴏ ᴀ ᴍᴇssᴀɢᴇ.")
+        await update.message.reply_text(usage_msg, parse_mode="HTML")
         return
 
     file_name = f"v_{update.effective_user.id}.ogg"
