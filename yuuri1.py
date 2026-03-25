@@ -53,50 +53,41 @@ MONGO_URI = os.getenv("MONGO_URI")
 OWNER_ID = 7139383373
 OWNER_IDS = 5773908061
 
-# ================= MONGODB =================
-# Use AsyncIOMotorClient for everything so 'await' works
+# ================= MONGODB SETUP (UNIFIED) =================
+from pymongo import MongoClient
+from motor.motor_asyncio import AsyncIOMotorClient
+
+# 1. Initialize both clients first so they are ready
+client = MongoClient(MONGO_URI)
+sync_db = client["yuuri_db"]
+
 async_client = AsyncIOMotorClient(MONGO_URI)
 async_db = async_client["yuuri_db"]
 
-# All these now support 'await'
+# 2. Define 'db' as the main sync variable for the whole script
+# This prevents the "NameError: name 'db' is not defined"
+db = sync_db 
+
+# --- SYNC COLLECTIONS (No 'await' needed) ---
 users = db["users"]
+users_collection = db["users"] # Fixed the missing quote/bracket here
 guilds = db["guilds"]
 chat = db["chats"]
 sticker_packs = db["sticker_packs"]
 heists = db["heists"]
 redeem_col = db["redeem_codes"]
-
-# Management Db Collection
 admins_db = db["admins"] 
 torture_db = db["torture_registry"]
 allowed_collection = db["allowed_users"] 
 groups_collection = db["saved_groups"]
+feedback_db = db["feedbacks"]
+
+# --- ASYNC COLLECTIONS (Specifically for 'await' commands) ---
+# We keep this separate so your async functions (like get_img) work perfectly
 image_db = async_db["command_images"]
 
 # ================= LOG =================
 logging.basicConfig(level=logging.INFO)
-
-#===========Systems========
-#--
-# ================= MONGODB (STRICT SYNC) =================
-# Use MongoClient ONLY to avoid 'coroutine' errors
-from pymongo import MongoClient
-
-# Initialize the sync client
-client = MongoClient(MONGO_URI)
-db = client["yuuri_db"]
-
-# Define all collections
-users = db["users"]
-users_collection = db["users"]
-guilds = db["guilds"]
-sticker_packs = db["sticker_packs"]
-heists = db["heists"]
-redeem_col = db["redeem_codes"]
-admins_db = db["admins"] 
-allowed_collection = db["allowed_users"] 
-groups_collection = db["saved_groups"]
-feedback_db = db["feedbacks"]
 
 # ================= USER SYSTEM (STRICT SYNC) =================
 def get_user(user):
