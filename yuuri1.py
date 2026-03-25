@@ -2198,28 +2198,34 @@ async def purchase(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 #===================top_players_command=================
 #--
+import html
+
 #=====Top_rhichest=====
 async def richest(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Sort by coins (descending) - Sync DB call (No await)
-    # Filter out the bot's own ID if necessary
+    # Sort by coins (descending)
     top_list = users.find({"id": {"$ne": context.bot.id}}).sort("coins", -1).limit(10)
     
     text = "🏆 <b>Tᴏᴘ 10 Rɪᴄʜᴇꜱᴛ Uꜱᴇʀꜱ:</b>\n\n"
     
     for i, user in enumerate(top_list, start=1):
-        name = user.get("name", "Uɴᴋɴᴏᴡɴ")
+        # 🛡️ FIX 1: Prevent 'NoneType' crash if a DB record is somehow null
+        if not user:
+            continue
+            
+        raw_name = user.get("name", "Uɴᴋɴᴏᴡɴ")
+        # 🛡️ FIX 2: Escape names to prevent HTML parsing crashes (Fixes the "<3" bug)
+        safe_name = html.escape(str(raw_name))
+        
         coins = user.get("coins", 0)
         # Use 💓 for premium, 👤 for normal
         icon = "💓" if user.get("premium") else "👤"
         
         # Display: Icon Index. Name: `Coins`
-        # Using <code> tag for the monospaced "code" look
-        text += f"{icon} {i}. {name} <code>{coins:,}</code>\n"
+        text += f"{icon} {i}. {safe_name} <code>{coins:,}</code>\n"
     
     text += "\n💓 = Pʀᴇᴍɪᴜᴍ • 👤 = Nᴏʀᴍᴀʟ\n\n"
     text += "<i>✅ Uᴘɢʀᴀᴅᴇ Tᴏ Pʀᴇᴍɪᴜᴍ : ᴄᴏᴍɪɴɢ ꜱᴏᴏɴ 🔜</i>"
     
-    # Ensure parse_mode is set to HTML so the <code> tags work
     await update.message.reply_text(text, parse_mode="HTML")
 
 #=====rankers====
