@@ -179,15 +179,6 @@ async def get_img(command_name, default_url="https://graph.org/file/default.jpg"
         print(f"❌ Error fetching image for {command_name}: {e}")
         return default_url
 
-# ======Broadcast_System======
-import asyncio
-import time
-from telegram import Update
-from telegram.ext import ContextTypes
-
-# Broadcast control dictionary
-broadcast_control = {"running": False, "cancel": False}
-
 # ========== UPDATED LEVEL SYSTEM ========
 # Updated Leveling Config
 def add_xp(user_data, amount):
@@ -2291,124 +2282,134 @@ async def rullrank(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 #=======broadcasting======
 #--
-# ======= PRIVATE BROADCAST ========
-async def broad_c(update: Update, context: ContextTypes.DEFAULT_TYPE):
+import asyncio
+import time
+import html
+from telegram import Update
+from telegram.constants import ParseMode
+from telegram.ext import ContextTypes, CommandHandler
+
+broadcast_control = {"running": False, "cancel": False}
+broadcast_history = {"last_broadcast": []} # To store (chat_id, msg_id)
+
+# ======= UNIVERSAL BROADCAST ENGINE ========
+async def perform_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE, target_chats, is_group=False):
     if update.effective_user.id != OWNER_IDS:
         return await update.message.reply_text("❌ Uɴᴀᴜᴛʜᴏʀɪᴢᴇᴅ")
 
     if broadcast_control["running"]:
         return await update.message.reply_text("⚠️ Aɴᴏᴛʜᴇʀ ʙʀᴏᴀᴅᴄᴀsᴛ ʀᴜɴɴɪɴɢ!")
 
-    # Get message preserving all spaces
+    # Determine which message to send
+    # If replying to something, use that. Otherwise, use the command message itself.
     if update.message.reply_to_message:
-        msg = update.message.reply_to_message.text or update.message.reply_to_message.caption
+        target_msg_id = update.message.reply_to_message.message_id
+        from_chat_id = update.effective_chat.id
     else:
         if not context.args:
-            return await update.message.reply_text("Rᴇᴘʟʏ ᴏʀ ᴜsᴇ /broad_c message")
-        msg = update.message.text.split(" ", 1)[1]
+            return await update.message.reply_text("❌ Rᴇᴘʟʏ ᴛᴏ ᴀ ᴍᴇssᴀɢᴇ ᴏʀ ᴘʀᴏᴠɪᴅᴇ ᴛᴇxᴛ.")
+        target_msg_id = update.message.message_id
+        from_chat_id = update.effective_chat.id
 
-    all_chats = list(db["chats"].find({"type": "private"}))
-    total = len(all_chats)
-    success = 0
-    failed = 0
+    total = len(target_chats)
+    if total == 0:
+        return await update.message.reply_text("❌ Nᴏ ᴄʜᴀᴛs ꜰᴏᴜɴᴅ ɪɴ ᴅᴀᴛᴀʙᴀsᴇ.")
 
+    # Reset controls
     broadcast_control["running"] = True
     broadcast_control["cancel"] = False
+    broadcast_history["last_broadcast"] = [] 
+    
+    success, failed = 0, 0
     start_time = time.time()
-    progress_msg = await update.message.reply_text("🚀 Sᴛᴀʀᴛɪɴɢ Bʀᴏᴀᴅᴄᴀsᴛ...")
+    label = "Gʀᴏᴜᴘ" if is_group else "Pʀɪᴠᴀᴛᴇ"
+    progress_msg = await update.message.reply_text(f"🚀 Sᴛᴀʀᴛɪɴɢ {label} Bʀᴏᴀᴅᴄᴀsᴛ...")
 
-    for i, chat in enumerate(all_chats, start=1):
+    for i, chat in enumerate(target_chats, start=1):
         if broadcast_control["cancel"]:
             break
 
         try:
-            await context.bot.send_message(chat_id=chat["id"], text=msg)
-            success += 1
-        except:
-            failed += 1
-
-        if i % 10 == 0 or i == total:
-            bar_len = 10
-            filled = int((i / total) * bar_len)
-            bar = "█" * filled + "░" * (bar_len - filled)
-            await progress_msg.edit_text(
-                f"📊 Bʀᴏᴀᴅᴄᴀsᴛɪɴɢ...\n\n[{bar}] {i}/{total}\n✅ Sᴜᴄᴄᴇss: {success}\n❌ Fᴀɪʟᴇᴅ: {failed}\n📦 Tᴏᴛᴀʟ: {total}"
+            # ✨ copy_message preserves stickers, polls, gifs, and formatting perfectly
+            sent = await context.bot.copy_message(
+                chat_id=chat["id"],
+                from_chat_id=from_chat_id,
+                message_id=target_msg_id
             )
-
-        await asyncio.sleep(0.07)
-
-    broadcast_control["running"] = False
-    status = "🛑 Cᴀɴᴄᴇʟʟᴇᴅ" if broadcast_control["cancel"] else "✅ Cᴏᴍᴘʟᴇᴛᴇᴅ"
-    total_time = round(time.time() - start_time, 2)
-
-    await progress_msg.edit_text(
-        f"📢 Bʀᴏᴀᴅᴄᴀsᴛ {status}\n\n✅ Sᴇɴᴛ: {success}\n❌ Fᴀɪʟᴇᴅ: {failed}\n📦 Tᴏᴛᴀʟ: {total}\n⏱ Tɪᴍᴇ: {total_time}s"
-    )
-
-# ======= GROUP BROADCAST =========
-async def broad_gc(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != OWNER_ID:
-        return await update.message.reply_text("❌ Uɴᴀᴜᴛʜᴏʀɪᴢᴇᴅ")
-
-    if broadcast_control["running"]:
-        return await update.message.reply_text("⚠️ Aɴᴏᴛʜᴇʀ ʙʀᴏᴀᴅᴄᴀsᴛ ʀᴜɴɴɪɴɢ!")
-
-    if update.message.reply_to_message:
-        msg = update.message.reply_to_message.text or update.message.reply_to_message.caption
-    else:
-        if not context.args:
-            return await update.message.reply_text("Rᴇᴘʟʏ ᴏʀ ᴜsᴇ /broad_gc message")
-        msg = update.message.text.split(" ", 1)[1]
-
-    all_groups = list(db["chats"].find({"type": {"$in": ["group", "supergroup"]}}))
-    total = len(all_groups)
-    success = 0
-    failed = 0
-
-    broadcast_control["running"] = True
-    broadcast_control["cancel"] = False
-    start_time = time.time()
-
-    progress_msg = await update.message.reply_text("🚀 Sᴛᴀʀᴛɪɴɢ Gʀᴏᴜᴘ Bʀᴏᴀᴅᴄᴀsᴛ...")
-
-    for i, chat in enumerate(all_groups, start=1):
-        if broadcast_control["cancel"]:
-            break
-
-        try:
-            await context.bot.send_message(chat_id=chat["id"], text=msg)
+            broadcast_history["last_broadcast"].append((chat["id"], sent.message_id))
             success += 1
-        except:
+        except Exception:
             failed += 1
 
+        # Update progress UI
         if i % 10 == 0 or i == total:
             percent = int((i / total) * 100)
-            filled = int(percent / 10)
-            bar = "█" * filled + "░" * (10 - filled)
-            await progress_msg.edit_text(
-                f"📊 Gʀᴏᴜᴘ Bʀᴏᴀᴅᴄᴀsᴛ...\n\n[{bar}] {percent}%\n✅ Sᴜᴄᴄᴇss: {success}\n❌ Fᴀɪʟᴇᴅ: {failed}\n📦 Tᴏᴛᴀʟ: {total}"
-            )
+            bar = "█" * (percent // 10) + "░" * (10 - (percent // 10))
+            try:
+                await progress_msg.edit_text(
+                    f"📊 <b>{label} Bʀᴏᴀᴅᴄᴀsᴛɪɴɢ...</b>\n\n"
+                    f"<code>[{bar}]</code> {percent}%\n"
+                    f"✅ Sᴜᴄᴄᴇss: {success}\n"
+                    f"❌ Fᴀɪʟᴇᴅ: {failed}\n"
+                    f"📦 Tᴏᴛᴀʟ: {total}",
+                    parse_mode=ParseMode.HTML
+                )
+            except: pass
 
-        await asyncio.sleep(0.07)
+        await asyncio.sleep(0.08) # Safety delay to prevent Telegram Flood
 
     broadcast_control["running"] = False
-    status = "🛑 Cᴀɴᴄᴇʟʟᴇᴅ" if broadcast_control["cancel"] else "✅ Cᴏᴍᴘʟᴇᴛᴇᴅ"
-    total_time = round(time.time() - start_time, 2)
-
+    status = "🛑 Sᴛᴏᴘᴘᴇᴅ" if broadcast_control["cancel"] else "✅ Cᴏᴍᴘʟᴇᴛᴇᴅ"
+    
     await progress_msg.edit_text(
-        f"📢 Gʀᴏᴜᴘ Bʀᴏᴀᴅᴄᴀsᴛ {status}\n\n✅ Sᴇɴᴛ: {success}\n❌ Fᴀɪʟᴇᴅ: {failed}\n📦 Tᴏᴛᴀʟ: {total}\n⏱ Tɪᴍᴇ: {total_time}s"
+        f"📢 <b>{label} Bʀᴏᴀᴅᴄᴀsᴛ {status}</b>\n\n"
+        f"✅ Sᴇɴᴛ: {success}\n"
+        f"❌ Fᴀɪʟᴇᴅ: {failed}\n"
+        f"⏱ Tɪᴍᴇ: {round(time.time() - start_time, 2)}s",
+        parse_mode=ParseMode.HTML
     )
 
-# ======== CANCEL BROADCAST ========
-async def cancel_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != OWNER_ID:
-        return await update.message.reply_text("❌ Uɴᴀᴜᴛʜᴏʀɪᴢᴇᴅ")
+# ======= COMMAND HANDLERS ========
 
+async def broad_c(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Broadcast to Private Chats"""
+    all_privates = list(db["chats"].find({"type": "private"}))
+    await perform_broadcast(update, context, all_privates, is_group=False)
+
+async def broad_gc(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Broadcast to Groups"""
+    all_groups = list(db["chats"].find({"type": {"$in": ["group", "supergroup"]}}))
+    await perform_broadcast(update, context, all_groups, is_group=True)
+
+async def stop_broad(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Stops a currently running broadcast"""
+    if update.effective_user.id != OWNER_IDS: return
     if not broadcast_control["running"]:
-        return await update.message.reply_text("❌ Nᴏ ʙʀᴏᴀᴅᴄᴀsᴛ ʀᴜɴɴɪɴɢ")
-
+        return await update.message.reply_text("❌ Nᴏ ʙʀᴏᴀᴅᴄᴀsᴛ ɪs ʀᴜɴɴɪɴɢ.")
+    
     broadcast_control["cancel"] = True
-    await update.message.reply_text("🛑 Bʀᴏᴀᴅᴄᴀsᴛ Cᴀɴᴄᴇʟʟᴀᴛɪᴏɴ RᴇQᴜᴇsᴛᴇᴅ...")
+    await update.message.reply_text("🛑 Bʀᴏᴀᴅᴄᴀsᴛ sᴛᴏᴘ ʀᴇǫᴜᴇsᴛ sᴇɴᴛ.")
+
+async def del_broad(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Deletes the messages from the last broadcast"""
+    if update.effective_user.id != OWNER_IDS: return
+    
+    history = broadcast_history["last_broadcast"]
+    if not history:
+        return await update.message.reply_text("❌ Nᴏ ʀᴇᴄᴇɴᴛ ʙʀᴏᴀᴅᴄᴀsᴛ ꜰᴏᴜɴᴅ ᴛᴏ ᴅᴇʟᴇᴛᴇ.")
+
+    status_msg = await update.message.reply_text("🗑️ Dᴇʟᴇᴛɪɴɢ ʟᴀsᴛ ʙʀᴏᴀᴅᴄᴀsᴛ ᴍᴇssᴀɢᴇs...")
+    deleted = 0
+    
+    for chat_id, msg_id in history:
+        try:
+            await context.bot.delete_message(chat_id=chat_id, message_id=msg_id)
+            deleted += 1
+        except: pass
+        await asyncio.sleep(0.05)
+
+    broadcast_history["last_broadcast"] = [] # Wipe history
+    await status_msg.edit_text(f"✅ Dᴇʟᴇᴛᴇᴅ {deleted} ᴍᴇssᴀɢᴇs sᴜᴄᴄᴇssꜰᴜʟʟʏ.")
 
 #===============Mini_Upgrades===============
 #--
@@ -4108,9 +4109,10 @@ application.add_handler(CommandHandler("personal", send_personal))
 application.add_handler(CommandHandler("q", quote))
 application.add_handler(CommandHandler("obt", save_sticker))
 application.add_handler(CommandHandler("groups", savgc_command))
-application.add_handler(CommandHandler("broad_gc", broad_gc))
 application.add_handler(CommandHandler("broad_c", broad_c))
-application.add_handler(CommandHandler("stop_b", cancel_broadcast))
+application.add_handler(CommandHandler("broad_gc", broad_gc))
+application.add_handler(CommandHandler("stop_broad", stop_broad))
+application.add_handler(CommandHandler("del_broad", del_broad))
 application.add_handler(CommandHandler("block", block_cmd))
 application.add_handler(CommandHandler("unblock", unblock_cmd))
 application.add_handler(CommandHandler("ping", ping))
