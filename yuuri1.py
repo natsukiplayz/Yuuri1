@@ -1483,11 +1483,15 @@ def get_help_keyboard():
 # --- 4. START COMMAND ---
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
+    
+    # Use f-string with proper line breaks and closed parenthesis
     caption = (
         f"<b>ᴡᴇʟᴄᴏᴍᴇ, {user.first_name}!</b> 👋\n\n"
-        f"<blockquote>ɪ ᴀᴍ <b>ʏᴜᴜʀɪ</b> — ᴀɴ ᴀᴅᴠᴀɴᴄᴇᴅ ᴀɪ ᴀssɪsᴛᴀɴᴛ ᴅᴇsɪɢɴᴇᴅ ᴛᴏ ᴇɴʜᴀɴᴄᴇ ʏᴏᴜʀ ᴛᴇʟᴇɢʀᴀᴍ ᴇxᴘᴇʀɪᴇɴᴄᴇ.</blockquote>\n\n"
+        f"<blockquote>ɪ ᴀᴍ <b>ʏᴜᴜʀɪ</b> — ʜᴇʀᴇ ᴛᴏ ᴇɴʜᴀɴᴄᴇ ʏᴏᴜʀ ᴇxᴘᴇʀɪᴇɴᴄᴇ ᴏɴ ᴛᴇʟᴇɢʀᴀᴍ. ᴇɴᴊᴏʏ ʏᴏᴜʀ ᴊᴏᴜʀɴᴇʏ ᴡɪᴛʜ ᴍᴇ!\n\n"
+        f"ᴜsᴇ: /referral ᴛᴏ sʜᴀʀᴇ ʏᴏᴜʀ ʟɪɴᴋ. ɪᴛ ʜᴇʟᴘs ᴍᴇ ɢʀᴏᴡ ᴀɴᴅ ʙᴏᴏsᴛs ʏᴏᴜʀ ʙᴀʟᴀɴᴄᴇ ᴀs ᴡᴇʟʟ.</blockquote>\n\n"
         f"ᴀᴅᴅ ᴍᴇ ᴛᴏ ʏᴏᴜʀ ɢʀᴏᴜᴘ ᴀɴᴅ ʟᴇᴛ ᴍᴇ ᴛᴀᴋᴇ ᴄᴀʀᴇ ᴏғ ᴛʜᴇ ʀᴇsᴛ."
     )
+
     await update.message.reply_photo(
         photo=IMG_MAIN,
         caption=caption,
