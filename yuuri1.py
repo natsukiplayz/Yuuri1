@@ -2221,7 +2221,7 @@ async def richest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         icon = "💓" if user.get("premium") else "👤"
         
         # Display: Icon Index. Name: `Coins`
-        text += f"{icon} {i}. {safe_name} <code>{coins:,}</code>\n"
+        text += f"{icon} {i}. {safe_name}: <code>{coins:,}$</code>\n"
     
     text += "\n💓 = Pʀᴇᴍɪᴜᴍ • 👤 = Nᴏʀᴍᴀʟ\n\n"
     text += "<i>✅ Uᴘɢʀᴀᴅᴇ Tᴏ Pʀᴇᴍɪᴜᴍ : ᴄᴏᴍɪɴɢ ꜱᴏᴏɴ 🔜</i>"
