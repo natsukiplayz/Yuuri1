@@ -1581,8 +1581,7 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     target_user = msg.reply_to_message.from_user if msg.reply_to_message else update.effective_user
     data = get_user(target_user) 
 
-    # --- ✨ AUTO-FIX LOGIC ---
-    # This checks if the user is "overdue" for a level up
+    # --- ✨ AUTO-LEVEL LOGIC ---
     updated = False
     while True:
         need = int(100 * (1.5 ** (data["level"] - 1)))
@@ -1592,16 +1591,16 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
             updated = True
         else:
             break
-    
     if updated:
-        save_user(data) # Sync the fix back to MongoDB
-    # -------------------------
+        save_user(data)
 
+    # --- DATA EXTRACTION ---
     xp = data.get("xp", 0)
     lvl = data.get("level", 1)
     coins = data.get("coins", 0)
+    kills = data.get("kills", 0) # ⚔️ New Stat
     premium = data.get("premium", False)
-    
+
     current_rank_data, _ = get_rank_data(lvl)
     rank_title = current_rank_data["name"]
 
@@ -1609,14 +1608,12 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     percent = int((xp / need) * 100) if need > 0 else 0
     bar = create_progress_bar(min(percent, 100))
 
-    # Calculate Global Ranks (Excluding the bot)
-    # Note: Make sure context.bot.id is correct here
-    higher_lvl = users.count_documents({"id": {"$ne": context.bot.id}, "level": {"$gt": lvl}})
-    same_lvl_more_xp = users.count_documents({"id": {"$ne": context.bot.id}, "level": lvl, "xp": {"$gt": xp}})
-    xp_rank = 1 + higher_lvl + same_lvl_more_xp
-
-    richer_people = users.count_documents({"id": {"$ne": context.bot.id}, "coins": {"$gt": coins}})
-    wealth_rank = 1 + richer_people
+    # --- GLOBAL RANKINGS ---
+    bot_id = context.bot.id
+    
+    xp_rank = 1 + users.count_documents({"id": {"$ne": bot_id}, "$or": [{"level": {"$gt": lvl}}, {"level": lvl, "xp": {"$gt": xp}}]})
+    wealth_rank = 1 + users.count_documents({"id": {"$ne": bot_id}, "coins": {"$gt": coins}})
+    kill_rank = 1 + users.count_documents({"id": {"$ne": bot_id}, "kills": {"$gt": kills}}) # ⚔️ Kill Rank
 
     inv = data.get("inventory", [])
     inventory_str = ", ".join(inv) if inv else "Eᴍᴘᴛʏ"
@@ -1627,6 +1624,7 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"{icon} Nᴀᴍᴇ: {data.get('name', target_user.first_name)}\n"
         f"🛡️ Tɪᴛʟᴇ: {rank_title}\n"
         f"🏅 Lᴇᴠᴇʟ: {lvl}\n"
+        f"⚔️ Kɪʟʟs: {kills:,}\n"  # ⚔️ Added to display
         f"💰 Cᴏɪɴꜱ: {coins:,}\n"
         f"🎒 Iɴᴠᴇɴᴛᴏʀʏ: {inventory_str}\n"
         f"🎯 Sᴛᴀᴛᴜꜱ: {status}\n\n"
@@ -1634,6 +1632,7 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"{bar} ({percent}%)\n\n"
         f"🌐 Gʟᴏʙᴀʟ Rᴀɴᴋ (XP): {xp_rank}\n"
         f"💸 Wᴇᴀʟᴛʜ Rᴀɴᴋ: {wealth_rank}\n"
+        f"🩸 Kɪʟʟ Rᴀɴᴋ: {kill_rank}\n" # ⚔️ Added to display
         f"🏰 Gᴜɪʟᴅ: {data.get('guild') or 'Nᴏɴᴇ'}"
     )
 
@@ -2252,6 +2251,32 @@ async def rankers(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text += "🏆 Kᴇᴇᴘ Gʀɪɴᴅɪɴɢ Tᴏ Rᴇᴀᴄʜ Tʜᴇ Tᴏᴘ!"
     
     await update.message.reply_text(text)
+
+#=====killers====
+async def top_killers(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Displays the top 10 players with the highest kills"""
+    # Query: More than 0 kills, exclude the bot, sort by kills descending
+    top_list = list(users.find(
+        {"kills": {"$gt": 0}, "id": {"$ne": context.bot.id}}
+    ).sort("kills", -1).limit(10))
+
+    if not top_list:
+        return await update.message.reply_text("<b>🚫 ɴᴏ ᴋɪʟʟᴇʀs ғᴏᴜɴᴅ ʏᴇᴛ!</b>", parse_mode='HTML')
+
+    header = "<b>🩸 ᴛᴏᴘ 10 ᴅᴇᴀᴅʟɪᴇsᴛ ᴋɪʟʟᴇʀs 🩸</b>\n"
+    header += "⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n"
+    
+    entries = []
+    medals = ["🥇", "🥈", "🥉", "🏅", "🏅", "🏅", "🏅", "🏅", "🏅", "🏅"]
+
+    for i, user_data in enumerate(top_list):
+        medal = medals[i]
+        name = user_data.get("name", "Unknown")
+        kills = user_data.get("kills", 0)
+        entries.append(f"{medal} <b>{name}</b> — <code>{kills:,} ᴋɪʟʟs</code>")
+
+    full_text = header + "\n".join(entries)
+    await update.message.reply_text(full_text, parse_mode='HTML')
 
 #=======mini_games_topplayers=======
 #--
@@ -4066,6 +4091,7 @@ application.add_handler(CommandHandler("status", profile))
 application.add_handler(CommandHandler("stats", stats))
 application.add_handler(CommandHandler("rankers", rankers))
 application.add_handler(CommandHandler("richest", richest))
+application.add_handler(CommandHandler("topkillers", top_killers))
 application.add_handler(CommandHandler("id", user_command))
 application.add_handler(CommandHandler("font", font_converter))
 application.add_handler(CommandHandler("register", register))
