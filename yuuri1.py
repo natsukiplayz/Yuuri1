@@ -56,7 +56,7 @@ OWNER_IDS = 5773908061
 # ================= MONGODB =================
 # Use AsyncIOMotorClient for everything so 'await' works
 async_client = AsyncIOMotorClient(MONGO_URI)
-db = async_client["yuuri_db"]
+async_db = async_client["yuuri_db"]
 
 # All these now support 'await'
 users = db["users"]
@@ -71,7 +71,7 @@ admins_db = db["admins"]
 torture_db = db["torture_registry"]
 allowed_collection = db["allowed_users"] 
 groups_collection = db["saved_groups"]
-image_db = db["command_images"]
+image_db = async_db["command_images"]
 
 # ================= LOG =================
 logging.basicConfig(level=logging.INFO)
@@ -88,6 +88,7 @@ db = client["yuuri_db"]
 
 # Define all collections
 users = db["users"]
+users_collection = db["users"]
 guilds = db["guilds"]
 sticker_packs = db["sticker_packs"]
 heists = db["heists"]
@@ -161,6 +162,8 @@ def save_user(data):
     users.update_one({"id": data["id"]}, {"$set": data}, upsert=True)
 
 #======== load groups ====
+SAVED_GROUPS = {}
+
 def load_groups_from_db():
     """Sync: Loads groups from MongoDB into the local SAVED_GROUPS dictionary"""
     global SAVED_GROUPS
@@ -175,6 +178,8 @@ def load_groups_from_db():
         logging.info(f"✅ Loaded {len(SAVED_GROUPS)} groups from Database.")
     except Exception as e:
         logging.error(f"❌ DB Load Error: {e}")
+
+load_groups_from_db()
 
 # --- DATABASE HELPERS ---
 async def get_img(command_name, default_url="https://graph.org/file/default.jpg"):
@@ -2900,42 +2905,30 @@ async def allow_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 #---
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
-# --- GROUPS COMMAND (Public or Admin) ---
+# --- GROUPS COMMAND ---
 async def groups_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Displays the saved groups to the user in a clean button layout"""
-    # If you want this for OWNER ONLY, uncomment the next line:
-    # if update.effective_user.id != OWNER_ID: return
-
     if not SAVED_GROUPS:
         return await update.message.reply_text("<b>⚠️ ɴᴏ ɢʀᴏᴜᴘs ʜᴀᴠᴇ ʙᴇᴇɴ sᴀᴠᴇᴅ ʏᴇᴛ.</b>", parse_mode='HTML')
 
     keyboard = []
-
-    # Row 1: Position 1 (Full Width)
+    # Row 1: Position 1
     if 1 in SAVED_GROUPS:
         keyboard.append([InlineKeyboardButton(SAVED_GROUPS[1]["name"], url=SAVED_GROUPS[1]["url"])])
 
-    # Row 2: Positions 2 & 3 (Side by Side)
-    row2 = []
-    for p in [2, 3]:
-        if p in SAVED_GROUPS:
-            row2.append(InlineKeyboardButton(SAVED_GROUPS[p]["name"], url=SAVED_GROUPS[p]["url"]))
+    # Row 2: Positions 2 & 3
+    row2 = [InlineKeyboardButton(SAVED_GROUPS[p]["name"], url=SAVED_GROUPS[p]["url"]) for p in [2, 3] if p in SAVED_GROUPS]
     if row2: keyboard.append(row2)
 
-    # Row 3: Positions 4 & 5 (Side by Side)
-    row3 = []
-    for p in [4, 5]:
-        if p in SAVED_GROUPS:
-            row3.append(InlineKeyboardButton(SAVED_GROUPS[p]["name"], url=SAVED_GROUPS[p]["url"]))
+    # Row 3: Positions 4 & 5
+    row3 = [InlineKeyboardButton(SAVED_GROUPS[p]["name"], url=SAVED_GROUPS[p]["url"]) for p in [4, 5] if p in SAVED_GROUPS]
     if row3: keyboard.append(row3)
 
-    # Row 4: Position 6 (Full Width)
+    # Row 4: Position 6
     if 6 in SAVED_GROUPS:
         keyboard.append([InlineKeyboardButton(SAVED_GROUPS[6]["name"], url=SAVED_GROUPS[6]["url"])])
 
     await update.message.reply_text(
-        "✨ <b>ᴊᴏɪɴ ᴏᴜʀ ᴏꜰꜰɪᴄɪᴀʟ ɢʀᴏᴜᴘꜱ</b> ✨\n\n"
-        "<i>ꜱᴇʟᴇᴄᴛ ᴀ ɢʀᴏᴜᴘ ꜰʀᴏᴍ ᴛʜᴇ ʙᴜᴛᴛᴏɴꜱ ʙᴇʟᴏᴡ:</i>",
+        "✨ <b>ᴊᴏɪɴ ᴏᴜʀ ᴏꜰꜰɪᴄɪᴀʟ ɢʀᴏᴜᴘꜱ</b> ✨",
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode='HTML'
     )
@@ -2943,7 +2936,6 @@ async def groups_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # --- SAVE COMMAND ---
 async def save_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != OWNER_ID: return 
-
     args = context.args
     if len(args) < 3:
         return await update.message.reply_text("<code>⚠️ ᴜsᴀɢᴇ: /sᴀᴠᴇ [ɴᴀᴍᴇ] [ᴜʀʟ] [ᴘᴏs]</code>", parse_mode='HTML')
@@ -2953,8 +2945,9 @@ async def save_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
         url = args[-2]
         name = " ".join(args[:-2])
 
-        # Sync Update
+        # Sync Update to DB
         groups_collection.update_one({"pos": pos}, {"$set": {"name": name, "url": url}}, upsert=True)
+        # Update local memory
         SAVED_GROUPS[pos] = {"name": name, "url": url}
         
         await update.message.reply_text(f"✅ <b>ɢʀᴏᴜᴘ sᴀᴠᴇᴅ ᴛᴏ ᴘᴏsɪᴛɪᴏɴ {pos}</b>", parse_mode='HTML')
@@ -2964,13 +2957,12 @@ async def save_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # --- DELETE COMMAND ---
 async def del_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != OWNER_ID: return
-
     if not context.args:
         return await update.message.reply_text("<code>⚠️ ᴜsᴀɢᴇ: /ᴅᴇʟ [ᴘᴏsɪᴛɪᴏɴ]</code>", parse_mode='HTML')
 
     try:
         pos = int(context.args[0])
-        groups_collection.delete_one({"pos": pos})
+        groups_collection.delete_one({"pos": pos}) # Sync Delete
 
         if pos in SAVED_GROUPS:
             del SAVED_GROUPS[pos]
