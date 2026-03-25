@@ -1923,7 +1923,7 @@ async def kill(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ========== BOUNTY =========
 async def bounty(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message.reply_to_message:
-        return await update.message.reply_text("Reply to someone to place bounty.")
+        return await update.message.reply_text("Rᴇᴘʟʏ Tᴏ Sᴏᴍᴇᴏɴᴇ Tᴏ Pʟᴀᴄᴇ Bᴏᴜɴᴛʏ.")
 
     if not context.args:
         return await update.message.reply_text("Use: /bounty <amount>")
