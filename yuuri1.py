@@ -1531,6 +1531,129 @@ async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         print(f"Callback Error: {e}")
 
+# ================= HELP SYSTEM MODULE =================
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
+from telegram.constants import ParseMode
+from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler
+
+# --- 1. CONFIGURATION ---
+# Ensure these variables match your global image links
+IMG_HELP = "https://i.ibb.co/HT6fHBP9/x.jpg"
+
+# --- 2. THE DYNAMIC HELP DATA ---
+HELP_TEXTS = {
+    "help_manage": (
+        "🛡️ <b>𝐆𝐫𝐨𝐮𝐩 𝐌𝐚𝐧𝐚𝐠𝐞𝐦𝐞𝐧𝐭</b>\n"
+        "<i>ᴀᴅᴍɪɴ ᴛᴏᴏʟs ᴛᴏ ᴇɴғᴏʀᴄᴇ ᴛʜᴇ ʟᴀᴡ.</i>\n\n"
+        "• <code>/ban</code> | <code>/unban</code> : ᴍᴀɴᴀɢᴇ ʙᴀɴs\n"
+        "• <code>/mute</code> | <code>/unmute</code> : sɪʟᴇɴᴄᴇ ᴜsᴇʀs\n"
+        "• <code>/tmute</code> : ᴛᴇᴍᴘᴏʀᴀʀʏ ᴍᴜᴛᴇ\n"
+        "• <code>/warn</code> | <code>/unwarn</code> : ᴡᴀʀɴɪɴɢ sʏsᴛᴇᴍ\n"
+        "• <code>/promote</code> | <code>/demote</code> : ᴀᴅᴍɪɴ ʀᴏʟᴇs\n"
+        "• <code>/pin</code> | <code>/unpin</code> : sᴛɪᴄᴋʏ ᴍsɢs\n"
+        "• <code>/dlt</code> : ᴄʟᴇᴀɴ ᴄʜᴀᴛ"
+    ),
+    "help_eco": (
+        "💰 <b>𝐄𝐜𝐨𝐧𝐨𝐦𝐲 & 𝐖𝐞𝐚𝐥𝐭𝐡</b>\n"
+        "<i>ɢʀɪɴᴅ, ᴛʀᴀᴅᴇ, ᴀɴᴅ sᴛᴀᴄᴋ ᴄᴀsʜ.</i>\n\n"
+        "• <code>/daily</code> : ᴄʟᴀɪᴍ ᴅᴀɪʟʏ ᴄᴏɪɴs\n"
+        "• <code>/givee [ɪᴅ] [ᴀᴍᴛ]</code> : ᴛʀᴀɴsғᴇʀ ꜰᴜɴᴅs\n"
+        "• <code>/shop</code> | <code>/purchase</code> : ʙᴜʏ ɪᴛᴇᴍs\n"
+        "• <code>/claim</code> : Cʟᴀɪᴍ Rᴇᴡᴀʀᴅꜱ Iɴ Gʀᴏᴜᴘꜱ\n"
+        "• <code>/redeem [ᴄᴏᴅᴇ]</code> : ᴜsᴇ ᴘʀᴏᴍᴏ ᴄᴏᴅᴇ\n"
+        "• <code>/richest</code> : ᴡᴇᴀʟᴛʜ ʟᴇᴀᴅᴇʀʙᴏᴀʀᴅ"
+    ),
+    "help_game": (
+        "🕹️ <b>𝐆𝐚𝐦𝐞 & 𝐂𝐨𝐦𝐛𝐚𝐭</b>\n"
+        "<i>ʜᴜɴᴛ, ꜰɪɢʜᴛ, ᴀɴᴅ sᴜʀᴠɪᴠᴇ.</i>\n\n"
+        "⚔️ <b>ᴄᴏᴍʙᴀᴛ</b>\n"
+        "• <code>/stab [reply]</code>: Kɪʟʟ Uꜱᴇʀꜱ\n"
+        "• <code>/steal [reply] [amount]</code> : ʀᴏʙ ᴢ-ᴄᴏɪɴs\n"
+        "• <code>/revive</code> : ʙʀɪɴɢ ʙᴀᴄᴋ ᴛʜᴇ ᴅᴇᴀᴅ\n"
+        "• <code>/protect</code> : ʜɪʀᴇ ᴀʀᴍᴏʀ\n\n"
+        "📊 <b>sᴛᴀᴛs & ʀᴀɴᴋ</b>\n"
+        "• <code>/profile</code> : ᴠɪᴇᴡ ᴘʀᴏꜰɪʟᴇ\n"
+        "• <code>/topkillers</code> : ᴅᴇᴀᴅʟɪᴇsᴛ ᴘʟᴀʏᴇʀs\n"
+        "• <code>/rankers</code> : ɢʟᴏʙᴀʟ ᴇxᴘ ʀᴀɴᴋs"
+    ),
+    "help_ai": (
+        "🧠 <b>𝐀𝐈 & 𝐔𝐭𝐢𝐥𝐢𝐭𝐢𝐞𝐬</b>\n"
+        "<i>sᴍᴀʀᴛ ᴛᴏᴏʟs ꜰᴏʀ ᴇᴠᴇʀʏᴅᴀʏ ᴜsᴇ.</i>\n\n"
+        "• <code>/q</code> : ᴍᴀᴋᴇ ᴀ ǫᴜᴏᴛᴇ sᴛɪᴄᴋᴇʀ\n"
+        "• <code>/font [ᴛᴇxᴛ]</code> : sᴛʏʟɪsʜ ᴛᴇxᴛ\n"
+        "• <code>/id</code> : ɢᴇᴛ ᴜɴɪǫᴜᴇ ɪᴅs\n"
+        "• <code>/voice [reply]</code>: Tᴇxᴛ Tᴏ Vᴏɪᴄᴇ\n"
+        "• <code>/feedback</code> : ʀᴇᴘᴏʀᴛ ɪssᴜᴇs"
+    ),
+    "help_social": (
+        "🚩 <b>𝐒𝐨𝐜𝐢𝐚𝐥 & 𝐅𝐮𝐧</b>\n"
+        "<i>ɪɴᴛᴇʀᴀᴄᴛ ᴡɪᴛʜ ᴛʜᴇ ᴄᴏᴍᴍᴜɴɪᴛʏ.</i>\n\n"
+        "• <code>/kiss</code> | <code>/hug</code> | <code>/slap</code>\n"
+        "• <code>/bite</code> | <code>/punch</code>\n"
+        "• <code>/referral</code> : ɪɴᴠɪᴛᴇ ꜰʀɪᴇɴᴅs\n"
+        "• <code>/stats</code> : ᴄʜᴀᴛ sᴛᴀᴛɪsᴛɪᴄs"
+    )
+}
+
+# --- 3. KEYBOARDS ---
+def get_help_keyboard():
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("🛡️ ᴍᴀɴᴀɢᴇ", callback_data="help_manage"), 
+            InlineKeyboardButton("💰 ᴇᴄᴏɴᴏᴍʏ", callback_data="help_eco")
+        ],
+        [
+            InlineKeyboardButton("🕹️ ɢᴀᴍᴇ", callback_data="help_game"), 
+            InlineKeyboardButton("🚩 sᴏᴄɪᴀʟ", callback_data="help_social")
+        ],
+        [InlineKeyboardButton("🧠 ᴀɪ & ᴛᴏᴏʟs", callback_data="help_ai")],
+        [InlineKeyboardButton("❌ ᴄʟᴏsᴇ ᴍᴇɴᴜ", callback_data="close_menu")]
+    ])
+
+# --- 4. COMMAND HANDLER ---
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Standalone /help command"""
+    text = "✨ <b>ʏᴜᴜʀɪ ʜᴇʟᴘ ᴍᴇɴᴜ</b>\n\n<i>sᴇʟᴇᴄᴛ ᴀ ᴍᴏᴅᴜʟᴇ ᴛᴏ ᴠɪᴇᴡ ᴜsᴀɢᴇ:</i>"
+    await update.message.reply_photo(
+        photo=IMG_HELP,
+        caption=text,
+        parse_mode=ParseMode.HTML,
+        reply_markup=get_help_keyboard()
+    )
+
+# --- 5. CALLBACK HANDLER ---
+async def handle_help_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    data = query.data
+    
+    # Check if this callback belongs to the help system
+    if not data.startswith(("help_", "close_menu", "back_to_start")):
+        return
+
+    await query.answer()
+
+    try:
+        if data == "help_main":
+            text = "✨ <b>ʏᴜᴜʀɪ ʜᴇʟᴘ ᴍᴇɴᴜ</b>\n\n<i>sᴇʟᴇᴄᴛ ᴀ ᴍᴏᴅᴜʟᴇ ᴛᴏ ᴠɪᴇᴡ ᴜsᴀɢᴇ:</i>"
+            await query.edit_message_media(
+                media=InputMediaPhoto(media=IMG_HELP, caption=text, parse_mode=ParseMode.HTML),
+                reply_markup=get_help_keyboard()
+            )
+
+        elif data in HELP_TEXTS:
+            keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 ʙᴀᴄᴋ", callback_data="help_main")]])
+            await query.edit_message_caption(
+                caption=HELP_TEXTS[data],
+                reply_markup=keyboard,
+                parse_mode=ParseMode.HTML
+            )
+
+        elif data == "close_menu":
+            await query.delete_message()
+
+    except Exception as e:
+        print(f"Help Callback Error: {e}")
+
 # =======Daily=======
 from datetime import datetime
 import random
@@ -4154,6 +4277,7 @@ application.add_handler(CommandHandler("feedback", feedback_command))
 application.add_handler(CommandHandler("voice", voice_msg_handler))
 application.add_handler(CommandHandler("setpng", set_png))
 application.add_handler(CommandHandler("claim", claim))
+application.add_handler(CommandHandler("help", help_command)) 
 
 # Message Handlers
 application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
@@ -4170,6 +4294,7 @@ application.add_handler(CallbackQueryHandler(heist_choice, pattern="^heist_"))
 # 2. Handle Menu/Help clicks second
 # Added 'help_' as a prefix to catch 'help_main', 'help_manage', 'help_eco', etc.
 # Added 'back_to_start' to handle the return button
+application.add_handler(CallbackQueryHandler(handle_help_callbacks))
 application.add_handler(
     CallbackQueryHandler(
         handle_callbacks, 
