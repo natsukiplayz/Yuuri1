@@ -160,6 +160,22 @@ def save_user(data):
         return
     users.update_one({"id": data["id"]}, {"$set": data}, upsert=True)
 
+#======== load groups ====
+def load_groups_from_db():
+    """Sync: Loads groups from MongoDB into the local SAVED_GROUPS dictionary"""
+    global SAVED_GROUPS
+    try:
+        SAVED_GROUPS.clear()
+        # Fetch all saved groups from your existing sync collection
+        cursor = groups_collection.find({}) 
+        for doc in cursor:
+            # Ensure the position is an integer for the dictionary key
+            pos = int(doc["pos"])
+            SAVED_GROUPS[pos] = {"name": doc["name"], "url": doc["url"]}
+        logging.info(f"✅ Loaded {len(SAVED_GROUPS)} groups from Database.")
+    except Exception as e:
+        logging.error(f"❌ DB Load Error: {e}")
+
 # --- DATABASE HELPERS ---
 async def get_img(command_name, default_url="https://graph.org/file/default.jpg"):
     """
@@ -2882,95 +2898,85 @@ async def allow_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ================= CONFIG ===============
 #---
-# ================= SAVED GROUPS (SYNC) =================
-SAVED_GROUPS = {}
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
-def load_groups_from_db():
-    """Sync: Loads groups into memory"""
-    global SAVED_GROUPS
-    try:
-        SAVED_GROUPS.clear()
-        cursor = groups_collection.find({})
-        for doc in cursor:
-            SAVED_GROUPS[int(doc["pos"])] = {"name": doc["name"], "url": doc["url"]}
-    except Exception as e:
-        logging.error(f"DB Load Error: {e}")
+# --- GROUPS COMMAND (Public or Admin) ---
+async def groups_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Displays the saved groups to the user in a clean button layout"""
+    # If you want this for OWNER ONLY, uncomment the next line:
+    # if update.effective_user.id != OWNER_ID: return
+
+    if not SAVED_GROUPS:
+        return await update.message.reply_text("<b>⚠️ ɴᴏ ɢʀᴏᴜᴘs ʜᴀᴠᴇ ʙᴇᴇɴ sᴀᴠᴇᴅ ʏᴇᴛ.</b>", parse_mode='HTML')
+
+    keyboard = []
+
+    # Row 1: Position 1 (Full Width)
+    if 1 in SAVED_GROUPS:
+        keyboard.append([InlineKeyboardButton(SAVED_GROUPS[1]["name"], url=SAVED_GROUPS[1]["url"])])
+
+    # Row 2: Positions 2 & 3 (Side by Side)
+    row2 = []
+    for p in [2, 3]:
+        if p in SAVED_GROUPS:
+            row2.append(InlineKeyboardButton(SAVED_GROUPS[p]["name"], url=SAVED_GROUPS[p]["url"]))
+    if row2: keyboard.append(row2)
+
+    # Row 3: Positions 4 & 5 (Side by Side)
+    row3 = []
+    for p in [4, 5]:
+        if p in SAVED_GROUPS:
+            row3.append(InlineKeyboardButton(SAVED_GROUPS[p]["name"], url=SAVED_GROUPS[p]["url"]))
+    if row3: keyboard.append(row3)
+
+    # Row 4: Position 6 (Full Width)
+    if 6 in SAVED_GROUPS:
+        keyboard.append([InlineKeyboardButton(SAVED_GROUPS[6]["name"], url=SAVED_GROUPS[6]["url"])])
+
+    await update.message.reply_text(
+        "✨ <b>ᴊᴏɪɴ ᴏᴜʀ ᴏꜰꜰɪᴄɪᴀʟ ɢʀᴏᴜᴘꜱ</b> ✨\n\n"
+        "<i>ꜱᴇʟᴇᴄᴛ ᴀ ɢʀᴏᴜᴘ ꜰʀᴏᴍ ᴛʜᴇ ʙᴜᴛᴛᴏɴꜱ ʙᴇʟᴏᴡ:</i>",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode='HTML'
+    )
 
 # --- SAVE COMMAND ---
 async def save_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != OWNER_IDS: return
+    if update.effective_user.id != OWNER_ID: return 
 
     args = context.args
     if len(args) < 3:
-        await update.message.reply_text("<code>⚠️ ᴜsᴀɢᴇ: /sᴀᴠᴇ [ɴᴀᴍᴇ] [ᴜʀʟ] [ᴘᴏs]</code>", parse_mode='HTML')
-        return
+        return await update.message.reply_text("<code>⚠️ ᴜsᴀɢᴇ: /sᴀᴠᴇ [ɴᴀᴍᴇ] [ᴜʀʟ] [ᴘᴏs]</code>", parse_mode='HTML')
 
     try:
         pos = int(args[-1])
         url = args[-2]
         name = " ".join(args[:-2])
 
-        # Sync DB Update (No await)
-        groups_collection.update_one(
-            {"pos": pos},
-            {"$set": {"name": name, "url": url}},
-            upsert=True
-        )
-
+        # Sync Update
+        groups_collection.update_one({"pos": pos}, {"$set": {"name": name, "url": url}}, upsert=True)
         SAVED_GROUPS[pos] = {"name": name, "url": url}
-        await update.message.reply_text(f"✅ sᴀᴠᴇᴅ ᴛᴏ ᴘᴏsɪᴛɪᴏɴ {pos}")
+        
+        await update.message.reply_text(f"✅ <b>ɢʀᴏᴜᴘ sᴀᴠᴇᴅ ᴛᴏ ᴘᴏsɪᴛɪᴏɴ {pos}</b>", parse_mode='HTML')
     except Exception as e:
         await update.message.reply_text(f"❌ ᴇʀʀᴏʀ: {e}")
 
-# --- VIEW COMMAND ---
-async def savgc_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != OWNER_IDS: return
-
-    keyboard = []
-    # Layout logic
-    if 1 in SAVED_GROUPS:
-        keyboard.append([InlineKeyboardButton(SAVED_GROUPS[1]["name"], url=SAVED_GROUPS[1]["url"])])
-
-    row2 = []
-    for p in [2, 3]:
-        if p in SAVED_GROUPS: row2.append(InlineKeyboardButton(SAVED_GROUPS[p]["name"], url=SAVED_GROUPS[p]["url"]))
-    if row2: keyboard.append(row2)
-
-    row3 = []
-    for p in [4, 5]:
-        if p in SAVED_GROUPS: row3.append(InlineKeyboardButton(SAVED_GROUPS[p]["name"], url=SAVED_GROUPS[p]["url"]))
-    if row3: keyboard.append(row3)
-
-    if 6 in SAVED_GROUPS:
-        keyboard.append([InlineKeyboardButton(SAVED_GROUPS[6]["name"], url=SAVED_GROUPS[6]["url"])])
-
-    if not keyboard:
-        await update.message.reply_text("⚠️ ɴᴏ ɢʀᴏᴜᴘs sᴀᴠᴇᴅ.")
-        return
-
-    await update.message.reply_text(
-        "❖ <b>Yᴏᴜʀ Sᴀᴠᴇᴅ Gʀᴏᴜᴘꜱ</b> ❖",
-        reply_markup=InlineKeyboardMarkup(keyboard),
-        parse_mode='HTML'
-    )
-
 # --- DELETE COMMAND ---
 async def del_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != OWNER_IDS: return
+    if update.effective_user.id != OWNER_ID: return
 
     if not context.args:
-        await update.message.reply_text("<code>⚠️ ᴜsᴀɢᴇ: /ᴅᴇʟ [ᴘᴏsɪᴛɪᴏɴ 1-6]</code>", parse_mode='HTML')
-        return
+        return await update.message.reply_text("<code>⚠️ ᴜsᴀɢᴇ: /ᴅᴇʟ [ᴘᴏsɪᴛɪᴏɴ]</code>", parse_mode='HTML')
 
     try:
         pos = int(context.args[0])
-        groups_collection.delete_one({"pos": pos}) # Sync
+        groups_collection.delete_one({"pos": pos})
 
         if pos in SAVED_GROUPS:
             del SAVED_GROUPS[pos]
-            await update.message.reply_text(f"✅ ɢʀᴏᴜᴘ ʀᴇᴍᴏᴠᴇᴅ ғʀᴏᴍ ᴘᴏsɪᴛɪᴏɴ {pos}")
+            await update.message.reply_text(f"🗑️ <b>ɢʀᴏᴜᴘ ʀᴇᴍᴏᴠᴇᴅ ꜰʀᴏᴍ ᴘᴏsɪᴛɪᴏɴ {pos}</b>", parse_mode='HTML')
         else:
-            await update.message.reply_text("🧐 ɴᴏᴛʜɪɴɢ sᴀᴠᴇᴅ ᴛʜᴇʀᴇ.")
+            await update.message.reply_text("🧐 ɴᴏᴛʜɪɴɢ sᴀᴠᴇᴅ ᴀᴛ ᴛʜᴀᴛ ᴘᴏsɪᴛɪᴏɴ.")
     except Exception as e:
         await update.message.reply_text(f"❌ ᴇʀʀᴏʀ: {e}")
 
@@ -4108,7 +4114,7 @@ application.add_handler(CommandHandler("leave", leave_group))
 application.add_handler(CommandHandler("personal", send_personal))
 application.add_handler(CommandHandler("q", quote))
 application.add_handler(CommandHandler("obt", save_sticker))
-application.add_handler(CommandHandler("groups", savgc_command))
+application.add_handler(CommandHandler("groups", groups_command))
 application.add_handler(CommandHandler("broad_c", broad_c))
 application.add_handler(CommandHandler("broad_gc", broad_gc))
 application.add_handler(CommandHandler("stop_broad", stop_broad))
