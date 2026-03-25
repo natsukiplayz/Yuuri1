@@ -1454,6 +1454,7 @@ HELP_TEXTS = {
         "<i>ɪɴᴛᴇʀᴀᴄᴛ ᴡɪᴛʜ ᴛʜᴇ ᴄᴏᴍᴍᴜɴɪᴛʏ.</i>\n\n"
         "• <code>/kiss</code> | <code>/hug</code> | <code>/slap</code>\n"
         "• <code>/bite</code> | <code>/kick</code> | <code>/punch</code>\n"
+        "• <code>/bet [amount]</code> : Bᴇᴛ Fᴏʀ Aɴɪᴍᴇ Qᴜɪᴢ (coming soon)\n"
         "• <code>/referral</code> : ɪɴᴠɪᴛᴇ ꜰʀɪᴇɴᴅs\n"
         "• <code>/stats</code> : ᴄʜᴀᴛ sᴛᴀᴛɪsᴛɪᴄs"
     )
@@ -1465,7 +1466,7 @@ def get_main_keyboard(bot_username):
         [InlineKeyboardButton("👨‍💻 ᴅᴇᴠᴇʟᴏᴘᴇʀ", url="tg://user?id=5773908061")],
         [
             InlineKeyboardButton("✨ sᴜᴘᴘᴏʀᴛ", url="https://t.me/+wlkvrPKG8wdkMDNl"),
-            InlineKeyboardButton("📢 ᴜᴘᴅᴀᴛᴇs", url="https://t.me/yuuriXupdates")
+            InlineKeyboardButton("📢 ᴜᴘᴅᴀᴛᴇs", url="https://t.me/ig_yuukii")
         ],
         [InlineKeyboardButton("📚 ʜᴇʟᴘ & ᴄᴏᴍᴍᴀɴᴅs", callback_data="help_main")],
         [InlineKeyboardButton("➕ ᴀᴅᴅ ᴍᴇ ᴛᴏ ʏᴏᴜʀ ɢʀᴏᴜᴘ", url=f"https://t.me/{bot_username}?startgroup=true")]
