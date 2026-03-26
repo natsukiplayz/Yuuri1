@@ -2450,30 +2450,38 @@ async def rullrank(update: Update, context: ContextTypes.DEFAULT_TYPE):
 #--
 import asyncio
 import time
-import html
 from telegram import Update
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes, CommandHandler
 
-broadcast_control = {"running": False, "cancel": False}
-broadcast_history = {"last_broadcast": []} # To store (chat_id, msg_id)
+# --- 1. CONFIGURATION & STATE ---
+# Ensure OWNER_ID is defined elsewhere in your 4000 lines.
+# This helper handles both single IDs or lists of IDs.
+def is_owner(user_id):
+    if 'OWNER_ID' in globals():
+        owners = OWNER_ID if isinstance(OWNER_ID, list) else [OWNER_ID]
+        return user_id in owners
+    return False
 
-# ======= UNIVERSAL BROADCAST ENGINE ========
+broadcast_control = {"running": False, "cancel": False}
+broadcast_history = {"last_broadcast": []} # Stores (chat_id, msg_id) for deletion
+
+# --- 2. THE FORWARD ENGINE ---
 async def perform_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE, target_chats, is_group=False):
-    if update.effective_user.id != OWNER_IDS:
+    if not is_owner(update.effective_user.id):
         return await update.message.reply_text("❌ Uɴᴀᴜᴛʜᴏʀɪᴢᴇᴅ")
 
     if broadcast_control["running"]:
-        return await update.message.reply_text("⚠️ Aɴᴏᴛʜᴇʀ ʙʀᴏᴀᴅᴄᴀsᴛ ʀᴜɴɴɪɴɢ!")
+        return await update.message.reply_text("⚠️ Aɴᴏᴛʜᴇʀ ʙʀᴏᴀᴅᴄᴀsᴛ ɪs ᴄᴜʀʀᴇɴᴛʟʏ ʀᴜɴɴɪɴɢ!")
 
-    # Determine which message to send
-    # If replying to something, use that. Otherwise, use the command message itself.
+    # Determine source message
     if update.message.reply_to_message:
         target_msg_id = update.message.reply_to_message.message_id
         from_chat_id = update.effective_chat.id
     else:
+        # If not replying, we forward the command message itself
         if not context.args:
-            return await update.message.reply_text("❌ Rᴇᴘʟʏ ᴛᴏ ᴀ ᴍᴇssᴀɢᴇ ᴏʀ ᴘʀᴏᴠɪᴅᴇ ᴛᴇxᴛ.")
+            return await update.message.reply_text("❌ Rᴇᴘʟʏ ᴛᴏ ᴀ ᴍᴇssᴀɢᴇ ᴛᴏ ꜰᴏʀᴡᴀʀᴅ ɪᴛ.")
         target_msg_id = update.message.message_id
         from_chat_id = update.effective_chat.id
 
@@ -2481,23 +2489,23 @@ async def perform_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     if total == 0:
         return await update.message.reply_text("❌ Nᴏ ᴄʜᴀᴛs ꜰᴏᴜɴᴅ ɪɴ ᴅᴀᴛᴀʙᴀsᴇ.")
 
-    # Reset controls
+    # Initialize Broadcast
     broadcast_control["running"] = True
     broadcast_control["cancel"] = False
     broadcast_history["last_broadcast"] = [] 
-    
+
     success, failed = 0, 0
     start_time = time.time()
     label = "Gʀᴏᴜᴘ" if is_group else "Pʀɪᴠᴀᴛᴇ"
-    progress_msg = await update.message.reply_text(f"🚀 Sᴛᴀʀᴛɪɴɢ {label} Bʀᴏᴀᴅᴄᴀsᴛ...")
+    progress_msg = await update.message.reply_text(f"🚀 Sᴛᴀʀᴛɪɴɢ {label} Fᴏʀᴡᴀʀᴅ Bʀᴏᴀᴅᴄᴀsᴛ...")
 
     for i, chat in enumerate(target_chats, start=1):
         if broadcast_control["cancel"]:
             break
 
         try:
-            # ✨ copy_message preserves stickers, polls, gifs, and formatting perfectly
-            sent = await context.bot.copy_message(
+            # ✨ forward_message preserves the "Forwarded From" tag
+            sent = await context.bot.forward_message(
                 chat_id=chat["id"],
                 from_chat_id=from_chat_id,
                 message_id=target_msg_id
@@ -2507,13 +2515,13 @@ async def perform_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         except Exception:
             failed += 1
 
-        # Update progress UI
+        # Update Progress UI
         if i % 10 == 0 or i == total:
             percent = int((i / total) * 100)
             bar = "█" * (percent // 10) + "░" * (10 - (percent // 10))
             try:
                 await progress_msg.edit_text(
-                    f"📊 <b>{label} Bʀᴏᴀᴅᴄᴀsᴛɪɴɢ...</b>\n\n"
+                    f"📊 <b>{label} Fᴏʀᴡᴀʀᴅɪɴɢ...</b>\n\n"
                     f"<code>[{bar}]</code> {percent}%\n"
                     f"✅ Sᴜᴄᴄᴇss: {success}\n"
                     f"❌ Fᴀɪʟᴇᴅ: {failed}\n"
@@ -2522,51 +2530,52 @@ async def perform_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE, 
                 )
             except: pass
 
-        await asyncio.sleep(0.08) # Safety delay to prevent Telegram Flood
+        await asyncio.sleep(0.08) # Rate limit safety
 
     broadcast_control["running"] = False
     status = "🛑 Sᴛᴏᴘᴘᴇᴅ" if broadcast_control["cancel"] else "✅ Cᴏᴍᴘʟᴇᴛᴇᴅ"
-    
+
     await progress_msg.edit_text(
         f"📢 <b>{label} Bʀᴏᴀᴅᴄᴀsᴛ {status}</b>\n\n"
-        f"✅ Sᴇɴᴛ: {success}\n"
+        f"✅ Fᴏʀᴡᴀʀᴅᴇᴅ: {success}\n"
         f"❌ Fᴀɪʟᴇᴅ: {failed}\n"
         f"⏱ Tɪᴍᴇ: {round(time.time() - start_time, 2)}s",
         parse_mode=ParseMode.HTML
     )
 
-# ======= COMMAND HANDLERS ========
+# --- 3. COMMAND HANDLERS ---
 
 async def broad_c(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Broadcast to Private Chats"""
+    """/broad - Broadcast to all private chats"""
+    # Assuming 'db' is your MongoDB client and it tracks users
     all_privates = list(db["chats"].find({"type": "private"}))
     await perform_broadcast(update, context, all_privates, is_group=False)
 
 async def broad_gc(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Broadcast to Groups"""
+    """/gbroad - Broadcast to all groups"""
     all_groups = list(db["chats"].find({"type": {"$in": ["group", "supergroup"]}}))
     await perform_broadcast(update, context, all_groups, is_group=True)
 
 async def stop_broad(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Stops a currently running broadcast"""
-    if update.effective_user.id != OWNER_IDS: return
+    """/stopbroad - Halts the current broadcast loop"""
+    if not is_owner(update.effective_user.id): return
     if not broadcast_control["running"]:
-        return await update.message.reply_text("❌ Nᴏ ʙʀᴏᴀᴅᴄᴀsᴛ ɪs ʀᴜɴɴɪɴɢ.")
-    
+        return await update.message.reply_text("❌ Nᴏ ᴀᴄᴛɪᴠᴇ ʙʀᴏᴀᴅᴄᴀsᴛ ᴛᴏ sᴛᴏᴘ.")
+
     broadcast_control["cancel"] = True
-    await update.message.reply_text("🛑 Bʀᴏᴀᴅᴄᴀsᴛ sᴛᴏᴘ ʀᴇǫᴜᴇsᴛ sᴇɴᴛ.")
+    await update.message.reply_text("🛑 Sᴛᴏᴘ ʀᴇǫᴜᴇsᴛ sᴇɴᴛ. Tʜᴇ ʟᴏᴏᴘ ᴡɪʟʟ ʜᴀʟᴛ sʜᴏʀᴛʟʏ.")
 
 async def del_broad(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Deletes the messages from the last broadcast"""
-    if update.effective_user.id != OWNER_IDS: return
-    
+    """/delbroad - Deletes all messages sent in the last broadcast"""
+    if not is_owner(update.effective_user.id): return
+
     history = broadcast_history["last_broadcast"]
     if not history:
-        return await update.message.reply_text("❌ Nᴏ ʀᴇᴄᴇɴᴛ ʙʀᴏᴀᴅᴄᴀsᴛ ꜰᴏᴜɴᴅ ᴛᴏ ᴅᴇʟᴇᴛᴇ.")
+        return await update.message.reply_text("❌ Nᴏ ʀᴇᴄᴇɴᴛ ʙʀᴏᴀᴅᴄᴀsᴛ ᴅᴀᴛᴀ ꜰᴏᴜɴᴅ.")
 
-    status_msg = await update.message.reply_text("🗑️ Dᴇʟᴇᴛɪɴɢ ʟᴀsᴛ ʙʀᴏᴀᴅᴄᴀsᴛ ᴍᴇssᴀɢᴇs...")
+    status_msg = await update.message.reply_text("🗑️ Dᴇʟᴇᴛɪɴɢ ᴍᴇssᴀɢᴇs ꜰʀᴏᴍ ʟᴀsᴛ ʙʀᴏᴀᴅᴄᴀsᴛ...")
     deleted = 0
-    
+
     for chat_id, msg_id in history:
         try:
             await context.bot.delete_message(chat_id=chat_id, message_id=msg_id)
@@ -2574,8 +2583,8 @@ async def del_broad(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except: pass
         await asyncio.sleep(0.05)
 
-    broadcast_history["last_broadcast"] = [] # Wipe history
-    await status_msg.edit_text(f"✅ Dᴇʟᴇᴛᴇᴅ {deleted} ᴍᴇssᴀɢᴇs sᴜᴄᴄᴇssꜰᴜʟʟʏ.")
+    broadcast_history["last_broadcast"] = [] # Clear history after deletion
+    await status_msg.edit_text(f"✅ Sᴜᴄᴄᴇssꜰᴜʟʟʏ ᴅᴇʟᴇᴛᴇᴅ {deleted} ᴍᴇssᴀɢᴇs.")
 
 #===============Mini_Upgrades===============
 #--
