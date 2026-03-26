@@ -2963,9 +2963,51 @@ f"""
 
 #================ Sᴀғᴇᴛʏ Sʏsᴛᴇᴍ =============
 import re
+from telegram import Update
+from telegram.constants import ChatMemberStatus
+from telegram.ext import ContextTypes
 
-BAD_WORDS = ["sex", "fuck"] # Aᴅᴅ ʏᴏᴜʀ ᴋᴇʏᴡᴏʀᴅs ʜᴇʀᴇ
+# --- 1. CONFIGURATION ---
 LINK_PATTERN = r"(https?://\S+|www\.\S+|t\.me/\S+)"
+
+# Unified Bad Words List (English + Hindi/Hinglish)
+BAD_WORDS = [
+    "fuck", "fucking", "fuk", "shitt", "bitch", "btch", "asshole", "dick", "pussy", 
+    "cunt", "slut", "whore", "bastard", "motherfucker", "nigga", "nigger",
+    "bc", "mc", "bsdk", "bhenchod", "behenchod", "madarchod", "maderchod", 
+    "chutiya", "chut", "gaand", "gand", "gandu", "lund", "lodu", "lauda", 
+    "raandi", "randi", "bhosadi", "bhosadike", "bhosdike", "saala", "sala", 
+    "harami", "kamina", "kamine", "muth", "muthal", "bakchod", "bakchodi", "lowda"
+]
+
+# --- 2. DATABASE HELPER FUNCTIONS (STRICT SYNC) ---
+
+def is_allowed(user_id):
+    """Checks if a user is in the whitelist or is the owner."""
+    if user_id == OWNER_ID: return True
+    found = allowed_collection.find_one({"user_id": user_id})
+    return bool(found)
+
+def get_security_data(user_id):
+    """Fetches warning data from the users collection."""
+    user = users_collection.find_one({"id": user_id})
+    if not user: return 0
+    return user.get("warns", 0)
+
+def increment_warns(user_id):
+    """Increments the warning count and returns the new total."""
+    users_collection.update_one(
+        {"id": user_id}, 
+        {"$inc": {"warns": 1}}, 
+        upsert=True
+    )
+    return get_security_data(user_id)
+
+def reset_warns(user_id):
+    """Resets warnings (useful for /unwarn)."""
+    users_collection.update_one({"id": user_id}, {"$set": {"warns": 0}})
+
+# --- 3. THE SECURITY GUARD ---
 
 async def security_guard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.from_user:
@@ -2976,59 +3018,66 @@ async def security_guard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     text = update.message.text or update.message.caption or ""
 
-    # Iᴍᴍᴜɴɪᴛʏ Cʜᴇᴄᴋ (Oᴡɴᴇʀ, Aᴅᴍɪɴs, Wʜɪᴛᴇʟɪsᴛ)
-    if user_id == OWNER_ID or is_allowed(user_id):
+    # 1. IMMUNITY CHECK
+    if is_allowed(user_id):
         return
-    
+
+    # 2. ADMIN CHECK
     try:
-        chat_member = await context.bot.get_chat_member(chat_id, user_id)
-        if chat_member.status in ["administrator", "creator"]:
+        member = await context.bot.get_chat_member(chat_id, user_id)
+        if member.status in [ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER]:
             return
     except Exception:
-        pass # Ignore errors if bot can't fetch member status
+        pass 
 
+    # 3. VIOLATION DETECTION
     violation = False
     reason = ""
 
-    # Check for rule breaks
-    if any(word in text.lower() for word in BAD_WORDS):
-        violation = True
-        reason = "🔞 Iɴᴀᴘᴘʀᴏᴘʀɪᴀᴛᴇ Cᴏɴᴛᴇɴᴛ"
-    elif re.search(LINK_PATTERN, text):
+    # A. Link Check
+    if re.search(LINK_PATTERN, text):
         violation = True
         reason = "🔗 Uɴᴀᴜᴛʜᴏʀɪᴢᴇᴅ Lɪɴᴋ"
 
+    # B. Bad Word Check (Using Regex for whole-word matching only)
+    if not violation:
+        for word in BAD_WORDS:
+            # \b ensures we don't delete words like "Class" or "Message"
+            pattern = rf"\b{re.escape(word)}\b"
+            if re.search(pattern, text, re.IGNORECASE):
+                violation = True
+                reason = "🔞 Iɴᴀᴘᴘʀᴏᴘʀɪᴀᴛᴇ Cᴏɴᴛᴇɴᴛ"
+                break
+
+    # 4. ENFORCEMENT
     if violation:
         try:
-            # 1. Auto-Delete the bad message
             await update.message.delete()
-            
-            # 2. Auto-Warn the user
             warn_count = increment_warns(user_id)
-            
-            # 3. Action if they hit the limit
-            if warn_count >= 3:
-                # Standard Ban (Does NOT delete their past history)
-                await context.bot.ban_chat_member(chat_id, user_id)
 
+            if warn_count >= 3:
+                await context.bot.ban_chat_member(chat_id, user_id)
+                reset_warns(user_id) # Reset after ban so they don't stay at 3 if unbanned later
+                
                 report = (
-                    f"🚫 **Sᴇᴄᴜʀɪᴛʏ Aᴄᴛɪᴏɴ**\n\n"
-                    f"👤 Nᴀᴍᴇ: {user.first_name}\n"
-                    f"🆔 ID: `{user_id}`\n"
-                    f"⚖️ Aᴄᴛɪᴏɴ: Bᴀɴɴᴇᴅ 🔨\n"
-                    f"🌀 Rᴇᴀsᴏɴ: {reason} (Rᴇᴀᴄʜᴇᴅ 3 Wᴀʀɴs)"
+                    f"🚫 <b>sᴇᴄᴜʀɪᴛʏ ᴀᴄᴛɪᴏɴ</b>\n\n"
+                    f"👤 ɴᴀᴍᴇ: {user.first_name}\n"
+                    f"🆔 ɪᴅ: <code>{user_id}</code>\n"
+                    f"⚖️ ᴀᴄᴛɪᴏɴ: ʙᴀɴɴᴇᴅ 🔨\n"
+                    f"🌀 ʀᴇᴀsᴏɴ: {reason} (ʀᴇᴀᴄʜᴇᴅ 3 ᴡᴀʀɴs)"
                 )
-                await context.bot.send_message(chat_id=chat_id, text=report)
+                await context.bot.send_message(chat_id=chat_id, text=report, parse_mode='HTML')
             else:
-                # Just send a warning
                 await context.bot.send_message(
                     chat_id=chat_id,
                     text=f"⚠️ {user.first_name}, {reason} ɪs ɴᴏᴛ ᴀʟʟᴏᴡᴇᴅ!\n"
-                         f"Aᴄᴛɪᴏɴ: Mᴇssᴀɢᴇ Dᴇʟᴇᴛᴇᴅ 🗑️\n"
-                         f"Wᴀʀɴɪɴɢs: `{warn_count}/3`"
+                         f"ᴀᴄᴛɪᴏɴ: ᴍᴇssᴀɢᴇ ᴅᴇʟᴇᴛᴇᴅ 🗑️\n"
+                         f"ᴡᴀʀɴɪɴɢs: <code>{warn_count}/3</code>",
+                    parse_mode='HTML'
                 )
         except Exception as e:
-            print(f"Sᴇᴄᴜʀɪᴛʏ Eʀʀᴏʀ: {e}")
+            logging.error(f"Sᴇᴄᴜʀɪᴛʏ Eʀʀᴏʀ: {e}")
+
 
 async def allow_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """/allow <id> - Whitelist a user from security checks"""
