@@ -1256,6 +1256,7 @@ async def words_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await update.message.reply_text("⚠️ <b>𝗔 𝗴𝗮𝗺𝗲 𝗶𝘀 𝗮𝗹𝗿𝗲𝗮𝗱𝘆 𝗶𝗻 𝗽𝗿𝗲𝗽𝗮𝗿𝗮𝘁𝗶𝗼𝗻 𝗼𝗿 𝗿𝘂𝗻𝗻𝗶𝗻𝗴!</b>", parse_mode="HTML")
 
     try:
+        if len(context.args) < 2: raise ValueError
         amount = int(context.args[0])
         mode = int(context.args[1])
         if mode not in [4, 5, 6] or amount < 0: 
@@ -1268,7 +1269,6 @@ async def words_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return await update.message.reply_text(usage, parse_mode="HTML")
 
-    # Select random word based on mode
     target_word = random.choice(WORDS_4 if mode == 4 else (WORDS_5 if mode == 5 else WORDS_6))
 
     active_word_games[chat_id] = {
@@ -1281,37 +1281,26 @@ async def words_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"🎮 <b>𝗪𝗢𝗥𝗗 𝗦𝗘𝗘𝗞: 𝗕𝗘𝗧 𝗠𝗢𝗗𝗘</b>\n\n"
         f"💰 Eɴᴛʀʏ Fᴇᴇ: <code>{amount:,}</code>\n"
         f"🔢 Mᴏᴅᴇ: <code>{mode}-ʟᴇᴛᴛᴇʀs</code>\n\n"
-        f"<b>Jᴏɪɴ Tʜᴇ Wᴏʀᴅɢᴀᴍᴇ</b> ʙʏ ᴛʏᴘɪɴɢ <code>/bet</code>",
+        f"<b>Jᴏɪɴ Tʜᴇ Wᴏʀᴅɢᴀᴍᴇ</b> ʙʏ ᴛʏᴘɪɴɢ <code>/bet {amount}</code>",
         parse_mode="HTML"
     )
 
-    # Wait 60 seconds for players to join
     await asyncio.sleep(60)
     if chat_id not in active_word_games: return
-
     game = active_word_games[chat_id]
     
     if len(game["players"]) < 2:
-        # REFUND logic for solo players
         for p_id in game["players"]:
-            await users_async.update_one({"user_id": p_id}, {"$inc": {"coins": amount}})
-        
+            await users_async.update_one({"user_id": p_id}, {"$inc": {"coins": game["entry_fee"]}})
         del active_word_games[chat_id]
-        return await update.message.reply_text("❌ <b>𝗡𝗼𝘁 𝗲𝗻𝗼𝘂𝗴𝗵 𝗽𝗹𝗮𝘆𝗲𝗿𝘀!</b> Gᴀᴍᴇ ᴄᴀɴᴄᴇʟʟᴇᴅ, ʙᴇᴛs ʀᴇғᴜɴᴅᴇᴅ.", parse_mode="HTML")
+        return await update.message.reply_text("❌ <b>𝗡𝗼𝘁 𝗲𝗻𝗼𝘂𝗴𝗵 𝗽𝗹𝗮𝘆𝗲𝗿𝘀!</b> Bets refunded.", parse_mode="HTML")
 
     game["is_joinable"] = False
     game["is_started"] = True
-    
-    await update.message.reply_text(
-        f"🚀 <b>𝗚𝗔𝗠𝗘 𝗦𝗧𝗔𝗥𝗧𝗘𝗗!</b>\n\n"
-        f"💰 Tᴏᴛᴀʟ Pᴏᴛ : <code>{game['pot']:,}</code>\n"
-        f"👥 Pʟᴀʏᴇʀs : <code>{len(game['players'])}</code>\n\n"
-        f"𝗧𝗵𝗲 𝘄𝗼𝗿𝗱 𝗶𝘀 {mode} 𝗹𝗲𝘁𝘁𝗲𝗿𝘀 𝗹𝗼𝗻𝗴. Gᴜᴇss ɴᴏᴡ!",
-        parse_mode="HTML"
-    )
+    await update.message.reply_text(f"🚀 <b>𝗚𝗔𝗠𝗘 𝗦𝗧𝗔𝗥𝗧𝗘𝗗!</b>\n💰 Pᴏᴛ: <code>{game['pot']:,}</code>\nGᴜᴇss ᴛʜᴇ {mode}-ʟᴇᴛᴛᴇʀ ᴡᴏʀᴅ!", parse_mode="HTML")
 
 async def bet(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """/bet - Jᴏɪɴ Tʜᴇ Wᴏʀᴅɢᴀᴍᴇ"""
+    """/bet <amount> - Jᴏɪɴ Tʜᴇ Wᴏʀᴅɢᴀᴍᴇ"""
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id
     
@@ -1319,106 +1308,30 @@ async def bet(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await update.message.reply_text("❌ <b>𝗡𝗼 𝗮𝗰𝘁𝗶𝘃𝗲 𝗷𝗼𝗶𝗻𝗮𝗯𝗹𝗲 𝗴𝗮𝗺𝗲 𝗳𝗼𝘂𝗻𝗱.</b>", parse_mode="HTML")
 
     game = active_word_games[chat_id]
+    
+    # Check if they typed an amount and if it matches the lobby fee
+    if context.args:
+        try:
+            input_amount = int(context.args[0])
+            if input_amount != game["entry_fee"]:
+                return await update.message.reply_text(f"⚠️ <b>𝗧𝗵𝗲 𝗲𝗻𝘁𝗿𝘆 𝗳𝗲𝗲 𝗳𝗼𝗿 𝘁𝗵𝗶𝘀 𝗴𝗮𝗺𝗲 𝗶𝘀 {game['entry_fee']:,} 𝗰𝗼𝗶𝗻𝘀.</b>", parse_mode="HTML")
+        except ValueError:
+            pass # Ignore non-number text
+
     if user_id in game["players"]:
         return await update.message.reply_text("⚠️ <b>𝗬𝗼𝘂 𝗮𝗿𝗲 𝗮𝗹𝗿𝗲𝗮𝗱𝘆 𝗶𝗻 𝘁𝗵𝗲 𝗯𝗲𝘁!</b>", parse_mode="HTML")
 
     user = await users_async.find_one({"user_id": user_id})
     if not user or user.get("coins", 0) < game["entry_fee"]:
-        return await update.message.reply_text("💸 <b>𝗬𝗼𝘂 𝗱𝗼𝗻'𝘁 𝗵𝗮𝘃𝗲 𝗲𝗻𝗼𝘂𝗴𝗵 𝗰𝗼𝗶𝗻𝘀!</b>", parse_mode="HTML")
+        return await update.message.reply_text(f"💸 <b>𝗬𝗼𝘂 𝗻𝗲𝗲𝗱 {game['entry_fee']:,} 𝗰𝗼𝗶𝗻𝘀 𝘁𝗼 𝗷𝗼𝗶𝗻!</b>", parse_mode="HTML")
 
+    # Deduct and Update
     await users_async.update_one({"user_id": user_id}, {"$inc": {"coins": -game["entry_fee"]}})
     game["players"].append(user_id)
     game["pot"] += game["entry_fee"]
 
     await update.message.reply_text(
         f"✅ <b>{update.effective_user.first_name}</b> Jᴏɪɴᴇᴅ Tʜᴇ Wᴏʀᴅɢᴀᴍᴇ!\nPᴏᴛ: 💰 <code>{game['pot']:,}</code>",
-        parse_mode="HTML"
-    )
-
-async def cancelword(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """/cancelword - Owner Only (Single ID)"""
-    if update.effective_user.id != OWNER_ID: 
-        return 
-    
-    active_word_games.clear()
-    await update.message.reply_text("🛑 <b>𝗔𝗹𝗹 𝘄𝗼𝗿𝗱 𝗴𝗮𝗺𝗲𝘀 𝗵𝗮𝘃𝗲 𝗯𝗲𝗲𝗻 𝘁𝗲𝗿𝗺𝗶𝗻𝗮𝘁𝗲𝗱.</b>", parse_mode="HTML")
-
-# --- GAME LOGIC ---
-
-async def word_guess_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.effective_message.text: return
-    chat_id = update.effective_chat.id
-    user_id = update.effective_user.id
-    msg = update.effective_message
-    
-    if chat_id not in active_word_games or not active_word_games[chat_id]["is_started"]:
-        return
-
-    game = active_word_games[chat_id]
-    if user_id not in game["players"]: return
-
-    guess = msg.text.upper()
-    if len(guess) != game["mode"]: return 
-
-    valid_list = WORDS_4 if game["mode"] == 4 else (WORDS_5 if game["mode"] == 5 else WORDS_6)
-    if guess not in valid_list:
-        return await msg.reply_text(f"❌ <b>{guess.lower()} 𝗶𝘀 𝗻𝗼𝘁 𝗮 𝘃𝗮𝗹𝗶𝗱 𝘄𝗼𝗿𝗱.</b>", parse_mode="HTML")
-
-    if guess in game["guessed_words"]:
-        return await msg.reply_text("⚠️ <b>𝗦𝗼𝗺𝗲𝗼𝗻𝗲 𝗵𝗮𝘀 𝗮𝗹𝗿𝗲𝗮𝗱𝘆 𝗴𝘂𝗲𝘀𝘀𝗲𝗱 𝘁𝗵𝗮𝘁 𝘄𝗼𝗿𝗱!</b>", parse_mode="HTML")
-
-    # Color Feedback Logic
-    target_word = game["word"].upper()
-    result_blocks = [""] * len(guess)
-    target_chars = list(target_word)
-
-    # First Pass: Green
-    for i in range(len(guess)):
-        if guess[i] == target_word[i]:
-            result_blocks[i] = "🟩"
-            target_chars[i] = None
-
-    # Second Pass: Yellow/Red
-    for i in range(len(guess)):
-        if result_blocks[i] == "":
-            if guess[i] in target_chars and guess[i] is not None:
-                result_blocks[i] = "🟨"
-                target_chars[target_chars.index(guess[i])] = None
-            else:
-                result_blocks[i] = "🟥"
-
-    final_blocks = " ".join(result_blocks)
-    game["guessed_words"].append(guess)
-    game["history"].append(f"{final_blocks} {get_bold_sans(guess)}")
-    
-    board = "\n".join(game["history"])
-
-    # --- WIN CONDITION ---
-    if guess == target_word:
-        prize = game["pot"]
-        await users_async.update_one({"user_id": user_id}, {"$inc": {"coins": prize}})
-        
-        success_msg = (
-            f"🎉 <b>𝗖𝗢𝗡𝗚𝗥𝗔𝗧𝗨𝗟𝗔𝗧𝗜𝗢𝗡𝗦 {update.effective_user.first_name.upper()}!</b>\n\n"
-            f"{board}\n\n"
-            f"🏆 Wɪɴɴᴇʀ : {update.effective_user.first_name}\n"
-            f"💰 Pʀɪᴢᴇ : <code>{prize:,}</code> Cᴏɪɴs"
-        )
-        del active_word_games[chat_id]
-        return await msg.reply_text(success_msg, parse_mode="HTML")
-
-    # --- LOSS CONDITION ---
-    if len(game["history"]) >= 30:
-        del active_word_games[chat_id]
-        return await msg.reply_text(
-            f"💀 <b>𝗚𝗔𝗠𝗘 𝗢𝗩𝗘𝗥!</b>\n\n{board}\n\n"
-            f"Tʜᴇ ᴡᴏʀᴅ ᴡᴀs: <b>{target_word}</b>", 
-            parse_mode="HTML"
-        )
-
-    # --- STATUS UPDATE ---
-    await msg.reply_text(
-        f"<b>{game['mode']}-𝗹𝗲𝘁𝘁𝗲𝗿 𝗺𝗼𝗱𝗲</b> · {len(game['history'])}/30\n\n{board}",
         parse_mode="HTML"
     )
 
