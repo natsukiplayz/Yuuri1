@@ -90,12 +90,13 @@ image_db = async_db["command_images"]
 # ================= LOG =================
 logging.basicConfig(level=logging.INFO)
 
+
 # ================= USER SYSTEM (STRICT SYNC) =================
 def get_user(user):
     """Fetches user data synchronously with Auto-Name Update and History tracking."""
-    # 1. Fetch from MongoDB (Sync - No await)
     data = users.find_one({"id": user.id})
 
+    # 🧩 Removed "referred_by" to support your multi-link requirement
     default_data = {
         "id": user.id,
         "name": user.first_name,
@@ -106,11 +107,10 @@ def get_user(user):
         "guild": None,
         "dead": False,
         "inventory": [],
-        "referred_by": None,
         "claimed_groups": [],
         "blocked": False,
         "premium": False,
-        "old_names": []  # 🧩 Store previous names here
+        "old_names": []  
     }
 
     if not data:
@@ -119,19 +119,16 @@ def get_user(user):
 
     # 2. ✨ AUTO-UPDATE & NAME TRACKING LOGIC
     updated_fields = {}
-    
-    # Check if the Telegram name has changed since the last time the bot saw them
+
     if data.get("name") != user.first_name:
         current_db_name = data.get("name")
         old_names_list = data.get("old_names", [])
-        
-        # Move the existing name to history before updating
+
         if current_db_name and current_db_name not in old_names_list:
             old_names_list.append(current_db_name)
             updated_fields["old_names"] = old_names_list
             data["old_names"] = old_names_list
 
-        # Update to the NEW name immediately in local dictionary and DB
         updated_fields["name"] = user.first_name
         data["name"] = user.first_name
 
@@ -141,16 +138,17 @@ def get_user(user):
             updated_fields[key] = value
             data[key] = value
 
-    # 4. PUSH CHANGES TO DB (Sync)
+    # 4. PUSH CHANGES TO DB
     if updated_fields:
         users.update_one({"id": user.id}, {"$set": updated_fields})
 
     return data
 
 def save_user(data):
-    """Saves user data synchronously. Works for /save and profile updates."""
+    """Saves user data synchronously."""
     if not data or "id" not in data:
         return
+    # Using $set ensures we don't accidentally wipe the whole document
     users.update_one({"id": data["id"]}, {"$set": data}, upsert=True)
 
 #======== load groups ====
