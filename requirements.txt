@@ -9,3 +9,4 @@ pytz==2026.1.post1
 fastapi==0.135.1
 uvicorn[standard]==0.42.0
 edge-tts>=6.1.12
+nltk
