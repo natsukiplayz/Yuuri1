@@ -4507,7 +4507,6 @@ application.add_handler(CommandHandler("claim", claim))
 application.add_handler(CommandHandler("help", help_command)) 
 application.add_handler(CommandHandler("words", words_cmd))
 application.add_handler(CommandHandler("bet", bet))
-application.add_handler(CommandHandler("cancelword", cancelword))
 
 # Message Handlers
 application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
