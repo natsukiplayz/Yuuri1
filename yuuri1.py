@@ -86,6 +86,7 @@ feedback_db = db["feedbacks"]
 # --- ASYNC COLLECTIONS (Specifically for 'await' commands) ---
 # We keep this separate so your async functions (like get_img) work perfectly
 image_db = async_db["command_images"]
+users_async = async_db["users"]
 
 # ================= LOG =================
 logging.basicConfig(level=logging.INFO)
@@ -1248,16 +1249,16 @@ def get_bold_sans(text: str) -> str:
 # --- COMMAND HANDLERS ---
 
 async def words_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """/words <amount> <4|5|6> - Start the lobby"""
+    """/words <amount> <4|5|6> - Sᴛᴀʀᴛ Tʜᴇ Wᴏʀᴅɢᴀᴍᴇ Lobby"""
     chat_id = update.effective_chat.id
     
     if chat_id in active_word_games:
-        return await update.message.reply_text("⚠️ 𝗔 𝗴𝗮𝗺𝗲 𝗶𝘀 𝗮𝗹𝗿𝗲𝗮𝗱𝘆 𝗶𝗻 𝗽𝗿𝗲𝗽𝗮𝗿𝗮𝘁𝗶𝗼𝗻 𝗼𝗿 𝗿𝘂𝗻𝗻𝗶𝗻𝗴!")
+        return await update.message.reply_text("⚠️ <b>𝗔 𝗴𝗮𝗺𝗲 𝗶𝘀 𝗮𝗹𝗿𝗲𝗮𝗱𝘆 𝗶𝗻 𝗽𝗿𝗲𝗽𝗮𝗿𝗮𝘁𝗶𝗼𝗻 𝗼𝗿 𝗿𝘂𝗻𝗻𝗶𝗻𝗴!</b>", parse_mode="HTML")
 
     try:
         amount = int(context.args[0])
         mode = int(context.args[1])
-        if mode not in [4, 5, 6]: 
+        if mode not in [4, 5, 6] or amount < 0: 
             raise ValueError
     except (IndexError, ValueError):
         usage = (
@@ -1267,197 +1268,157 @@ async def words_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return await update.message.reply_text(usage, parse_mode="HTML")
 
-    # Select a random word based on mode
-    target_word = ""
-    if mode == 4: target_word = random.choice(WORDS_4)
-    elif mode == 5: target_word = random.choice(WORDS_5)
-    elif mode == 6: target_word = random.choice(WORDS_6)
+    # Select random word based on mode
+    target_word = random.choice(WORDS_4 if mode == 4 else (WORDS_5 if mode == 5 else WORDS_6))
 
-    # Initialize Game State
     active_word_games[chat_id] = {
-        "pot": 0,
-        "entry_fee": amount,
-        "mode": mode,
-        "players": [],
-        "word": target_word,
-        "is_joinable": True,
-        "is_started": False,
-        "history": [],
-        "guessed_words": [] # To prevent duplicate guesses
+        "pot": 0, "entry_fee": amount, "mode": mode, "players": [],
+        "word": target_word, "is_joinable": True, "is_started": False,
+        "history": [], "guessed_words": []
     }
 
     await update.message.reply_text(
         f"🎮 <b>𝗪𝗢𝗥𝗗 𝗦𝗘𝗘𝗞: 𝗕𝗘𝗧 𝗠𝗢𝗗𝗘</b>\n\n"
         f"💰 Eɴᴛʀʏ Fᴇᴇ: <code>{amount:,}</code>\n"
-        f"🔢 Mᴏᴅᴇ: <code>{mode}-letters</code>\n\n"
-        f"Yᴏᴜ ʜᴀᴠᴇ <b>1 ᴍɪɴᴜᴛᴇ</b> ᴛᴏ ᴊᴏɪɴ!\n"
-        f"𝗧𝘆𝗽𝗲 <code>/bet</code> 𝘁𝗼 𝗲𝗻𝘁𝗲𝗿 𝘁𝗵𝗲 𝗽𝗼𝘁.",
+        f"🔢 Mᴏᴅᴇ: <code>{mode}-ʟᴇᴛᴛᴇʀs</code>\n\n"
+        f"<b>Jᴏɪɴ Tʜᴇ Wᴏʀᴅɢᴀᴍᴇ</b> ʙʏ ᴛʏᴘɪɴɢ <code>/bet</code>",
         parse_mode="HTML"
     )
 
-    # Wait for 1 minute for players to join
+    # Wait 60 seconds for players to join
     await asyncio.sleep(60)
-    
-    # Check if game was forcibly cancelled during the wait
     if chat_id not in active_word_games: return
 
     game = active_word_games[chat_id]
     
-    # Needs at least 2 players to start a betting pool
     if len(game["players"]) < 2:
-        # Refund logic (Assume user_data_col is defined globally)
+        # REFUND logic for solo players
         for p_id in game["players"]:
-            user_data_col.update_one({"user_id": p_id}, {"$inc": {"coins": amount}})
+            await users_async.update_one({"user_id": p_id}, {"$inc": {"coins": amount}})
         
         del active_word_games[chat_id]
-        return await update.message.reply_text("❌ 𝗡𝗼𝘁 𝗲𝗻𝗼𝘂𝗴𝗵 𝗽𝗹𝗮𝘆𝗲𝗿𝘀! Gᴀᴍᴇ ᴄᴀɴᴄᴇʟʟᴇᴅ, ʙᴇᴛꜱ ʀᴇꜰᴜɴᴅᴇᴅ.")
+        return await update.message.reply_text("❌ <b>𝗡𝗼𝘁 𝗲𝗻𝗼𝘂𝗴𝗵 𝗽𝗹𝗮𝘆𝗲𝗿𝘀!</b> Gᴀᴍᴇ ᴄᴀɴᴄᴇʟʟᴇᴅ, ʙᴇᴛs ʀᴇғᴜɴᴅᴇᴅ.", parse_mode="HTML")
 
-    # Close lobby and start game
     game["is_joinable"] = False
     game["is_started"] = True
     
     await update.message.reply_text(
         f"🚀 <b>𝗚𝗔𝗠𝗘 𝗦𝗧𝗔𝗥𝗧𝗘𝗗!</b>\n\n"
-        f"💰 Tᴏᴛᴀʟ Pᴏᴛ : <code>{game['pot']:,} Cᴏɪɴꜱ</code>\n"
-        f"👥 Pʟᴀʏᴇʀꜱ : <code>{len(game['players'])}</code>\n\n"
-        f"𝗧𝗵𝗲 𝘄𝗼𝗿𝗱 𝗶𝘀 {mode} 𝗹𝗲𝘁𝘁𝗲𝗿𝘀 𝗹𝗼𝗻𝗴. Gᴜᴇꜱꜱ ɴᴏᴡ!",
+        f"💰 Tᴏᴛᴀʟ Pᴏᴛ : <code>{game['pot']:,}</code>\n"
+        f"👥 Pʟᴀʏᴇʀs : <code>{len(game['players'])}</code>\n\n"
+        f"𝗧𝗵𝗲 𝘄𝗼𝗿𝗱 𝗶𝘀 {mode} 𝗹𝗲𝘁𝘁𝗲𝗿𝘀 𝗹𝗼𝗻𝗴. Gᴜᴇss ɴᴏᴡ!",
         parse_mode="HTML"
     )
 
 async def bet(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """/bet - Join the current game lobby"""
+    """/bet - Jᴏɪɴ Tʜᴇ Wᴏʀᴅɢᴀᴍᴇ"""
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id
     
     if chat_id not in active_word_games or not active_word_games[chat_id]["is_joinable"]:
-        return await update.message.reply_text("❌ 𝗡𝗼 𝗮𝗰𝘁𝗶𝘃𝗲 𝗷𝗼𝗶𝗻𝗮𝗯𝗹𝗲 𝗴𝗮𝗺𝗲 𝗳𝗼𝘂𝗻𝗱.")
+        return await update.message.reply_text("❌ <b>𝗡𝗼 𝗮𝗰𝘁𝗶𝘃𝗲 𝗷𝗼𝗶𝗻𝗮𝗯𝗹𝗲 𝗴𝗮𝗺𝗲 𝗳𝗼𝘂𝗻𝗱.</b>", parse_mode="HTML")
 
     game = active_word_games[chat_id]
-    
     if user_id in game["players"]:
-        return await update.message.reply_text("⚠️ 𝗬𝗼𝘂 𝗮𝗿𝗲 𝗮𝗹𝗿𝗲𝗮𝗱𝘆 𝗶𝗻 𝘁𝗵𝗲 𝗯𝗲𝘁!")
+        return await update.message.reply_text("⚠️ <b>𝗬𝗼𝘂 𝗮𝗿𝗲 𝗮𝗹𝗿𝗲𝗮𝗱𝘆 𝗶𝗻 𝘁𝗵𝗲 𝗯𝗲𝘁!</b>", parse_mode="HTML")
 
-    # Deduct coins
-    user = user_data_col.find_one({"user_id": user_id})
+    user = await users_async.find_one({"user_id": user_id})
     if not user or user.get("coins", 0) < game["entry_fee"]:
-        return await update.message.reply_text("💸 𝗬𝗼𝘂 𝗱𝗼𝗻'𝘁 𝗵𝗮𝘃𝗲 𝗲𝗻𝗼𝘂𝗴𝗵 𝗰𝗼𝗶𝗻𝘀!")
+        return await update.message.reply_text("💸 <b>𝗬𝗼𝘂 𝗱𝗼𝗻'𝘁 𝗵𝗮𝘃𝗲 𝗲𝗻𝗼𝘂𝗴𝗵 𝗰𝗼𝗶𝗻𝘀!</b>", parse_mode="HTML")
 
-    user_data_col.update_one({"user_id": user_id}, {"$inc": {"coins": -game["entry_fee"]}})
-    
-    # Update game state
+    await users_async.update_one({"user_id": user_id}, {"$inc": {"coins": -game["entry_fee"]}})
     game["players"].append(user_id)
     game["pot"] += game["entry_fee"]
 
     await update.message.reply_text(
-        f"✅ {update.effective_user.first_name} ᴊᴏɪɴᴇᴅ! Pᴏᴛ: 💰 <code>{game['pot']:,}</code>",
+        f"✅ <b>{update.effective_user.first_name}</b> Jᴏɪɴᴇᴅ Tʜᴇ Wᴏʀᴅɢᴀᴍᴇ!\nPᴏᴛ: 💰 <code>{game['pot']:,}</code>",
         parse_mode="HTML"
     )
 
 async def cancelword(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """/cancelword - Owner Only - Stop all games"""
-    # Assuming OWNER_IDS is defined globally
-    if update.effective_user.id not in OWNER_IDS: return 
+    """/cancelword - Owner Only (Single ID)"""
+    if update.effective_user.id != OWNER_ID: 
+        return 
     
     active_word_games.clear()
     await update.message.reply_text("🛑 <b>𝗔𝗹𝗹 𝘄𝗼𝗿𝗱 𝗴𝗮𝗺𝗲𝘀 𝗵𝗮𝘃𝗲 𝗯𝗲𝗲𝗻 𝘁𝗲𝗿𝗺𝗶𝗻𝗮𝘁𝗲𝗱.</b>", parse_mode="HTML")
 
-# --- GAME LOGIC (MESSAGE HANDLER) ---
+# --- GAME LOGIC ---
 
 async def word_guess_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Listens to text messages to process game guesses"""
     if not update.effective_message.text: return
-    
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id
     msg = update.effective_message
     
-    # Check if a game is active and running
     if chat_id not in active_word_games or not active_word_games[chat_id]["is_started"]:
         return
 
     game = active_word_games[chat_id]
-    
-    # Ignore messages from people who didn't bet
-    if user_id not in game["players"]:
-        return
+    if user_id not in game["players"]: return
 
     guess = msg.text.upper()
-    target_word = game["word"].upper()
+    if len(guess) != game["mode"]: return 
 
-    # Ignore text that isn't exactly the right length
-    if len(guess) != game["mode"]:
-        return 
+    valid_list = WORDS_4 if game["mode"] == 4 else (WORDS_5 if game["mode"] == 5 else WORDS_6)
+    if guess not in valid_list:
+        return await msg.reply_text(f"❌ <b>{guess.lower()} 𝗶𝘀 𝗻𝗼𝘁 𝗮 𝘃𝗮𝗹𝗶𝗱 𝘄𝗼𝗿𝗱.</b>", parse_mode="HTML")
 
-    # Prevent duplicate guesses
     if guess in game["guessed_words"]:
         return await msg.reply_text("⚠️ <b>𝗦𝗼𝗺𝗲𝗼𝗻𝗲 𝗵𝗮𝘀 𝗮𝗹𝗿𝗲𝗮𝗱𝘆 𝗴𝘂𝗲𝘀𝘀𝗲𝗱 𝘁𝗵𝗮𝘁 𝘄𝗼𝗿𝗱!</b>", parse_mode="HTML")
 
-    # Validate that it is a real dictionary word
-    valid_list = WORDS_4 if game["mode"] == 4 else (WORDS_5 if game["mode"] == 5 else WORDS_6)
-    if guess not in valid_list:
-        return await msg.reply_text(f"❌ <b>{guess.lower()} 𝗶𝘀 𝗻𝗼𝘁 𝗮 𝘃𝗮𝗹𝗶𝗱 {game['mode']}-𝗹𝗲𝘁𝘁𝗲𝗿 𝘄𝗼𝗿𝗱.</b>", parse_mode="HTML")
-
-    # Generate Color Blocks
-    result_blocks = ""
+    # Color Feedback Logic
+    target_word = game["word"].upper()
+    result_blocks = [""] * len(guess)
     target_chars = list(target_word)
-    
-    # First pass: Check for exact matches (Green)
+
+    # First Pass: Green
     for i in range(len(guess)):
         if guess[i] == target_word[i]:
-            result_blocks += "🟩 "
-            target_chars[i] = None # Mark as used
-        else:
-            result_blocks += "TBD " # Placeholder
+            result_blocks[i] = "🟩"
+            target_chars[i] = None
 
-    # Second pass: Check for partial matches (Yellow) and misses (Red)
-    final_blocks = ""
-    for i, block in enumerate(result_blocks.split()):
-        if block == "🟩":
-            final_blocks += "🟩 "
-        elif guess[i] in target_chars:
-            final_blocks += "🟨 "
-            target_chars[target_chars.index(guess[i])] = None # Mark as used
-        else:
-            final_blocks += "🟥 "
+    # Second Pass: Yellow/Red
+    for i in range(len(guess)):
+        if result_blocks[i] == "":
+            if guess[i] in target_chars and guess[i] is not None:
+                result_blocks[i] = "🟨"
+                target_chars[target_chars.index(guess[i])] = None
+            else:
+                result_blocks[i] = "🟥"
 
-    # Add guess to history
+    final_blocks = " ".join(result_blocks)
     game["guessed_words"].append(guess)
-    bold_guess = get_bold_sans(guess)
-    game["history"].append(f"{final_blocks} {bold_guess}")
+    game["history"].append(f"{final_blocks} {get_bold_sans(guess)}")
     
-    attempts = len(game["history"])
     board = "\n".join(game["history"])
-    
+
     # --- WIN CONDITION ---
     if guess == target_word:
         prize = game["pot"]
-        user_data_col.update_one({"user_id": user_id}, {"$inc": {"coins": prize}})
+        await users_async.update_one({"user_id": user_id}, {"$inc": {"coins": prize}})
         
         success_msg = (
             f"🎉 <b>𝗖𝗢𝗡𝗚𝗥𝗔𝗧𝗨𝗟𝗔𝗧𝗜𝗢𝗡𝗦 {update.effective_user.first_name.upper()}!</b>\n\n"
             f"{board}\n\n"
             f"🏆 Wɪɴɴᴇʀ : {update.effective_user.first_name}\n"
-            f"💰 Pʀɪᴢᴇ : <code>{prize:,} Cᴏɪɴꜱ</code>\n"
-            f"✨ Gᴜᴇꜱꜱᴇꜱ : <code>{attempts}</code>"
+            f"💰 Pʀɪᴢᴇ : <code>{prize:,}</code> Cᴏɪɴs"
         )
         del active_word_games[chat_id]
         return await msg.reply_text(success_msg, parse_mode="HTML")
 
     # --- LOSS CONDITION ---
-    if attempts >= 30:
+    if len(game["history"]) >= 30:
         del active_word_games[chat_id]
         return await msg.reply_text(
-            f"💀 <b>𝗚𝗔𝗠𝗘 𝗢𝗩𝗘𝗥!</b>\n\n"
-            f"{board}\n\n"
-            f"Nᴏ ᴏɴᴇ ɢᴜᴇꜱꜱᴇᴅ ɪᴛ.\nTʜᴇ ᴡᴏʀᴅ ᴡᴀꜱ: <b>{target_word}</b>\n"
-            f"Tʜᴇ ᴘᴏᴛ ᴏꜰ <code>{game['pot']}</code> ᴄᴏɪɴꜱ ɪꜱ ʟᴏꜱᴛ!", 
+            f"💀 <b>𝗚𝗔𝗠𝗘 𝗢𝗩𝗘𝗥!</b>\n\n{board}\n\n"
+            f"Tʜᴇ ᴡᴏʀᴅ ᴡᴀs: <b>{target_word}</b>", 
             parse_mode="HTML"
         )
 
-    # --- CONTINUE PLAYING ---
+    # --- STATUS UPDATE ---
     await msg.reply_text(
-        f"<b>{game['mode']}-𝗹𝗲𝘁𝘁𝗲𝗿 𝗺𝗼𝗱𝗲</b> · {attempts}/30\n\n"
-        f"{board}",
+        f"<b>{game['mode']}-𝗹𝗲𝘁𝘁𝗲𝗿 𝗺𝗼𝗱𝗲</b> · {len(game['history'])}/30\n\n{board}",
         parse_mode="HTML"
     )
 
@@ -1857,6 +1818,8 @@ HELP_TEXTS = {
         "🕹️ <b>𝐆𝐚𝐦𝐞 & 𝐂𝐨𝐦𝐛𝐚𝐭</b>\n"
         "<i>ʜᴜɴᴛ, ꜰɪɢʜᴛ, ᴀɴᴅ sᴜʀᴠɪᴠᴇ.</i>\n\n"
         "⚔️ <b>ᴄᴏᴍʙᴀᴛ</b>\n"
+        "• <code>/words [amount] [letters]</code> : Hᴏꜱᴛ Wᴏʀᴅ Gᴀᴍᴇ\n"
+        "• <code>/bet [amount]</code> : Jᴏɪɴ Tʜᴇ Wᴏʀᴅɢᴀᴍᴇ\n"
         "• <code>/stab [reply]</code>: Kɪʟʟ Uꜱᴇʀꜱ\n"
         "• <code>/steal [reply] [amount]</code> : ʀᴏʙ ᴢ-ᴄᴏɪɴs\n"
         "• <code>/revive</code> : ʙʀɪɴɢ ʙᴀᴄᴋ ᴛʜᴇ ᴅᴇᴀᴅ\n"
