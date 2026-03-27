@@ -80,6 +80,7 @@ admins_db = db["admins"]
 torture_db = db["torture_registry"]
 allowed_collection = db["allowed_users"] 
 groups_collection = db["saved_groups"]
+referrals_db = db["referral_codes"] 
 feedback_db = db["feedbacks"]
 
 # --- ASYNC COLLECTIONS (Specifically for 'await' commands) ---
@@ -1380,6 +1381,7 @@ async def owner_cmds(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(help_text, parse_mode='HTML')
 
 #==================Main StartUp Of Yuuri==================
+import uuid
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes, CallbackQueryHandler
@@ -1388,7 +1390,43 @@ from telegram.ext import ContextTypes, CallbackQueryHandler
 IMG_MAIN = "https://i.ibb.co/sJvdmLDR/x.jpg"
 IMG_HELP = "https://i.ibb.co/HT6fHBP9/x.jpg"
 
-# --- 2. THE DYNAMIC HELP DATA ---
+# Assuming these are defined in your main file
+# referrals_db = db["referral_codes"]
+# users = db["users"]
+
+# --- 2. USER SYNC LOGIC ---
+def get_user(user):
+    """Fetches user data with Auto-Name Update and History tracking."""
+    data = users.find_one({"id": user.id})
+    default_data = {
+        "id": user.id, "name": user.first_name, "coins": 100, "xp": 0,
+        "level": 1, "kills": 0, "guild": None, "dead": False,
+        "inventory": [], "claimed_groups": [], "blocked": False,
+        "premium": False, "old_names": []
+    }
+    if not data:
+        users.insert_one(default_data)
+        return default_data
+
+    updated_fields = {}
+    if data.get("name") != user.first_name:
+        current_db_name = data.get("name")
+        old_names_list = data.get("old_names", [])
+        if current_db_name and current_db_name not in old_names_list:
+            old_names_list.append(current_db_name)
+            updated_fields["old_names"] = old_names_list
+        updated_fields["name"] = user.first_name
+
+    for key, value in default_data.items():
+        if key not in data:
+            updated_fields[key] = value
+
+    if updated_fields:
+        users.update_one({"id": user.id}, {"$set": updated_fields})
+        data.update(updated_fields)
+    return data
+
+# --- 3. THE DYNAMIC HELP DATA ---
 HELP_TEXTS = {
     "help_manage": (
         "🛡️ <b>𝐆𝐫𝐨𝐮𝐩 𝐌𝐚𝐧𝐚𝐠𝐞𝐦𝐞𝐧𝐭</b>\n"
@@ -1449,7 +1487,7 @@ HELP_TEXTS = {
     )
 }
 
-# --- 3. KEYBOARDS ---
+# --- 4. KEYBOARDS ---
 def get_main_keyboard(bot_username):
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("👨‍💻 ᴅᴇᴠᴇʟᴏᴘᴇʀ", url="tg://user?id=5773908061")],
@@ -1469,60 +1507,60 @@ def get_help_keyboard():
         [InlineKeyboardButton("🔙 ʙᴀᴄᴋ ᴛᴏ ᴍᴇɴᴜ", callback_data="back_to_start")]
     ])
 
-# --- 4. START COMMAND ---
+# --- 5. REFERRAL LINK GENERATOR ---
+async def referral(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    bot = await context.bot.get_me()
+    unique_code = str(uuid.uuid4())[:8]
+    
+    referrals_db.insert_one({"code": unique_code, "creator_id": user.id, "claimed_by": []})
+    link = f"https://t.me/{bot.username}?start=ref_{unique_code}"
+
+    text = f"🎁 <b>ʏᴏᴜʀ ʀᴇꜰᴇʀʀᴀʟ ʟɪɴᴋ</b>\n\n🔗 <code>{link}</code>\n\nɪɴᴠɪᴛᴇ ꜰʀɪᴇɴᴅꜱ ᴜꜱɪɴɢ ᴛʜɪꜱ ʟɪɴᴋ\n💰 ʀᴇᴡᴀʀᴅ: 1000 ᴄᴏɪɴꜱ\n\n🧩 ɴᴏᴛᴇ : ᴀɴʏᴏɴᴇ ᴄᴀɴ ᴜsᴇ ᴛʜɪs ʟɪɴᴋ, ʙᴜᴛ ᴏɴʟʏ ᴏɴᴄᴇ ᴘᴇʀ ᴜsᴇʀ."
+    await update.message.reply_text(text, parse_mode=ParseMode.HTML)
+
+# --- 6. START COMMAND (WITH REFERRAL LOGIC) ---
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    
-    # Use f-string with proper line breaks and closed parenthesis
+    args = context.args
+
+    if args and args[0].startswith("ref_"):
+        ref_code = args[0].replace("ref_", "")
+        ref_data = referrals_db.find_one({"code": ref_code})
+        if ref_data:
+            creator_id = ref_data["creator_id"]
+            if user.id != creator_id and user.id not in ref_data.get("claimed_by", []):
+                referrals_db.update_one({"code": ref_code}, {"$push": {"claimed_by": user.id}})
+                users.update_one({"id": creator_id}, {"$inc": {"coins": 1000}})
+                try:
+                    await context.bot.send_message(creator_id, f"💰 <b>ʀᴇꜰᴇʀʀᴀʟ sᴜᴄᴄᴇss!</b>\n{user.first_name} ᴜsᴇᴅ ʏᴏᴜʀ ʟɪɴᴋ. +1000 ᴄᴏɪɴs!", parse_mode=ParseMode.HTML)
+                except: pass
+
+    get_user(user) # Sync user data
+
     caption = (
         f"<b>ᴡᴇʟᴄᴏᴍᴇ, {user.first_name}!</b> 👋\n\n"
         f"<blockquote>ɪ ᴀᴍ <b>ʏᴜᴜʀɪ</b> — ʜᴇʀᴇ ᴛᴏ ᴇɴʜᴀɴᴄᴇ ʏᴏᴜʀ ᴇxᴘᴇʀɪᴇɴᴄᴇ ᴏɴ ᴛᴇʟᴇɢʀᴀᴍ. ᴇɴᴊᴏʏ ʏᴏᴜʀ ᴊᴏᴜʀɴᴇʏ ᴡɪᴛʜ ᴍᴇ!\n\n"
         f"ᴜsᴇ: /referral ᴛᴏ sʜᴀʀᴇ ʏᴏᴜʀ ʟɪɴᴋ. ɪᴛ ʜᴇʟᴘs ᴍᴇ ɢʀᴏᴡ ᴀɴᴅ ʙᴏᴏsᴛs ʏᴏᴜʀ ʙᴀʟᴀɴᴄᴇ ᴀs ᴡᴇʟʟ.</blockquote>\n\n"
         f"ᴀᴅᴅ ᴍᴇ ᴛᴏ ʏᴏᴜʀ ɢʀᴏᴜᴘ ᴀɴᴅ ʟᴇᴛ ᴍᴇ ᴛᴀᴋᴇ ᴄᴀʀᴇ ᴏғ ᴛʜᴇ ʀᴇsᴛ."
     )
+    await update.message.reply_photo(photo=IMG_MAIN, caption=caption, parse_mode=ParseMode.HTML, reply_markup=get_main_keyboard(context.bot.username))
 
-    await update.message.reply_photo(
-        photo=IMG_MAIN,
-        caption=caption,
-        parse_mode=ParseMode.HTML,
-        reply_markup=get_main_keyboard(context.bot.username)
-    )
-
-# --- 5. CALLBACK HANDLER ---
+# --- 7. CALLBACK HANDLER ---
 async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     data = query.data
     await query.answer()
-
     try:
         if data == "help_main":
             text = "✨ <b>ʏᴜᴜʀɪ ʜᴇʟᴘ ᴍᴇɴᴜ</b>\n\n<i>sᴇʟᴇᴄᴛ ᴀ ᴍᴏᴅᴜʟᴇ ᴛᴏ ᴠɪᴇᴡ ᴜsᴀɢᴇ:</i>"
-            await query.edit_message_media(
-                media=InputMediaPhoto(media=IMG_HELP, caption=text, parse_mode=ParseMode.HTML),
-                reply_markup=get_help_keyboard()
-            )
-
+            await query.edit_message_media(media=InputMediaPhoto(media=IMG_HELP, caption=text, parse_mode=ParseMode.HTML), reply_markup=get_help_keyboard())
         elif data in HELP_TEXTS:
-            keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 ʙᴀᴄᴋ", callback_data="help_main")]])
-            await query.edit_message_caption(
-                caption=HELP_TEXTS[data],
-                reply_markup=keyboard,
-                parse_mode=ParseMode.HTML
-            )
-
+            await query.edit_message_caption(caption=HELP_TEXTS[data], reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 ʙᴀᴄᴋ", callback_data="help_main")]]), parse_mode=ParseMode.HTML)
         elif data == "back_to_start":
-            user = update.effective_user
-            caption = (
-                f"<b>ᴡᴇʟᴄᴏᴍᴇ, {user.first_name}!</b> 👋\n\n"
-                f"<blockquote>ɪ ᴀᴍ <b>ʏᴜᴜʀɪ</b>.</blockquote>"
-            )
-            await query.edit_message_media(
-                media=InputMediaPhoto(media=IMG_MAIN, caption=caption, parse_mode=ParseMode.HTML),
-                reply_markup=get_main_keyboard(context.bot.username)
-            )
-
-    except Exception as e:
-        print(f"Callback Error: {e}")
+            caption = f"<b>ᴡᴇʟᴄᴏᴍᴇ, {update.effective_user.first_name}!</b> 👋\n\n<blockquote>ɪ ᴀᴍ <b>ʏᴜᴜʀɪ</b>.</blockquote>"
+            await query.edit_message_media(media=InputMediaPhoto(media=IMG_MAIN, caption=caption, parse_mode=ParseMode.HTML), reply_markup=get_main_keyboard(context.bot.username))
+    except Exception as e: print(f"Callback Error: {e}")
 
 # ================= HELP SYSTEM MODULE =================
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
@@ -2579,24 +2617,34 @@ async def del_broad(update: Update, context: ContextTypes.DEFAULT_TYPE):
 #--
 #=====Referral_Link======
 async def referral(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
     user = update.effective_user
     bot = await context.bot.get_me()
 
-    link = f"https://t.me/{bot.username}?start=ref_{user.id}"
+    # 1. Create a unique ID for THIS specific link
+    unique_code = str(uuid.uuid4())[:8] # Short 8-character unique ID
+    
+    # 2. Save this link in the database
+    referrals_db.insert_one({
+        "code": unique_code,
+        "creator_id": user.id,
+        "claimed_by": [] # List of users who used THIS specific link
+    })
+
+    link = f"https://t.me/{bot.username}?start=ref_{unique_code}"
 
     text = f"""
-🎁 ʏᴏᴜʀ ʀᴇꜰᴇʀʀᴀʟ ʟɪɴᴋ
+🎁 <b>ʏᴏᴜʀ ɴᴇᴡ ʀᴇꜰᴇʀʀᴀʟ ʟɪɴᴋ</b>
 
 🔗 {link}
 
 ɪɴᴠɪᴛᴇ ꜰʀɪᴇɴᴅꜱ ᴜꜱɪɴɢ ᴛʜɪꜱ ʟɪɴᴋ
-💰 ʀᴇᴡᴀʀᴅ: 1000 ᴄᴏɪɴꜱ
-🧩 Nᴏᴛᴇ :
-⚠️ Oɴʟʏ Nᴇᴡ Uꜱᴇʀꜱ Rᴇɢɪꜱᴛʀᴀᴛɪᴏɴ Wɪʟʟ Gɪᴠᴇ Mᴏɴᴇʏ. 💰
-"""
+💰 ʀᴇᴡᴀʀᴅ: <code><b>1000 ᴄᴏɪɴꜱ</b></code>
 
-    await update.message.reply_text(text)
+🧩 <b>ɴᴏᴛᴇ :</b>
+• ᴇᴠᴇʀʏ ᴛɪᴍᴇ ʏᴏᴜ ᴜsᴇ /referral, ᴀ ɴᴇᴡ ʟɪɴᴋ ɪs ᴍᴀᴅᴇ.
+• ᴀ ꜰʀɪᴇɴᴅ ᴄᴀɴ ᴜsᴇ ᴍᴜʟᴛɪᴘʟᴇ ʟɪɴᴋs ꜰʀᴏᴍ ʏᴏᴜ ᴛᴏ ɢɪᴠᴇ ʏᴏᴜ ᴍᴏɴᴇʏ!
+"""
+    await update.message.reply_text(text, parse_mode='HTML')
 
 #=======Russian_Rullate=(big)====
 import random
