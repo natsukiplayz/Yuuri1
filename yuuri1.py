@@ -4629,7 +4629,7 @@ application.add_handler(CommandHandler("voice", voice_msg_handler))
 application.add_handler(CommandHandler("setpng", set_png))
 application.add_handler(CommandHandler("claim", claim))
 application.add_handler(CommandHandler("help", help_command)) 
-application.add_handler(CommandHandler("words", words))
+application.add_handler(CommandHandler("words", words_cmd))
 application.add_handler(CommandHandler("bet", bet))
 application.add_handler(CommandHandler("cancelword", cancelword))
 
