@@ -4524,7 +4524,6 @@ application.add_handler(CallbackQueryHandler(heist_choice, pattern="^heist_"))
 # Added 'help_' as a prefix to catch 'help_main', 'help_manage', 'help_eco', etc.
 # Added 'back_to_start' to handle the return button
 
-application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, word_guess_handler))
 application.add_handler(CallbackQueryHandler(handle_help_callbacks))
 application.add_handler(
     CallbackQueryHandler(
