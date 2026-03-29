@@ -4119,7 +4119,7 @@ import pytz
 
 async def ask_ai_async(chat_id: int, text: str, username: str):
 
-    if not GROQ_API_KEY:
+    if not DEEPSEEK_API_KEY:
         return "🤖 AI not configured."
 
     try:
@@ -4139,10 +4139,10 @@ async def ask_ai_async(chat_id: int, text: str, username: str):
         # Limit memory size
         chat_memory[chat_id] = chat_memory[chat_id][-MAX_MEMORY:]
 
-        url = "https://api.groq.com/openai/v1/chat/completions"
+        url = "https://api.deepseek.com/chat/completions"
 
         headers = {
-            "Authorization": f"Bearer {GROQ_API_KEY}",
+            "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
             "Content-Type": "application/json"
         }
 
@@ -4167,7 +4167,7 @@ async def ask_ai_async(chat_id: int, text: str, username: str):
         )
 
         data = {
-            "model": "llama-3.3-70b-versatile",
+            "model": "deepseek-chat",
             "messages": [
                 {"role": "system", "content": system_content}
             ] + chat_memory[chat_id]
@@ -4177,13 +4177,12 @@ async def ask_ai_async(chat_id: int, text: str, username: str):
             response = await client.post(url, headers=headers, json=data)
 
         if response.status_code != 200:
-            # Printing the error help us see WHY it failed (like the 'Human' role error)
-            print(f"Groq Error: {response.status_code} - {response.text}")
+            # Printing the error help us see WHY it failed
+            print(f"DeepSeek Error: {response.status_code} - {response.text}")
             return "⚠️ Iᴍ A Bɪᴛ Tɪʀᴇᴅ Sᴏ Pʟᴇᴀꜱᴇ 🥺"
 
         reply = response.json()["choices"][0]["message"]["content"]
 
-        # ✅ FIXED: Changed role from "Human" to "assistant"
         chat_memory[chat_id].append({
             "role": "assistant",
             "content": reply
