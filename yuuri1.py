@@ -4140,10 +4140,10 @@ async def ask_ai_async(chat_id: int, text: str, username: str):
         # Limit memory size
         chat_memory[chat_id] = chat_memory[chat_id][-MAX_MEMORY:]
 
-        url = "https://api.deepseek.com/chat/completions"
+        url = "https://api.groq.com/openai/v1/chat/completions"
 
         headers = {
-            "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
+            "Authorization": f"Bearer {GROQ_API_KEY}",
             "Content-Type": "application/json"
         }
 
@@ -4168,7 +4168,7 @@ async def ask_ai_async(chat_id: int, text: str, username: str):
         )
 
         data = {
-            "model": "deepseek-chat",
+            "model": "deepseek-r1-distill-llama-70b",
             "messages": [
                 {"role": "system", "content": system_content}
             ] + chat_memory[chat_id]
