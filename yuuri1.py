@@ -4302,7 +4302,7 @@ async def ask_ai_async(chat_id: int, text: str, username: str):
         )
 
         data = {
-            "model": "openai/gpt-oss-120b",
+            "model": "moonshotai/kimi-k2-instruct-0905",
             "messages": [
                 {"role": "system", "content": system_content}
             ] + chat_memory[chat_id]
