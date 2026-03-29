@@ -86,7 +86,6 @@ feedback_db = db["feedbacks"]
 # --- ASYNC COLLECTIONS (Specifically for 'await' commands) ---
 # We keep this separate so your async functions (like get_img) work perfectly
 image_db = async_db["command_images"]
-users_async = async_db["users"]
 
 # ================= LOG =================
 logging.basicConfig(level=logging.INFO)
@@ -1198,140 +1197,6 @@ async def claim(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"👥 <b>Gʀᴏᴜᴘ Sɪᴢᴇ:</b> {member_count} Mᴇᴍʙᴇʀꜱ\n"
         f"💰 <b>Rᴇᴡᴀʀᴅ:</b> {reward:,} Cᴏɪɴꜱ\n\n"
         f"<i>Tʜɪꜱ ɢʀᴏᴜᴘ's ʀᴇᴡᴀʀᴅ ʜᴀꜱ ʙᴇᴇɴ ᴇxʜᴀᴜꜱᴛᴇᴅ. Nᴏ ᴏɴᴇ ᴇʟꜱᴇ ᴄᴀɴ ᴄʟᴀɪᴍ ʜᴇʀᴇ!</i>",
-        parse_mode="HTML"
-    )
-
-import asyncio
-import random
-import re
-from telegram import Update
-from telegram.ext import ContextTypes, CommandHandler, MessageHandler, filters
-
-# --- AUTO DICTIONARY SETUP ---
-import nltk
-from nltk.corpus import words as nltk_words
-
-# Download the word list if it's not already on the server
-try:
-    nltk.data.find('corpora/words')
-except LookupError:
-    nltk.download('words')
-
-# Filter the massive list into usable 4, 5, and 6 letter words
-# We use regex to ensure it's only normal letters (no hyphens, no numbers)
-all_words = [w.upper() for w in nltk_words.words() if re.match("^[a-zA-Z]+$", w)]
-
-WORDS_4 = [w for w in all_words if len(w) == 4]
-WORDS_5 = [w for w in all_words if len(w) == 5]
-WORDS_6 = [w for w in all_words if len(w) == 6]
-
-print(f"Loaded Dictionary: {len(WORDS_4)} 4-letter, {len(WORDS_5)} 5-letter, {len(WORDS_6)} 6-letter words.")
-
-
-# --- CONFIGURATION & STORAGE ---
-
-# Storage for active games
-# Format: {chat_id: {"pot": 0, "players": [], "word": "", "mode": 5, "is_joinable": False, "is_started": False, "history": [], "guessed_words": []}}
-active_word_games = {}
-
-# --- HELPER FUNCTIONS ---
-
-def get_bold_sans(text: str) -> str:
-    """Converts regular uppercase text to 𝗕𝗼𝗹𝗱 𝗦𝗮𝗻𝘀 for the game board."""
-    bold_text = ""
-    for char in text.upper():
-        if 'A' <= char <= 'Z':
-            bold_text += chr(ord(char) - 65 + 0x1D5D4)
-        else:
-            bold_text += char
-    return bold_text
-
-# --- COMMAND HANDLERS ---
-
-async def words_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """/words <amount> <4|5|6> - Sᴛᴀʀᴛ Tʜᴇ Wᴏʀᴅɢᴀᴍᴇ Lobby"""
-    chat_id = update.effective_chat.id
-    
-    if chat_id in active_word_games:
-        return await update.message.reply_text("⚠️ <b>𝗔 𝗴𝗮𝗺𝗲 𝗶𝘀 𝗮𝗹𝗿𝗲𝗮𝗱𝘆 𝗶𝗻 𝗽𝗿𝗲𝗽𝗮𝗿𝗮𝘁𝗶𝗼𝗻 𝗼𝗿 𝗿𝘂𝗻𝗻𝗶𝗻𝗴!</b>", parse_mode="HTML")
-
-    try:
-        if len(context.args) < 2: raise ValueError
-        amount = int(context.args[0])
-        mode = int(context.args[1])
-        if mode not in [4, 5, 6] or amount < 0: 
-            raise ValueError
-    except (IndexError, ValueError):
-        usage = (
-            "🎮 <b>𝗪𝗢𝗥𝗗 𝗦𝗘𝗘𝗞</b>\n\n"
-            "𝗨𝘀𝗮𝗴𝗲: <code>/words &lt;amount&gt; &lt;4|5|6&gt;</code>\n"
-            "𝗘𝘅𝗮𝗺𝗽𝗹𝗲: <code>/words 1000 5</code>"
-        )
-        return await update.message.reply_text(usage, parse_mode="HTML")
-
-    target_word = random.choice(WORDS_4 if mode == 4 else (WORDS_5 if mode == 5 else WORDS_6))
-
-    active_word_games[chat_id] = {
-        "pot": 0, "entry_fee": amount, "mode": mode, "players": [],
-        "word": target_word, "is_joinable": True, "is_started": False,
-        "history": [], "guessed_words": []
-    }
-
-    await update.message.reply_text(
-        f"🎮 <b>𝗪𝗢𝗥𝗗 𝗦𝗘𝗘𝗞: 𝗕𝗘𝗧 𝗠𝗢𝗗𝗘</b>\n\n"
-        f"💰 Eɴᴛʀʏ Fᴇᴇ: <code>{amount:,}</code>\n"
-        f"🔢 Mᴏᴅᴇ: <code>{mode}-ʟᴇᴛᴛᴇʀs</code>\n\n"
-        f"<b>Jᴏɪɴ Tʜᴇ Wᴏʀᴅɢᴀᴍᴇ</b> ʙʏ ᴛʏᴘɪɴɢ <code>/bet {amount}</code>",
-        parse_mode="HTML"
-    )
-
-    await asyncio.sleep(60)
-    if chat_id not in active_word_games: return
-    game = active_word_games[chat_id]
-    
-    if len(game["players"]) < 2:
-        for p_id in game["players"]:
-            await users_async.update_one({"user_id": p_id}, {"$inc": {"coins": game["entry_fee"]}})
-        del active_word_games[chat_id]
-        return await update.message.reply_text("❌ <b>𝗡𝗼𝘁 𝗲𝗻𝗼𝘂𝗴𝗵 𝗽𝗹𝗮𝘆𝗲𝗿𝘀!</b> Bets refunded.", parse_mode="HTML")
-
-    game["is_joinable"] = False
-    game["is_started"] = True
-    await update.message.reply_text(f"🚀 <b>𝗚𝗔𝗠𝗘 𝗦𝗧𝗔𝗥𝗧𝗘𝗗!</b>\n💰 Pᴏᴛ: <code>{game['pot']:,}</code>\nGᴜᴇss ᴛʜᴇ {mode}-ʟᴇᴛᴛᴇʀ ᴡᴏʀᴅ!", parse_mode="HTML")
-
-async def bet(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """/bet <amount> - Jᴏɪɴ Tʜᴇ Wᴏʀᴅɢᴀᴍᴇ"""
-    chat_id = update.effective_chat.id
-    user_id = update.effective_user.id
-    
-    if chat_id not in active_word_games or not active_word_games[chat_id]["is_joinable"]:
-        return await update.message.reply_text("❌ <b>𝗡𝗼 𝗮𝗰𝘁𝗶𝘃𝗲 𝗷𝗼𝗶𝗻𝗮𝗯𝗹𝗲 𝗴𝗮𝗺𝗲 𝗳𝗼𝘂𝗻𝗱.</b>", parse_mode="HTML")
-
-    game = active_word_games[chat_id]
-    
-    # Check if they typed an amount and if it matches the lobby fee
-    if context.args:
-        try:
-            input_amount = int(context.args[0])
-            if input_amount != game["entry_fee"]:
-                return await update.message.reply_text(f"⚠️ <b>𝗧𝗵𝗲 𝗲𝗻𝘁𝗿𝘆 𝗳𝗲𝗲 𝗳𝗼𝗿 𝘁𝗵𝗶𝘀 𝗴𝗮𝗺𝗲 𝗶𝘀 {game['entry_fee']:,} 𝗰𝗼𝗶𝗻𝘀.</b>", parse_mode="HTML")
-        except ValueError:
-            pass # Ignore non-number text
-
-    if user_id in game["players"]:
-        return await update.message.reply_text("⚠️ <b>𝗬𝗼𝘂 𝗮𝗿𝗲 𝗮𝗹𝗿𝗲𝗮𝗱𝘆 𝗶𝗻 𝘁𝗵𝗲 𝗯𝗲𝘁!</b>", parse_mode="HTML")
-
-    user = await users_async.find_one({"user_id": user_id})
-    if not user or user.get("coins", 0) < game["entry_fee"]:
-        return await update.message.reply_text(f"💸 <b>𝗬𝗼𝘂 𝗻𝗲𝗲𝗱 {game['entry_fee']:,} 𝗰𝗼𝗶𝗻𝘀 𝘁𝗼 𝗷𝗼𝗶𝗻!</b>", parse_mode="HTML")
-
-    # Deduct and Update
-    await users_async.update_one({"user_id": user_id}, {"$inc": {"coins": -game["entry_fee"]}})
-    game["players"].append(user_id)
-    game["pot"] += game["entry_fee"]
-
-    await update.message.reply_text(
-        f"✅ <b>{update.effective_user.first_name}</b> Jᴏɪɴᴇᴅ Tʜᴇ Wᴏʀᴅɢᴀᴍᴇ!\nPᴏᴛ: 💰 <code>{game['pot']:,}</code>",
         parse_mode="HTML"
     )
 
@@ -4505,8 +4370,6 @@ application.add_handler(CommandHandler("voice", voice_msg_handler))
 application.add_handler(CommandHandler("setpng", set_png))
 application.add_handler(CommandHandler("claim", claim))
 application.add_handler(CommandHandler("help", help_command)) 
-application.add_handler(CommandHandler("words", words_cmd))
-application.add_handler(CommandHandler("bet", bet))
 
 # Message Handlers
 application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
