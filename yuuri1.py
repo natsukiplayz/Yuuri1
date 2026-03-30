@@ -13,7 +13,7 @@ from io import BytesIO
 import requests
 import httpx
 from telegram.constants import ParseMode
-from fastapi import FastAPI, Request  # <--- Added for Webhooks
+from fastapi import FastAPI, Request  
 from pymongo import MongoClient
 
 from telegram import InputSticker, Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -32,7 +32,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from datetime import datetime, timezone
 
 # ================= WEBHOOK SETUP =================
-app = FastAPI() # <--- This is your "Web Server"
+app = FastAPI()
 BOT_START_TIME = datetime.now(timezone.utc)
 
 # ================= TERMUX +srv FIX =================
@@ -85,7 +85,6 @@ referrals_db = db["referral_codes"]
 feedback_db = db["feedbacks"]
 
 # --- ASYNC COLLECTIONS (Specifically for 'await' commands) ---
-# We keep this separate so your async functions (like get_img) work perfectly
 image_db = async_db["command_images"]
 
 # ================= LOG =================
@@ -97,7 +96,6 @@ def get_user(user):
     """Fetches user data synchronously with Auto-Name Update and History tracking."""
     data = users.find_one({"id": user.id})
 
-    # 🧩 Removed "referred_by" to support your multi-link requirement
     default_data = {
         "id": user.id,
         "name": user.first_name,
@@ -118,7 +116,6 @@ def get_user(user):
         users.insert_one(default_data)
         return default_data
 
-    # 2. ✨ AUTO-UPDATE & NAME TRACKING LOGIC
     updated_fields = {}
 
     if data.get("name") != user.first_name:
@@ -133,13 +130,11 @@ def get_user(user):
         updated_fields["name"] = user.first_name
         data["name"] = user.first_name
 
-    # 3. SYNC MISSING FIELDS
     for key, value in default_data.items():
         if key not in data:
             updated_fields[key] = value
             data[key] = value
 
-    # 4. PUSH CHANGES TO DB
     if updated_fields:
         users.update_one({"id": user.id}, {"$set": updated_fields})
 
@@ -206,12 +201,11 @@ def add_xp(user_data, amount):
             user_data["level"] += 1
             leveled_up = True
         else:
-            break # User doesn't have enough XP for the next level
+            break
             
     save_user(user_data)
     return leveled_up
 
-# Re-balanced Ranks (Harder to reach "Immortal")
 RANKS = [
     {"name": "Nᴏᴏʙ", "lvl": 1},
     {"name": "Bᴇɢɪɴɴᴇʀ", "lvl": 5},
@@ -268,7 +262,6 @@ async def save_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 def increment_warns(user_id):
-    # Increments warning count and returns the new total
     res = users_collection.find_one_and_update(
         {"user_id": user_id},
         {"$inc": {"warns": 1}},
@@ -278,30 +271,25 @@ def increment_warns(user_id):
     return res.get("warns", 0)
 
 def is_allowed(user_id):
-    # Checks if user is in the whitelist
     user = allowed_collection.find_one({"user_id": user_id})
     return True if user else False
 
 #======= user info =========
 def get_user(user):
-    # ... your existing fetching logic ...
     data = users.find_one({"id": user.id}) # Or your specific fetcher
     
     if data:
-        # Ensure the new claim list exists so the bot doesn't error out
         if "claimed_groups" not in data:
             data["claimed_groups"] = []
             
     return data
 
 #========fonts-command========
-# Small Caps and Bold Mappings
 SMALL_CAPS = {"a": "ᴀ", "b": "ʙ", "c": "ᴄ", "d": "ᴅ", "e": "ᴇ", "f": "ꜰ", "g": "ɢ", "h": "ʜ", "i": "ɪ", "j": "ᴊ", "k": "ᴋ", "l": "ʟ", "m": "ᴍ", "n": "ɴ", "o": "ᴏ", "p": "ᴘ", "q": "ǫ", "r": "ʀ", "s": "ꜱ", "t": "ᴛ", "u": "ᴜ", "v": "ᴠ", "w": "ᴡ", "x": "x", "y": "ʏ", "z": "ᴢ"}
 
 BOLD_SERIF = {
-    # Capitals
     "A": "𝐀", "B": "𝐛", "C": "𝐜", "D": "𝐝", "E": "𝐞", "F": "𝐟", "G": "𝐠", "H": "𝐡", "I": "𝐢", "J": "𝐣", "K": "𝐤", "L": "𝐥", "M": "𝐦", "N": "𝐧", "O": "𝐨", "P": "𝐩", "Q": "𝐪", "R": "𝐫", "S": "𝐬", "T": "𝐭", "U": "𝐮", "V": "𝐯", "W": "𝐰", "X": "𝐱", "Y": "𝐲", "Z": "𝐳",
-    # Small
+
     "a": "𝐚", "b": "𝐛", "c": "𝐜", "d": "𝐝", "e": "𝐞", "f": "𝐟", "g": "𝐠", "h": "𝐡", "i": "𝐢", "j": "𝐣", "k": "𝐤", "l": "𝐥", "m": "𝐦", "n": "𝐧", "o": "𝐨", "p": "𝐩", "q": "𝐪", "r": "𝐫", "s": "𝐬", "t": "𝐭", "u": "𝐮", "v": "𝐯", "w": "𝐰", "x": "𝐱", "y": "𝐲", "z": "𝐳"
 }
 
