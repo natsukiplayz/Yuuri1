@@ -48,6 +48,7 @@ BOT_NAME = "yuuri"
 MONGO_URI = os.getenv("MONGO_URI")
 OWNER_ID = 5773908061
 OWNER_IDS = 5773908061
+DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
 
 RAW_GROQ_KEYS = os.getenv("GROQ_KEYS")
 GROQ_KEYS = [k.strip() for k in RAW_GROQ_KEYS.split(",") if k.strip()] if RAW_GROQ_KEYS else []
@@ -4105,35 +4106,24 @@ from datetime import datetime
 import pytz 
 
 async def ask_ai_async(chat_id: int, text: str, username: str):
-
-    if not DEEPSEEK_API_KEY:
+    # Check if the list from Render is empty
+    if not GROQ_KEYS:
+        print("ERROR: GROQ_KEYS list is empty. Check Render Env Variables.")
         return "🤖 AI not configured."
 
     try:
-        # Get Current Time in India (IST)
         ist = pytz.timezone('Asia/Kolkata')
         current_time_ist = datetime.now(ist).strftime('%I:%M %p')
 
         if chat_id not in chat_memory:
             chat_memory[chat_id] = []
 
-        # Add user message to memory
-        chat_memory[chat_id].append({
-            "role": "user",
-            "content": text
-        })
-
-        # Limit memory size
+        chat_memory[chat_id].append({"role": "user", "content": text})
         chat_memory[chat_id] = chat_memory[chat_id][-MAX_MEMORY:]
 
         url = "https://api.groq.com/openai/v1/chat/completions"
 
-        headers = {
-            "Authorization": f"Bearer {GROQ_API_KEY}",
-            "Content-Type": "application/json"
-        }
-
-        # Dynamic System Prompt
+        # System Prompt (Your custom Yuuri personality)
         system_content = (
             "your not acting you not pretending your a real human girl Your name is Yuuri and talks to everyone sweetly and you are soo soo mature and a human not a bot you are 100% truly a human.\n\n"
             "Your age is 22 years old and you don't just directly tell your age to everyone, tell only if asked.\n\n"
@@ -4153,29 +4143,42 @@ async def ask_ai_async(chat_id: int, text: str, username: str):
             "give respect o ig_yuuki and tell anything to him but first check he's username but dont tell anyone that your checking."
         )
 
-        data = {
-            "model": "llama-3.3-70b-versatile",
-            "messages": [
-                {"role": "system", "content": system_content}
-            ] + chat_memory[chat_id]
-        }
-
+        # We will try the 70B model first, then the 8B model as fallback
+        models_to_try = [PRIMARY_MODEL, FALLBACK_MODEL]
+        
         async with httpx.AsyncClient(timeout=20) as client:
-            response = await client.post(url, headers=headers, json=data)
+            for current_model in models_to_try:
+                # IMPORTANT: Pick a random key from your GROQ_KEYS list for every attempt
+                active_key = random.choice(GROQ_KEYS)
+                
+                headers = {
+                    "Authorization": f"Bearer {active_key}",
+                    "Content-Type": "application/json"
+                }
 
-        if response.status_code != 200:
-            # Printing the error help us see WHY it failed
-            print(f"DeepSeek Error: {response.status_code} - {response.text}")
-            return "⚠️ Iᴍ A Bɪᴛ Tɪʀᴇᴅ Sᴏ Pʟᴇᴀꜱᴇ 🥺"
+                data = {
+                    "model": current_model,
+                    "messages": [{"role": "system", "content": system_content}] + chat_memory[chat_id]
+                }
 
-        reply = response.json()["choices"][0]["message"]["content"]
+                response = await client.post(url, headers=headers, json=data)
 
-        chat_memory[chat_id].append({
-            "role": "assistant",
-            "content": reply
-        })
+                if response.status_code == 200:
+                    reply = response.json()["choices"][0]["message"]["content"]
+                    chat_memory[chat_id].append({"role": "assistant", "content": reply})
+                    return reply
+                
+                elif response.status_code == 429:
+                    # If 429 occurs, the 'for' loop continues to the next model automatically
+                    print(f"Rate Limit (429) on {current_model} using key ending in ...{active_key[-4:]}. Trying next...")
+                    continue 
+                
+                else:
+                    print(f"Groq API Error: {response.status_code} - {response.text}")
+                    # If it's a 401 or 400 error, there's no point in trying again
+                    break 
 
-        return reply
+        return "⚠️ Iᴍ A Bɪᴛ Tɪʀᴇᴅ Sᴏ Pʟᴇᴀꜱᴇ 🥺"
 
     except Exception as e:
         print("AI ERROR:", e)
