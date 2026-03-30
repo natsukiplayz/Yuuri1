@@ -65,13 +65,11 @@ sync_db = client["yuuri_db"]
 async_client = AsyncIOMotorClient(MONGO_URI)
 async_db = async_client["yuuri_db"]
 
-# 2. Define 'db' as the main sync variable for the whole script
-# This prevents the "NameError: name 'db' is not defined"
 db = sync_db 
 
 # --- SYNC COLLECTIONS (No 'await' needed) ---
 users = db["users"]
-users_collection = db["users"] # Fixed the missing quote/bracket here
+users_collection = db["users"]
 guilds = db["guilds"]
 chat = db["chats"]
 sticker_packs = db["sticker_packs"]
@@ -144,7 +142,7 @@ def save_user(data):
     """Saves user data synchronously."""
     if not data or "id" not in data:
         return
-    # Using $set ensures we don't accidentally wipe the whole document
+
     users.update_one({"id": data["id"]}, {"$set": data}, upsert=True)
 
 #======== load groups ====
@@ -155,7 +153,6 @@ def load_groups_from_db():
     global SAVED_GROUPS
     try:
         SAVED_GROUPS.clear()
-        # Fetch all saved groups from your existing sync collection
         cursor = groups_collection.find({}) 
         for doc in cursor:
             # Ensure the position is an integer for the dictionary key
