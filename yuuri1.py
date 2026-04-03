@@ -3485,54 +3485,53 @@ from telegram.ext import ContextTypes
 from telegram.error import BadRequest
 
 async def user_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = update.message
+    # Use effective_message to prevent NoneType errors from edited messages/channel posts
+    msg = update.effective_message
+    if not msg:
+        return
+
     chat = update.effective_chat
-    
-    # Initialize variables
     user_id = None
     label = "👤 Uꜱᴇʀ Iᴅ"
 
-    # 1. Handle Reply
+    # 1. HANDLE REPLY
     if msg.reply_to_message:
-        user_id = msg.reply_to_message.from_user.id
-        label = "👤 Rᴇᴘʟɪᴇᴅ Uꜱᴇʀ Iᴅ"
+        target_user = msg.reply_to_message.from_user
+        if target_user:
+            user_id = target_user.id
+            label = "👤 Rᴇᴘʟɪᴇᴅ Uꜱᴇʀ Iᴅ"
 
-    # 2. Handle Username Argument (/id @username)
+    # 2. HANDLE USERNAME ARGUMENT (/id @username)
     elif context.args:
-        # Get the first argument and remove the '@'
-        target = context.args[0].replace("@", "")
+        # Clean the input (remove @ and whitespace)
+        target = context.args[0].strip().replace("@", "")
         
-        # If it's a numeric ID instead of a username
-        if target.isdigit() or (target.startswith("-") and target[1:].isdigit()):
-            user_id = target
-        else:
-            try:
-                # Attempt to find the user via Telegram's API
-                resolved_chat = await context.bot.get_chat(target)
-                user_id = resolved_chat.id
-                label = f"👤 Uꜱᴇʀ Iᴅ (@{target})"
-            except (BadRequest, Exception):
-                # If user is not found or bot hasn't "seen" them
-                error_text = (
-                    "⚠️ Uꜱᴇʀ Nᴏᴛ Fᴏᴜɴᴅ.\n"
-                    "I ᴄᴏᴜʟᴅ ɴᴏᴛ ғɪɴᴅ ᴀɴʏ ᴜꜱᴇʀ ᴡɪᴛʜ ᴛʜᴀᴛ ᴜꜱᴇʀɴᴀᴍᴇ ɪɴ ᴍʏ ᴅᴀᴛᴀʙᴀꜱᴇ."
-                )
-                await msg.reply_text(error_text)
-                return
+        try:
+            # Use get_chat to find the user/chat by username
+            target_chat = await context.bot.get_chat(target)
+            user_id = target_chat.id
+            label = f"👤 Uꜱᴇʀ Iᴅ (@{target})"
+        except (BadRequest, Exception):
+            # The exact error message you requested
+            error_text = (
+                "⚠️ Uꜱᴇʀ Nᴏᴛ Fᴏᴜɴᴅ.\n"
+                "I ᴄᴏᴜʟᴅ ɴᴏᴛ ғɪɴᴅ ᴀɴʏ ᴜꜱᴇʀ ᴡɪᴛʜ ᴛʜᴀᴛ ᴜꜱᴇʀɴᴀᴍᴇ ɪɴ ᴍʏ ᴅᴀᴛᴀʙᴀꜱᴇ."
+            )
+            await msg.reply_text(error_text)
+            return
 
-    # 3. Handle Self (Default)
+    # 3. DEFAULT TO SENDER
     else:
-        user_id = msg.from_user.id
+        user_id = update.effective_user.id
         label = "👤 Uꜱᴇʀ Iᴅ"
 
-    # Final output
+    # Final Response
     text = (
         f"{label}: `{user_id}`\n"
         f"👥 Gʀᴏᴜᴘ Iᴅ: `{chat.id}`"
     )
 
     await msg.reply_text(text, parse_mode="Markdown")
-
 
 from telegram.constants import ChatMemberStatus
 
