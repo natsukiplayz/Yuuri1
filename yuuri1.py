@@ -334,38 +334,42 @@ def get_fancy_text(text, font_type):
 
 #============ Side_Features ========
 #--
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import ContextTypes
+# ================= LIST FEATURE (UNIFIED) =================
 
-# Update these to match your actual database logic
-# We use async_db because this is an async function
-users_col = async_db["users"]
-groups_col = async_db["chats"] # Changed to 'chats' to see all 1000+ groups
+async def list_manager(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Initial command handler for /list [users|groups]"""
+    if update.effective_user.id != OWNER_ID:
+        return
+
+    if not context.args:
+        await update.message.reply_text("ᴘʟᴇᴀsᴇ sᴘᴇᴄɪꜰʏ <b>ᴜsᴇʀs</b> ᴏʀ <b>ɢʀᴏᴜᴘs</b>", parse_mode="HTML")
+        return
+
+    choice = context.args[0].lower()
+    await show_page(update, context, choice, page=1)
 
 async def show_page(update: Update, context: ContextTypes.DEFAULT_TYPE, choice: str, page: int):
+    """Logic to fetch and display the paginated list"""
     limit = 10
     skip = (page - 1) * limit
 
     try:
+        # 1. Setup Filters based on your DB keys
         if choice == "users":
             collection = users_col 
+            query = {}  # All users
             title = "ᴜsᴇʀ ʟɪsᴛ"
-            # Using your 'id' field from get_user function
-            total = await collection.count_documents({})
         elif choice == "groups":
-            collection = groups_col
+            collection = async_db["chats"] # Targeted 'chats' collection
+            query = {"type": {"$in": ["group", "supergroup"]}}
             title = "ɢʀᴏᴜᴘ ʟɪsᴛ"
-            # Matching your stats command filter
-            total = await collection.count_documents({"type": {"$in": ["group", "supergroup"]}})
         else:
+            await update.effective_message.reply_text("ɪɴᴠᴀʟɪᴅ. ᴜsᴇ ᴜsᴇʀs ᴏʀ ɢʀᴏᴜᴘs")
             return
 
-        # Fetch data
-        if choice == "groups":
-            cursor = collection.find({"type": {"$in": ["group", "supergroup"]}}).skip(skip).limit(limit)
-        else:
-            cursor = collection.find({}).skip(skip).limit(limit)
-            
+        # 2. Fetch Total Count and Current Page Data
+        total = await collection.count_documents(query)
+        cursor = collection.find(query).skip(skip).limit(limit)
         data = await cursor.to_list(length=limit)
 
         if not data:
@@ -373,25 +377,27 @@ async def show_page(update: Update, context: ContextTypes.DEFAULT_TYPE, choice: 
             return
 
         total_pages = ((total - 1) // limit) + 1
-        text = f"📖 **{title}** (ᴘᴀɢᴇ: {page}/{total_pages})\n\n"
+        text = f"📖 <b>{title}</b> (ᴘᴀɢᴇ: {page}/{total_pages})\n\n"
 
+        # 3. Format List Rows
         for i, item in enumerate(data, start=skip + 1):
-            if choice == "users":
-                # Aligned with your get_user() keys: 'id', 'name', 'username'
-                uid = item.get('id') or item.get('user_id') or "N/A"
-                uname = item.get('username') or "No Username"
-                name = str(item.get('name') or "Unknown").replace("@", "")
-                
-                # Using <code> for ID and Username
-                text += f"{i}. {name} | <code>{uid}</code> | <code>@{uname}</code>\n"
-            
-            else:
-                # Aligned with Telegram Chat object keys
-                gid = item.get('id') or item.get('chat_id')
-                gname = item.get('title') or "Unknown Group"
-                # Using <code> for Group ID
-                text += f"{i}. **{gname}**\nID: <code>{gid}</code>\n\n"
+            try:
+                if choice == "users":
+                    # Matches your get_user() function keys
+                    uid = item.get('id') or item.get('user_id') or "N/A"
+                    uname = item.get('username') or "No Username"
+                    # Clean name to prevent @ tagging issues
+                    name = str(item.get('name') or "Unknown").replace("@", "")
+                    text += f"{i}. {name} | <code>{uid}</code> | <code>@{uname}</code>\n"
+                else:
+                    # Matches your chats collection keys
+                    gid = item.get('id') or item.get('chat_id')
+                    gname = item.get('title') or "Unknown Group"
+                    text += f"{i}. <b>{gname}</b>\nID: <code>{gid}</code>\n\n"
+            except:
+                continue
 
+        # 4. Navigation Buttons
         buttons = []
         nav_row = []
         if page > 1:
@@ -402,31 +408,37 @@ async def show_page(update: Update, context: ContextTypes.DEFAULT_TYPE, choice: 
         if nav_row:
             buttons.append(nav_row)
 
+        # 5. Output with HTML Parse Mode
         reply_markup = InlineKeyboardMarkup(buttons)
-
         if update.callback_query:
             await update.callback_query.edit_message_text(
-                text, 
-                reply_markup=reply_markup, 
-                parse_mode="HTML", # Changed to HTML for <code> tags
-                disable_web_page_preview=True
+                text, reply_markup=reply_markup, parse_mode="HTML", disable_web_page_preview=True
             )
         else:
             await update.message.reply_text(
-                text, 
-                reply_markup=reply_markup, 
-                parse_mode="HTML", 
-                disable_web_page_preview=True
+                text, reply_markup=reply_markup, parse_mode="HTML", disable_web_page_preview=True
             )
 
     except Exception as e:
-        import logging
         logging.error(f"Error in list: {e}")
-        # Send error to chat so you can see why it stops at Page 3
+        error_text = f"⚠️ ᴇʀʀᴏʀ: <code>{e}</code>"
         if update.callback_query:
-            await update.callback_query.message.reply_text(f"⚠️ ᴇʀʀᴏʀ: <code>{e}</code>", parse_mode="HTML")
+            await update.callback_query.message.reply_text(error_text, parse_mode="HTML")
         else:
-            await update.message.reply_text(f"⚠️ ᴇʀʀᴏʀ: <code>{e}</code>", parse_mode="HTML")
+            await update.message.reply_text(error_text, parse_mode="HTML")
+
+async def list_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handles click events for the navigation buttons"""
+    query = update.callback_query
+    await query.answer()
+
+    if query.from_user.id != OWNER_ID:
+        await query.answer("ʏᴏᴜ ᴀʀᴇ ɴᴏᴛ ᴛʜᴇ ᴏᴡɴᴇʀ", show_alert=True)
+        return
+
+    # Extract info from callback_data (e.g., plist_users_2)
+    _, choice, page = query.data.split("_")
+    await show_page(update, context, choice, int(page))
 
 #======= voice =======
 import os
