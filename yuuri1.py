@@ -332,6 +332,103 @@ def get_fancy_text(text, font_type):
 
 #============ Side_Features ========
 #--
+
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.ext import ContextTypes
+
+OWNER_ID = 5773908061
+
+async def list_manager(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != OWNER_ID:
+        return
+
+    # Check if user provided 'users' or 'groups'
+    if not context.args:
+        await update.message.reply_text("ᴘʟᴇᴀsᴇ sᴘᴇᴄɪꜰʏ ᴜsᴇʀs ᴏʀ ɢʀᴏᴜᴘs")
+        return
+
+    choice = context.args[0].lower()
+    await show_page(update, context, choice, page=1)
+
+async def show_page(update: Update, context: ContextTypes.DEFAULT_TYPE, choice: str, page: int):
+    limit = 10
+    skip = (page - 1) * limit
+    
+    # Database logic
+    if choice == "users":
+        total = await users_col.count_documents({})
+        data = await users_col.find().skip(skip).limit(limit).to_list(length=limit)
+        title = "ᴜsᴇʀ ʟɪsᴛ"
+    elif choice == "groups":
+        total = await groups_col.count_documents({})
+        data = await groups_col.find().skip(skip).limit(limit).to_list(length=limit)
+        title = "ɢʀᴏᴜᴘ ʟɪsᴛ"
+    else:
+        await update.effective_message.reply_text("ɪɴᴠᴀʟɪᴅ ᴏᴘᴛɪᴏɴ. ᴜsᴇ ᴜsᴇʀs ᴏʀ ɢʀᴏᴜᴘs")
+        return
+
+    if not data:
+        await update.effective_message.reply_text("ɴᴏ ᴅᴀᴛᴀ ꜰᴏᴜɴᴅ ɪɴ ᴅʙ")
+        return
+
+    total_pages = ((total - 1) // limit) + 1
+    text = f"📖 **{title}** (ᴘᴀɢᴇ: {page}/{total_pages})\n\n"
+    
+    for i, item in enumerate(data, start=skip + 1):
+        if choice == "users":
+            uid = item.get('user_id')
+            uname = item.get('username', 'No Username')
+            name = str(item.get('first_name', 'Unknown')).replace("@", "")
+            text += f"{i}. {name} | `{uid}` | @{uname}\n"
+        else:
+            gid = item.get('chat_id')
+            gname = item.get('title', 'Unknown Group')
+            link = item.get('invite_link', 'No Link')
+            members = item.get('members_count', '0')
+            text += f"{i}. **{gname}**\nID: `{gid}` | ᴍᴇᴍʙᴇʀs: {members}\nʟɪɴᴋ: {link}\n\n"
+
+    # Buttons
+    buttons = []
+    nav_row = []
+    if page > 1:
+        nav_row.append(InlineKeyboardButton("ᴘʀᴇᴠ", callback_data=f"plist_{choice}_{page-1}"))
+    if (page * limit) < total:
+        nav_row.append(InlineKeyboardButton("ɴᴇxᴛ", callback_data=f"plist_{choice}_{page+1}"))
+    
+    if nav_row:
+        buttons.append(nav_row)
+
+    # If this is called from a button click, edit the message
+    if update.callback_query:
+        await update.callback_query.edit_message_text(
+            text, 
+            reply_markup=InlineKeyboardMarkup(buttons), 
+            parse_mode="Markdown",
+            disable_web_page_preview=True
+        )
+    else:
+        await update.message.reply_text(
+            text, 
+            reply_markup=InlineKeyboardMarkup(buttons), 
+            parse_mode="Markdown",
+            disable_web_page_preview=True
+        )
+
+async def list_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    if query.from_user.id != OWNER_ID:
+        await query.answer("ʏᴏᴜ ᴀʀᴇ ɴᴏᴛ ᴛʜᴇ ᴏᴡɴᴇʀ", show_alert=True)
+        return
+    
+    # Extract choice and page from callback data (e.g., plist_users_2)
+    data_parts = query.data.split("_")
+    choice = data_parts[1]
+    page = int(data_parts[2])
+    
+    await show_page(update, context, choice, page)
+
 #======= voice =======
 import os
 import asyncio
@@ -4352,6 +4449,7 @@ application.add_handler(CommandHandler("save", save_group))
 application.add_handler(CommandHandler("del", del_group))
 application.add_handler(CommandHandler("data", inform_user))
 application.add_handler(CommandHandler("feedback", feedback_command))
+application.add_handler(CommandHandler("list", list_manager))
 application.add_handler(CommandHandler("voice", voice_msg_handler))
 application.add_handler(CommandHandler("setpng", set_png))
 application.add_handler(CommandHandler("claim", claim))
@@ -4372,7 +4470,7 @@ application.add_handler(CallbackQueryHandler(heist_choice, pattern="^heist_"))
 # 2. Handle Menu/Help clicks second
 # Added 'help_' as a prefix to catch 'help_main', 'help_manage', 'help_eco', etc.
 # Added 'back_to_start' to handle the return button
-
+application.add_handler(CallbackQueryHandler(list_callback, pattern="^plist_"))
 application.add_handler(CallbackQueryHandler(handle_help_callbacks))
 application.add_handler(
     CallbackQueryHandler(
