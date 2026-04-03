@@ -334,17 +334,22 @@ def get_fancy_text(text, font_type):
 
 #============ Side_Features ========
 #--
-
+import logging
+from datetime import datetime
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import ContextTypes
+from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler
 
-OWNER_ID = 5773908061
+# ================= CONFIG =================
+# Replace with your actual owner ID if different
+OWNER_ID = 5773908061 
+
+# ================= LIST LOGIC =================
 
 async def list_manager(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Main command handler for /list [users|groups]"""
     if update.effective_user.id != OWNER_ID:
         return
 
-    # Check if user provided 'users' or 'groups'
     if not context.args:
         await update.message.reply_text("ᴘʟᴇᴀsᴇ sᴘᴇᴄɪꜰʏ ᴜsᴇʀs ᴏʀ ɢʀᴏᴜᴘs")
         return
@@ -353,21 +358,24 @@ async def list_manager(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await show_page(update, context, choice, page=1)
 
 async def show_page(update: Update, context: ContextTypes.DEFAULT_TYPE, choice: str, page: int):
+    """Handles data fetching and message rendering"""
     limit = 10
     skip = (page - 1) * limit
-    
-    # Database logic
+
+    # Pointing to your existing async collections
     if choice == "users":
-        total = await users_col.count_documents({})
-        data = await users_col.find().skip(skip).limit(limit).to_list(length=limit)
+        collection = users_col 
         title = "ᴜsᴇʀ ʟɪsᴛ"
     elif choice == "groups":
-        total = await groups_col.count_documents({})
-        data = await groups_col.find().skip(skip).limit(limit).to_list(length=limit)
+        collection = groups_col
         title = "ɢʀᴏᴜᴘ ʟɪsᴛ"
     else:
         await update.effective_message.reply_text("ɪɴᴠᴀʟɪᴅ ᴏᴘᴛɪᴏɴ. ᴜsᴇ ᴜsᴇʀs ᴏʀ ɢʀᴏᴜᴘs")
         return
+
+    # Fetch data and total count
+    total = await collection.count_documents({})
+    data = await collection.find().skip(skip).limit(limit).to_list(length=limit)
 
     if not data:
         await update.effective_message.reply_text("ɴᴏ ᴅᴀᴛᴀ ꜰᴏᴜɴᴅ ɪɴ ᴅʙ")
@@ -375,21 +383,24 @@ async def show_page(update: Update, context: ContextTypes.DEFAULT_TYPE, choice: 
 
     total_pages = ((total - 1) // limit) + 1
     text = f"📖 **{title}** (ᴘᴀɢᴇ: {page}/{total_pages})\n\n"
-    
+
     for i, item in enumerate(data, start=skip + 1):
         if choice == "users":
-            uid = item.get('user_id')
-            uname = item.get('username', 'No Username')
-            name = str(item.get('first_name', 'Unknown')).replace("@", "")
+            # Multi-key check for IDs and Names to avoid 'None'
+            uid = item.get('user_id') or item.get('id') or item.get('_id')
+            uname = item.get('username') or item.get('user_name', 'No Username')
+            raw_name = item.get('first_name') or item.get('name') or 'Unknown'
+            name = str(raw_name).replace("@", "")
             text += f"{i}. {name} | `{uid}` | @{uname}\n"
         else:
-            gid = item.get('chat_id')
-            gname = item.get('title', 'Unknown Group')
-            link = item.get('invite_link', 'No Link')
-            members = item.get('members_count', '0')
+            # Group specific formatting
+            gid = item.get('chat_id') or item.get('id') or item.get('_id')
+            gname = item.get('title') or item.get('group_name') or 'Unknown Group'
+            link = item.get('invite_link') or item.get('link') or 'No Link'
+            members = item.get('members_count') or item.get('user_count') or '0'
             text += f"{i}. **{gname}**\nID: `{gid}` | ᴍᴇᴍʙᴇʀs: {members}\nʟɪɴᴋ: {link}\n\n"
 
-    # Buttons
+    # Navigation Buttons
     buttons = []
     nav_row = []
     if page > 1:
@@ -400,31 +411,26 @@ async def show_page(update: Update, context: ContextTypes.DEFAULT_TYPE, choice: 
     if nav_row:
         buttons.append(nav_row)
 
-    # If this is called from a button click, edit the message
+    # UI Update Logic
+    reply_markup = InlineKeyboardMarkup(buttons)
     if update.callback_query:
         await update.callback_query.edit_message_text(
-            text, 
-            reply_markup=InlineKeyboardMarkup(buttons), 
-            parse_mode="Markdown",
-            disable_web_page_preview=True
+            text, reply_markup=reply_markup, parse_mode="Markdown", disable_web_page_preview=True
         )
     else:
         await update.message.reply_text(
-            text, 
-            reply_markup=InlineKeyboardMarkup(buttons), 
-            parse_mode="Markdown",
-            disable_web_page_preview=True
+            text, reply_markup=reply_markup, parse_mode="Markdown", disable_web_page_preview=True
         )
 
 async def list_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handles the Prev/Next button clicks"""
     query = update.callback_query
     await query.answer()
 
     if query.from_user.id != OWNER_ID:
         await query.answer("ʏᴏᴜ ᴀʀᴇ ɴᴏᴛ ᴛʜᴇ ᴏᴡɴᴇʀ", show_alert=True)
         return
-    
-    # Extract choice and page from callback data (e.g., plist_users_2)
+
     data_parts = query.data.split("_")
     choice = data_parts[1]
     page = int(data_parts[2])
