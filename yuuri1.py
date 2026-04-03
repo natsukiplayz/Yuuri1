@@ -3509,7 +3509,7 @@ async def user_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_data = await users_col.find_one({"username": {"$regex": f"^{query}$", "$options": "i"}})
         
         if user_data:
-            user_id = user_data.get("user_id") or user_data.get("_id")
+            user_id = user_data.get("user_id")
             label = f"👤 @{query}'ꜱ Uꜱᴇʀ Iᴅ"
         else:
             try:
