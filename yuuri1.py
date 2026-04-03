@@ -1287,33 +1287,30 @@ import os
 from datetime import datetime, timezone
 
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # 1. Security check
-    if update.effective_user.id != OWNER_IDS:
+    if update.effective_user.id != OWNER_ID:
         return
 
-    # 2. Calculate Uptime
     now = datetime.now(timezone.utc)
     uptime_delta = now - BOT_START_TIME
+    
+    days = uptime_delta.days
     hours, remainder = divmod(uptime_delta.seconds, 3600)
     minutes, seconds = divmod(remainder, 60)
-    uptime_str = f"{hours}ʜ {minutes}ᴍ {seconds}ꜱ"
+    
+    uptime_str = f"{days}ᴅ {hours}ʜ {minutes}ᴍ {seconds}ꜱ"
 
-    # 3. Calculate REAL RAM (Bot only)
     process = psutil.Process(os.getpid())
     ram_mb = round(process.memory_info().rss / (1024 ** 2), 1)
-    
-    # Getting system percentage for the look, but using Real MB for the value
+
     sys_ram = psutil.virtual_memory()
     ram_str = f"{sys_ram.percent}% ({ram_mb} MB)"
 
-    # 4. Database Queries
     chats_col = db["chats"]
     groups = chats_col.count_documents({"type": {"$in": ["group", "supergroup"]}})
     private = chats_col.count_documents({"type": "private"})
     blocked = users.count_documents({"blocked": True})
     total_users = users.count_documents({})
 
-    # 5. UI - Compact & Fixed
     text = (
         "📊 **𝗬𝘂𝘂𝗿𝗶 𝗕𝗼𝘁 𝗦𝘁𝗮𝘁𝘀**\n\n"
         f"👥 Gʀᴏᴜᴘꜱ : `{groups}`\n"
