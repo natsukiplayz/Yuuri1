@@ -3485,7 +3485,6 @@ from telegram.ext import ContextTypes
 from telegram.error import BadRequest
 
 async def user_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Use effective_message to prevent NoneType errors from edited messages/channel posts
     msg = update.effective_message
     if not msg:
         return
@@ -3503,22 +3502,30 @@ async def user_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # 2. HANDLE USERNAME ARGUMENT (/id @username)
     elif context.args:
-        # Clean the input (remove @ and whitespace)
-        target = context.args[0].strip().replace("@", "")
+        query = context.args[0].strip().replace("@", "")
         
-        try:
-            # Use get_chat to find the user/chat by username
-            target_chat = await context.bot.get_chat(target)
-            user_id = target_chat.id
-            label = f"👤 Uꜱᴇʀ Iᴅ (@{target})"
-        except (BadRequest, Exception):
-            # The exact error message you requested
-            error_text = (
-                "⚠️ Uꜱᴇʀ Nᴏᴛ Fᴏᴜɴᴅ.\n"
-                "I ᴄᴏᴜʟᴅ ɴᴏᴛ ғɪɴᴅ ᴀɴʏ ᴜꜱᴇʀ ᴡɪᴛʜ ᴛʜᴀᴛ ᴜꜱᴇʀɴᴀᴍᴇ ɪɴ ᴍʏ ᴅᴀᴛᴀʙᴀꜱᴇ."
-            )
-            await msg.reply_text(error_text)
-            return
+        # Search in your async MongoDB collection (users_col)
+        # Using regex for case-insensitive matching
+        user_data = await users_col.find_one({"username": {"$regex": f"^{query}$", "$options": "i"}})
+        
+        if user_data:
+            # Note: Ensure your DB stores the ID as 'user_id' or '_id'
+            user_id = user_data.get("user_id") or user_data.get("_id")
+            label = f"👤 @{query}'ꜱ Uꜱᴇʀ Iᴅ"
+        else:
+            # Fallback to Telegram API if not in DB
+            try:
+                target_chat = await context.bot.get_chat(query)
+                user_id = target_chat.id
+                label = f"👤 @{query}'ꜱ Uꜱᴇʀ Iᴅ"
+            except (BadRequest, Exception):
+                # The exact error message you requested
+                error_text = (
+                    "⚠️ Uꜱᴇʀ Nᴏᴛ Fᴏᴜɴᴅ.\n"
+                    "I ᴄᴏᴜʟᴅ ɴᴏᴛ ғɪɴᴅ ᴀɴʏ ᴜꜱᴇʀ ᴡɪᴛʜ ᴛʜᴀᴛ ᴜꜱᴇʀɴᴀᴍᴇ ɪɴ ᴍʏ ᴅᴀᴛᴀʙᴀꜱᴇ."
+                )
+                await msg.reply_text(error_text)
+                return
 
     # 3. DEFAULT TO SENDER
     else:
