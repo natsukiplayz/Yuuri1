@@ -3486,46 +3486,53 @@ from telegram.error import BadRequest
 
 async def user_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
-    user = msg.from_user
     chat = update.effective_chat
     
+    # Initialize variables
     user_id = None
     label = "👤 Uꜱᴇʀ Iᴅ"
 
-    # 1. Check if it's a reply
+    # 1. Handle Reply
     if msg.reply_to_message:
-        target_user = msg.reply_to_message.from_user
-        user_id = target_user.id
+        user_id = msg.reply_to_message.from_user.id
         label = "👤 Rᴇᴘʟɪᴇᴅ Uꜱᴇʀ Iᴅ"
-        
-    # 2. Check if a username was provided as an argument (e.g., /id @username)
+
+    # 2. Handle Username Argument (/id @username)
     elif context.args:
-        username = context.args[0].replace("@", "")
-        try:
-            # Attempt to fetch chat info by username
-            target_chat = await context.bot.get_chat(username)
-            user_id = target_chat.id
-            label = f"👤 Uꜱᴇʀ Iᴅ (@{username})"
-        except (BadRequest, Exception):
-            # Error message if user is not found
-            error_text = (
-                "⚠️ Uꜱᴇʀ Nᴏᴛ Fᴏᴜɴᴅ.\n"
-                "I ᴄᴏᴜʟᴅ ɴᴏᴛ ғɪɴᴅ ᴀɴʏ ᴜꜱᴇʀ ᴡɪᴛʜ ᴛʜᴀᴛ ᴜꜱᴇʀɴᴀᴍᴇ ɪɴ ᴍʏ ᴅᴀᴛᴀʙᴀꜱᴇ."
-            )
-            await msg.reply_text(error_text)
-            return
+        # Get the first argument and remove the '@'
+        target = context.args[0].replace("@", "")
+        
+        # If it's a numeric ID instead of a username
+        if target.isdigit() or (target.startswith("-") and target[1:].isdigit()):
+            user_id = target
+        else:
+            try:
+                # Attempt to find the user via Telegram's API
+                resolved_chat = await context.bot.get_chat(target)
+                user_id = resolved_chat.id
+                label = f"👤 Uꜱᴇʀ Iᴅ (@{target})"
+            except (BadRequest, Exception):
+                # If user is not found or bot hasn't "seen" them
+                error_text = (
+                    "⚠️ Uꜱᴇʀ Nᴏᴛ Fᴏᴜɴᴅ.\n"
+                    "I ᴄᴏᴜʟᴅ ɴᴏᴛ ғɪɴᴅ ᴀɴʏ ᴜꜱᴇʀ ᴡɪᴛʜ ᴛʜᴀᴛ ᴜꜱᴇʀɴᴀᴍᴇ ɪɴ ᴍʏ ᴅᴀᴛᴀʙᴀꜱᴇ."
+                )
+                await msg.reply_text(error_text)
+                return
 
-    # 3. Default to the command sender
+    # 3. Handle Self (Default)
     else:
-        user_id = user.id
+        user_id = msg.from_user.id
+        label = "👤 Uꜱᴇʀ Iᴅ"
 
-    # Final Response Construction
+    # Final output
     text = (
         f"{label}: `{user_id}`\n"
         f"👥 Gʀᴏᴜᴘ Iᴅ: `{chat.id}`"
     )
 
     await msg.reply_text(text, parse_mode="Markdown")
+
 
 from telegram.constants import ChatMemberStatus
 
