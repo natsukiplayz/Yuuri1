@@ -334,108 +334,99 @@ def get_fancy_text(text, font_type):
 
 #============ Side_Features ========
 #--
-import logging
-from datetime import datetime
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler
+from telegram.ext import ContextTypes
 
-# ================= CONFIG =================
-# Replace with your actual owner ID if different
-OWNER_ID = 5773908061 
-
-# ================= LIST LOGIC =================
-
-async def list_manager(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Main command handler for /list [users|groups]"""
-    if update.effective_user.id != OWNER_ID:
-        return
-
-    if not context.args:
-        await update.message.reply_text("ᴘʟᴇᴀsᴇ sᴘᴇᴄɪꜰʏ ᴜsᴇʀs ᴏʀ ɢʀᴏᴜᴘs")
-        return
-
-    choice = context.args[0].lower()
-    await show_page(update, context, choice, page=1)
+# Update these to match your actual database logic
+# We use async_db because this is an async function
+users_col = async_db["users"]
+groups_col = async_db["chats"] # Changed to 'chats' to see all 1000+ groups
 
 async def show_page(update: Update, context: ContextTypes.DEFAULT_TYPE, choice: str, page: int):
-    """Handles data fetching and message rendering"""
     limit = 10
     skip = (page - 1) * limit
 
-    # Pointing to your existing async collections
-    if choice == "users":
-        collection = users_col 
-        title = "ᴜsᴇʀ ʟɪsᴛ"
-    elif choice == "groups":
-        collection = groups_col
-        title = "ɢʀᴏᴜᴘ ʟɪsᴛ"
-    else:
-        await update.effective_message.reply_text("ɪɴᴠᴀʟɪᴅ ᴏᴘᴛɪᴏɴ. ᴜsᴇ ᴜsᴇʀs ᴏʀ ɢʀᴏᴜᴘs")
-        return
-
-    # Fetch data and total count
-    total = await collection.count_documents({})
-    data = await collection.find().skip(skip).limit(limit).to_list(length=limit)
-
-    if not data:
-        await update.effective_message.reply_text("ɴᴏ ᴅᴀᴛᴀ ꜰᴏᴜɴᴅ ɪɴ ᴅʙ")
-        return
-
-    total_pages = ((total - 1) // limit) + 1
-    text = f"📖 **{title}** (ᴘᴀɢᴇ: {page}/{total_pages})\n\n"
-
-    for i, item in enumerate(data, start=skip + 1):
+    try:
         if choice == "users":
-            # Multi-key check for IDs and Names to avoid 'None'
-            uid = item.get('user_id') or item.get('id') or item.get('_id')
-            uname = item.get('username') or item.get('user_name', 'No Username')
-            raw_name = item.get('first_name') or item.get('name') or 'Unknown'
-            name = str(raw_name).replace("@", "")
-            text += f"{i}. {name} | `{uid}` | @{uname}\n"
+            collection = users_col 
+            title = "ᴜsᴇʀ ʟɪsᴛ"
+            # Using your 'id' field from get_user function
+            total = await collection.count_documents({})
+        elif choice == "groups":
+            collection = groups_col
+            title = "ɢʀᴏᴜᴘ ʟɪsᴛ"
+            # Matching your stats command filter
+            total = await collection.count_documents({"type": {"$in": ["group", "supergroup"]}})
         else:
-            # Group specific formatting
-            gid = item.get('chat_id') or item.get('id') or item.get('_id')
-            gname = item.get('title') or item.get('group_name') or 'Unknown Group'
-            link = item.get('invite_link') or item.get('link') or 'No Link'
-            members = item.get('members_count') or item.get('user_count') or '0'
-            text += f"{i}. **{gname}**\nID: `{gid}` | ᴍᴇᴍʙᴇʀs: {members}\nʟɪɴᴋ: {link}\n\n"
+            return
 
-    # Navigation Buttons
-    buttons = []
-    nav_row = []
-    if page > 1:
-        nav_row.append(InlineKeyboardButton("ᴘʀᴇᴠ", callback_data=f"plist_{choice}_{page-1}"))
-    if (page * limit) < total:
-        nav_row.append(InlineKeyboardButton("ɴᴇxᴛ", callback_data=f"plist_{choice}_{page+1}"))
-    
-    if nav_row:
-        buttons.append(nav_row)
+        # Fetch data
+        if choice == "groups":
+            cursor = collection.find({"type": {"$in": ["group", "supergroup"]}}).skip(skip).limit(limit)
+        else:
+            cursor = collection.find({}).skip(skip).limit(limit)
+            
+        data = await cursor.to_list(length=limit)
 
-    # UI Update Logic
-    reply_markup = InlineKeyboardMarkup(buttons)
-    if update.callback_query:
-        await update.callback_query.edit_message_text(
-            text, reply_markup=reply_markup, parse_mode="Markdown", disable_web_page_preview=True
-        )
-    else:
-        await update.message.reply_text(
-            text, reply_markup=reply_markup, parse_mode="Markdown", disable_web_page_preview=True
-        )
+        if not data:
+            await update.effective_message.reply_text("ɴᴏ ᴅᴀᴛᴀ ꜰᴏᴜɴᴅ ɪɴ ᴅʙ")
+            return
 
-async def list_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handles the Prev/Next button clicks"""
-    query = update.callback_query
-    await query.answer()
+        total_pages = ((total - 1) // limit) + 1
+        text = f"📖 **{title}** (ᴘᴀɢᴇ: {page}/{total_pages})\n\n"
 
-    if query.from_user.id != OWNER_ID:
-        await query.answer("ʏᴏᴜ ᴀʀᴇ ɴᴏᴛ ᴛʜᴇ ᴏᴡɴᴇʀ", show_alert=True)
-        return
+        for i, item in enumerate(data, start=skip + 1):
+            if choice == "users":
+                # Aligned with your get_user() keys: 'id', 'name', 'username'
+                uid = item.get('id') or item.get('user_id') or "N/A"
+                uname = item.get('username') or "No Username"
+                name = str(item.get('name') or "Unknown").replace("@", "")
+                
+                # Using <code> for ID and Username
+                text += f"{i}. {name} | <code>{uid}</code> | <code>@{uname}</code>\n"
+            
+            else:
+                # Aligned with Telegram Chat object keys
+                gid = item.get('id') or item.get('chat_id')
+                gname = item.get('title') or "Unknown Group"
+                # Using <code> for Group ID
+                text += f"{i}. **{gname}**\nID: <code>{gid}</code>\n\n"
 
-    data_parts = query.data.split("_")
-    choice = data_parts[1]
-    page = int(data_parts[2])
-    
-    await show_page(update, context, choice, page)
+        buttons = []
+        nav_row = []
+        if page > 1:
+            nav_row.append(InlineKeyboardButton("ᴘʀᴇᴠ", callback_data=f"plist_{choice}_{page-1}"))
+        if (page * limit) < total:
+            nav_row.append(InlineKeyboardButton("ɴᴇxᴛ", callback_data=f"plist_{choice}_{page+1}"))
+        
+        if nav_row:
+            buttons.append(nav_row)
+
+        reply_markup = InlineKeyboardMarkup(buttons)
+
+        if update.callback_query:
+            await update.callback_query.edit_message_text(
+                text, 
+                reply_markup=reply_markup, 
+                parse_mode="HTML", # Changed to HTML for <code> tags
+                disable_web_page_preview=True
+            )
+        else:
+            await update.message.reply_text(
+                text, 
+                reply_markup=reply_markup, 
+                parse_mode="HTML", 
+                disable_web_page_preview=True
+            )
+
+    except Exception as e:
+        import logging
+        logging.error(f"Error in list: {e}")
+        # Send error to chat so you can see why it stops at Page 3
+        if update.callback_query:
+            await update.callback_query.message.reply_text(f"⚠️ ᴇʀʀᴏʀ: <code>{e}</code>", parse_mode="HTML")
+        else:
+            await update.message.reply_text(f"⚠️ ᴇʀʀᴏʀ: <code>{e}</code>", parse_mode="HTML")
 
 #======= voice =======
 import os
