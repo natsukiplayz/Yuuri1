@@ -3483,6 +3483,7 @@ async def heist_result_timer(context: ContextTypes.DEFAULT_TYPE):
 from telegram import Update
 from telegram.ext import ContextTypes
 from telegram.error import BadRequest
+from telegram.constants import ParseMode
 
 async def user_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
@@ -3500,31 +3501,27 @@ async def user_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             user_id = target_user.id
             label = "👤 Rᴇᴘʟɪᴇᴅ Uꜱᴇʀ Iᴅ"
 
-    # 2. HANDLE USERNAME ARGUMENT (/id @username)
+    # 2. HANDLE USERNAME ARGUMENT
     elif context.args:
         query = context.args[0].strip().replace("@", "")
         
-        # Search in your async MongoDB collection (users_col)
-        # Using regex for case-insensitive matching
+        # SEARCH DB (Use users_col for async)
         user_data = await users_col.find_one({"username": {"$regex": f"^{query}$", "$options": "i"}})
         
         if user_data:
-            # Note: Ensure your DB stores the ID as 'user_id' or '_id'
             user_id = user_data.get("user_id") or user_data.get("_id")
             label = f"👤 @{query}'ꜱ Uꜱᴇʀ Iᴅ"
         else:
-            # Fallback to Telegram API if not in DB
             try:
                 target_chat = await context.bot.get_chat(query)
                 user_id = target_chat.id
                 label = f"👤 @{query}'ꜱ Uꜱᴇʀ Iᴅ"
             except (BadRequest, Exception):
-                # The exact error message you requested
                 error_text = (
-                    "⚠️ Uꜱᴇʀ Nᴏᴛ Fᴏᴜɴᴅ.\n"
+                    "⚠️ <b>Uꜱᴇʀ Nᴏᴛ Fᴏᴜɴᴅ.</b>\n"
                     "I ᴄᴏᴜʟᴅ ɴᴏᴛ ғɪɴᴅ ᴀɴʏ ᴜꜱᴇʀ ᴡɪᴛʜ ᴛʜᴀᴛ ᴜꜱᴇʀɴᴀᴍᴇ ɪɴ ᴍʏ ᴅᴀᴛᴀʙᴀꜱᴇ."
                 )
-                await msg.reply_text(error_text)
+                await msg.reply_text(error_text, parse_mode=ParseMode.HTML)
                 return
 
     # 3. DEFAULT TO SENDER
@@ -3532,13 +3529,13 @@ async def user_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id = update.effective_user.id
         label = "👤 Uꜱᴇʀ Iᴅ"
 
-    # Final Response
+    # Final Response using HTML to avoid underscore (_) crashes
     text = (
-        f"{label}: `{user_id}`\n"
-        f"👥 Gʀᴏᴜᴘ Iᴅ: `{chat.id}`"
+        f"{label}: <code>{user_id}</code>\n"
+        f"👥 Gʀᴏᴜᴘ Iᴅ: <code>{chat.id}</code>"
     )
 
-    await msg.reply_text(text, parse_mode="Markdown")
+    await msg.reply_text(text, parse_mode=ParseMode.HTML)
 
 from telegram.constants import ChatMemberStatus
 
