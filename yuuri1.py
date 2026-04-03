@@ -334,48 +334,43 @@ def get_fancy_text(text, font_type):
 
 #============ Side_Features ========
 #--
-# ================= LIST FEATURE (UNIFIED) =================
+import html
+import logging
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.ext import ContextTypes
+
+# ================= LIST FEATURE =================
 
 async def list_manager(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Initial command handler for /list [users|groups]"""
     if update.effective_user.id != OWNER_ID:
         return
-
     if not context.args:
         await update.message.reply_text("ᴘʟᴇᴀsᴇ sᴘᴇᴄɪꜰʏ <b>ᴜsᴇʀs</b> ᴏʀ <b>ɢʀᴏᴜᴘs</b>", parse_mode="HTML")
         return
-
     choice = context.args[0].lower()
     await show_page(update, context, choice, page=1)
 
-import html # Needed for escaping bad characters
-
 async def show_page(update: Update, context: ContextTypes.DEFAULT_TYPE, choice: str, page: int):
-    """Logic to fetch and display the paginated list"""
     limit = 10
     skip = (page - 1) * limit
-
     try:
         if choice == "users":
-            # Using the async collection for users
             collection = async_db["users"] 
             query = {}  
             title = "ᴜsᴇʀ ʟɪsᴛ"
         elif choice == "groups":
-            # Using the EXACT collection and filter from your /stats command
             collection = async_db["chats"] 
             query = {"type": {"$in": ["group", "supergroup"]}}
             title = "ɢʀᴏᴜᴘ ʟɪsᴛ"
         else:
             return
 
-        # Fetch Data
         total = await collection.count_documents(query)
         cursor = collection.find(query).skip(skip).limit(limit)
         data = await cursor.to_list(length=limit)
 
         if not data:
-            await update.effective_message.reply_text("ɴᴏ ᴅᴀᴛᴀ ꜰᴏᴜɴᴅ ɪɴ ᴅʙ")
+            await update.effective_message.reply_text("ɴᴏ ᴅᴀᴛᴀ ꜰᴏᴜɴᴅ")
             return
 
         total_pages = ((total - 1) // limit) + 1
@@ -385,25 +380,16 @@ async def show_page(update: Update, context: ContextTypes.DEFAULT_TYPE, choice: 
             try:
                 if choice == "users":
                     uid = item.get('id') or item.get('user_id') or "N/A"
-                    # Escape HTML to prevent "Can't parse entities" error
-                    raw_uname = item.get('username') or "No Username"
-                    uname = html.escape(str(raw_uname))
-                    raw_name = item.get('name') or "Unknown"
-                    name = html.escape(str(raw_name)).replace("@", "")
-                    
+                    uname = html.escape(str(item.get('username') or "No Username"))
+                    name = html.escape(str(item.get('name') or "Unknown")).replace("@", "")
                     text += f"{i}. {name} | <code>{uid}</code> | <code>@{uname}</code>\n"
                 else:
-                    # Logic for Groups
                     gid = item.get('id') or item.get('chat_id')
-                    raw_title = item.get('title') or "Unknown Group"
-                    gname = html.escape(str(raw_title))
-                    
+                    gname = html.escape(str(item.get('title') or "Unknown Group"))
                     text += f"{i}. <b>{gname}</b>\nID: <code>{gid}</code>\n\n"
-            except Exception as row_err:
-                logging.error(f"Error in row {i}: {row_err}")
+            except:
                 continue
 
-        # Buttons
         buttons = []
         nav_row = []
         if page > 1:
@@ -412,25 +398,23 @@ async def show_page(update: Update, context: ContextTypes.DEFAULT_TYPE, choice: 
             nav_row.append(InlineKeyboardButton("ɴᴇxᴛ", callback_data=f"plist_{choice}_{page+1}"))
         if nav_row: buttons.append(nav_row)
 
+        markup = InlineKeyboardMarkup(buttons)
         if update.callback_query:
-            await update.callback_query.edit_message_text(
-                text, reply_markup=InlineKeyboardMarkup(buttons), 
-                parse_mode="HTML", disable_web_page_preview=True
-            )
+            await update.callback_query.edit_message_text(text, reply_markup=markup, parse_mode="HTML", disable_web_page_preview=True)
         else:
-            await update.message.reply_text(
-                text, reply_markup=InlineKeyboardMarkup(buttons), 
-                parse_mode="HTML", disable_web_page_preview=True
-            )
-
+            await update.message.reply_text(text, reply_markup=markup, parse_mode="HTML", disable_web_page_preview=True)
     except Exception as e:
         logging.error(f"List Error: {e}")
-        # Show the error in chat so you can debug instantly
-        err_txt = f"⚠️ ᴇʀʀᴏʀ: <code>{html.escape(str(e))}</code>"
-        if update.callback_query:
-            await update.callback_query.message.reply_text(err_txt, parse_mode="HTML")
-        else:
-            await update.message.reply_text(err_txt, parse_mode="HTML")
+
+async def list_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """THIS IS THE MISSING FUNCTION"""
+    query = update.callback_query
+    await query.answer()
+    if query.from_user.id != OWNER_ID:
+        return
+    _, choice, page = query.data.split("_")
+    await show_page(update, context, choice, int(page))
+
 
 #======= voice =======
 import os
