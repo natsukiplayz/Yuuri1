@@ -3480,20 +3480,46 @@ async def heist_result_timer(context: ContextTypes.DEFAULT_TYPE):
 #===============Management_Commands============
 #--
 #===user_id_command======
-async def user_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+from telegram import Update
+from telegram.ext import ContextTypes
+from telegram.error import BadRequest
 
+async def user_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
     user = msg.from_user
     chat = update.effective_chat
+    
+    user_id = None
+    label = "👤 Uꜱᴇʀ Iᴅ"
 
+    # 1. Check if it's a reply
     if msg.reply_to_message:
         target_user = msg.reply_to_message.from_user
         user_id = target_user.id
         label = "👤 Rᴇᴘʟɪᴇᴅ Uꜱᴇʀ Iᴅ"
+        
+    # 2. Check if a username was provided as an argument (e.g., /id @username)
+    elif context.args:
+        username = context.args[0].replace("@", "")
+        try:
+            # Attempt to fetch chat info by username
+            target_chat = await context.bot.get_chat(username)
+            user_id = target_chat.id
+            label = f"👤 Uꜱᴇʀ Iᴅ (@{username})"
+        except (BadRequest, Exception):
+            # Error message if user is not found
+            error_text = (
+                "⚠️ Uꜱᴇʀ Nᴏᴛ Fᴏᴜɴᴅ.\n"
+                "I ᴄᴏᴜʟᴅ ɴᴏᴛ ғɪɴᴅ ᴀɴʏ ᴜꜱᴇʀ ᴡɪᴛʜ ᴛʜᴀᴛ ᴜꜱᴇʀɴᴀᴍᴇ ɪɴ ᴍʏ ᴅᴀᴛᴀʙᴀꜱᴇ."
+            )
+            await msg.reply_text(error_text)
+            return
+
+    # 3. Default to the command sender
     else:
         user_id = user.id
-        label = "👤 Uꜱᴇʀ Iᴅ"
 
+    # Final Response Construction
     text = (
         f"{label}: `{user_id}`\n"
         f"👥 Gʀᴏᴜᴘ Iᴅ: `{chat.id}`"
