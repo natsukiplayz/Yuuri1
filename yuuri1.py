@@ -86,6 +86,8 @@ feedback_db = db["feedbacks"]
 
 # --- ASYNC COLLECTIONS (Specifically for 'await' commands) ---
 image_db = async_db["command_images"]
+users_col = async_db["users"]
+groups_col = async_db["saved_groups"] 
 
 # ================= LOG =================
 logging.basicConfig(level=logging.INFO)
