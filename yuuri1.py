@@ -348,26 +348,28 @@ async def list_manager(update: Update, context: ContextTypes.DEFAULT_TYPE):
     choice = context.args[0].lower()
     await show_page(update, context, choice, page=1)
 
+import html # Needed for escaping bad characters
+
 async def show_page(update: Update, context: ContextTypes.DEFAULT_TYPE, choice: str, page: int):
     """Logic to fetch and display the paginated list"""
     limit = 10
     skip = (page - 1) * limit
 
     try:
-        # 1. Setup Filters based on your DB keys
         if choice == "users":
-            collection = users_col 
-            query = {}  # All users
+            # Using the async collection for users
+            collection = async_db["users"] 
+            query = {}  
             title = "ᴜsᴇʀ ʟɪsᴛ"
         elif choice == "groups":
-            collection = async_db["chats"] # Targeted 'chats' collection
+            # Using the EXACT collection and filter from your /stats command
+            collection = async_db["chats"] 
             query = {"type": {"$in": ["group", "supergroup"]}}
             title = "ɢʀᴏᴜᴘ ʟɪsᴛ"
         else:
-            await update.effective_message.reply_text("ɪɴᴠᴀʟɪᴅ. ᴜsᴇ ᴜsᴇʀs ᴏʀ ɢʀᴏᴜᴘs")
             return
 
-        # 2. Fetch Total Count and Current Page Data
+        # Fetch Data
         total = await collection.count_documents(query)
         cursor = collection.find(query).skip(skip).limit(limit)
         data = await cursor.to_list(length=limit)
@@ -379,66 +381,56 @@ async def show_page(update: Update, context: ContextTypes.DEFAULT_TYPE, choice: 
         total_pages = ((total - 1) // limit) + 1
         text = f"📖 <b>{title}</b> (ᴘᴀɢᴇ: {page}/{total_pages})\n\n"
 
-        # 3. Format List Rows
         for i, item in enumerate(data, start=skip + 1):
             try:
                 if choice == "users":
-                    # Matches your get_user() function keys
                     uid = item.get('id') or item.get('user_id') or "N/A"
-                    uname = item.get('username') or "No Username"
-                    # Clean name to prevent @ tagging issues
-                    name = str(item.get('name') or "Unknown").replace("@", "")
+                    # Escape HTML to prevent "Can't parse entities" error
+                    raw_uname = item.get('username') or "No Username"
+                    uname = html.escape(str(raw_uname))
+                    raw_name = item.get('name') or "Unknown"
+                    name = html.escape(str(raw_name)).replace("@", "")
+                    
                     text += f"{i}. {name} | <code>{uid}</code> | <code>@{uname}</code>\n"
                 else:
-                    # Matches your chats collection keys
+                    # Logic for Groups
                     gid = item.get('id') or item.get('chat_id')
-                    gname = item.get('title') or "Unknown Group"
+                    raw_title = item.get('title') or "Unknown Group"
+                    gname = html.escape(str(raw_title))
+                    
                     text += f"{i}. <b>{gname}</b>\nID: <code>{gid}</code>\n\n"
-            except:
+            except Exception as row_err:
+                logging.error(f"Error in row {i}: {row_err}")
                 continue
 
-        # 4. Navigation Buttons
+        # Buttons
         buttons = []
         nav_row = []
         if page > 1:
             nav_row.append(InlineKeyboardButton("ᴘʀᴇᴠ", callback_data=f"plist_{choice}_{page-1}"))
         if (page * limit) < total:
             nav_row.append(InlineKeyboardButton("ɴᴇxᴛ", callback_data=f"plist_{choice}_{page+1}"))
-        
-        if nav_row:
-            buttons.append(nav_row)
+        if nav_row: buttons.append(nav_row)
 
-        # 5. Output with HTML Parse Mode
-        reply_markup = InlineKeyboardMarkup(buttons)
         if update.callback_query:
             await update.callback_query.edit_message_text(
-                text, reply_markup=reply_markup, parse_mode="HTML", disable_web_page_preview=True
+                text, reply_markup=InlineKeyboardMarkup(buttons), 
+                parse_mode="HTML", disable_web_page_preview=True
             )
         else:
             await update.message.reply_text(
-                text, reply_markup=reply_markup, parse_mode="HTML", disable_web_page_preview=True
+                text, reply_markup=InlineKeyboardMarkup(buttons), 
+                parse_mode="HTML", disable_web_page_preview=True
             )
 
     except Exception as e:
-        logging.error(f"Error in list: {e}")
-        error_text = f"⚠️ ᴇʀʀᴏʀ: <code>{e}</code>"
+        logging.error(f"List Error: {e}")
+        # Show the error in chat so you can debug instantly
+        err_txt = f"⚠️ ᴇʀʀᴏʀ: <code>{html.escape(str(e))}</code>"
         if update.callback_query:
-            await update.callback_query.message.reply_text(error_text, parse_mode="HTML")
+            await update.callback_query.message.reply_text(err_txt, parse_mode="HTML")
         else:
-            await update.message.reply_text(error_text, parse_mode="HTML")
-
-async def list_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handles click events for the navigation buttons"""
-    query = update.callback_query
-    await query.answer()
-
-    if query.from_user.id != OWNER_ID:
-        await query.answer("ʏᴏᴜ ᴀʀᴇ ɴᴏᴛ ᴛʜᴇ ᴏᴡɴᴇʀ", show_alert=True)
-        return
-
-    # Extract info from callback_data (e.g., plist_users_2)
-    _, choice, page = query.data.split("_")
-    await show_page(update, context, choice, int(page))
+            await update.message.reply_text(err_txt, parse_mode="HTML")
 
 #======= voice =======
 import os
