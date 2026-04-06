@@ -1862,6 +1862,40 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await msg.reply_text(text)
 
+# ===============balance======== 
+async def bal(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = update.effective_message
+    if not msg: return
+
+    # Determine who we are checking
+    target_user = msg.reply_to_message.from_user if msg.reply_to_message else update.effective_user
+    data = get_user(target_user) 
+
+    # --- DATA EXTRACTION ---
+    coins = data.get("coins", 0)
+    kills = data.get("kills", 0)
+    status = "💀 Dᴇᴀᴅ" if data.get("dead") else "❤️ Aʟɪᴠᴇ"
+    premium = data.get("premium", False)
+    icon = "💓" if premium else "👤"
+    
+    # --- WEALTH RANKING ---
+    bot_id = context.bot.id
+    wealth_rank = 1 + users.count_documents({
+        "id": {"$ne": bot_id}, 
+        "coins": {"$gt": coins}
+    })
+
+    # --- TEXT CONSTRUCTION ---
+    text = (
+        f"{icon} Nᴀᴍᴇ: {data.get('name', target_user.first_name)}\n"
+        f"💰 Cᴏɪɴꜱ: {coins:,}\n"
+        f"💸 Wᴇᴀʟᴛʜ Rᴀɴᴋ: {wealth_rank}\n"
+        f"🎯 Sᴛᴀᴛᴜꜱ: {status}\n"
+        f"⚔️ Kɪʟʟs: {kills:,}"
+    )
+
+    await msg.reply_text(text)
+
 # ======== ROB SYSTEM ========
 from datetime import datetime
 
@@ -4504,6 +4538,7 @@ application.add_handler(CommandHandler("voice", voice_msg_handler))
 application.add_handler(CommandHandler("setpng", set_png))
 application.add_handler(CommandHandler("claim", claim))
 application.add_handler(CommandHandler("help", help_command)) 
+application.add_handler(CommandHandler("bal", bal))
 
 # Message Handlers
 application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
