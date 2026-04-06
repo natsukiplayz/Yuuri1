@@ -1655,25 +1655,25 @@ HELP_TEXTS = {
         "💰 <b>𝐄𝐜𝐨𝐧𝐨𝐦𝐲 & 𝐖𝐞𝐚𝐥𝐭𝐡</b>\n"
         "<i>ɢʀɪɴᴅ, ᴛʀᴀᴅᴇ, ᴀɴᴅ sᴛᴀᴄᴋ ᴄᴀsʜ.</i>\n\n"
         "• <code>/daily</code> : ᴄʟᴀɪᴍ ᴅᴀɪʟʏ ᴄᴏɪɴs\n"
-        "• <code>/givee [ɪᴅ] [ᴀᴍᴛ]</code> : ᴛʀᴀɴsғᴇʀ ꜰᴜɴᴅs\n"
+        "• <code>/give [ɪᴅ] [ᴀᴍᴛ]</code> : ᴛʀᴀɴsғᴇʀ ꜰᴜɴᴅs\n"
         "• <code>/shop</code> | <code>/purchase</code> : ʙᴜʏ ɪᴛᴇᴍs\n"
         "• <code>/claim</code> : Cʟᴀɪᴍ Rᴇᴡᴀʀᴅꜱ Iɴ Gʀᴏᴜᴘꜱ\n"
         "• <code>/redeem [ᴄᴏᴅᴇ]</code> : ᴜsᴇ ᴘʀᴏᴍᴏ ᴄᴏᴅᴇ\n"
-        "• <code>/richest</code> : ᴡᴇᴀʟᴛʜ ʟᴇᴀᴅᴇʀʙᴏᴀʀᴅ"
+        "• <code>/toprich</code> : ᴡᴇᴀʟᴛʜ ʟᴇᴀᴅᴇʀʙᴏᴀʀᴅ"
     ),
     "help_game": (
         "🕹️ <b>𝐆𝐚𝐦𝐞 & 𝐂𝐨𝐦𝐛𝐚𝐭</b>\n"
         "<i>ʜᴜɴᴛ, ꜰɪɢʜᴛ, ᴀɴᴅ sᴜʀᴠɪᴠᴇ.</i>\n\n"
         "⚔️ <b>ᴄᴏᴍʙᴀᴛ</b>\n"
-        "• <code>/words [amount] [letters]</code> : Hᴏꜱᴛ Wᴏʀᴅ Gᴀᴍᴇ\n"
-        "• <code>/bet [amount]</code> : Jᴏɪɴ Tʜᴇ Wᴏʀᴅɢᴀᴍᴇ\n"
-        "• <code>/stab [reply]</code>: Kɪʟʟ Uꜱᴇʀꜱ\n"
-        "• <code>/steal [reply] [amount]</code> : ʀᴏʙ ᴢ-ᴄᴏɪɴs\n"
+        "• <code>/words [ᴀᴍᴛ] [ʟᴇᴛᴛᴇʀꜱ]</code> : Hᴏꜱᴛ Wᴏʀᴅ Gᴀᴍᴇ\n"
+        "• <code>/bet [ᴀᴍᴛ]</code> : Jᴏɪɴ Tʜᴇ Wᴏʀᴅɢᴀᴍᴇ\n"
+        "• <code>/kill [ʀᴇᴘʟʏ]</code>: Kɪʟʟ Uꜱᴇʀꜱ\n"
+        "• <code>/rob [ʀᴇᴘʟʏ] [ᴀᴍᴛ]</code> : ʀᴏʙ ᴢ-ᴄᴏɪɴs\n"
         "• <code>/revive</code> : ʙʀɪɴɢ ʙᴀᴄᴋ ᴛʜᴇ ᴅᴇᴀᴅ\n"
         "• <code>/protect</code> : ʜɪʀᴇ ᴀʀᴍᴏʀ\n\n"
         "📊 <b>sᴛᴀᴛs & ʀᴀɴᴋ</b>\n"
-        "• <code>/profile</code> : ᴠɪᴇᴡ ᴘʀᴏꜰɪʟᴇ\n"
-        "• <code>/topkillers</code> : ᴅᴇᴀᴅʟɪᴇsᴛ ᴘʟᴀʏᴇʀs\n"
+        "• <code>/bal</code> : ᴠɪᴇᴡ ᴘʀᴏꜰɪʟᴇ\n"
+        "• <code>/topkills</code> : ᴅᴇᴀᴅʟɪᴇsᴛ ᴘʟᴀʏᴇʀs\n"
         "• <code>/rankers</code> : ɢʟᴏʙᴀʟ ᴇxᴘ ʀᴀɴᴋs"
     ),
     "help_ai": (
@@ -1682,7 +1682,7 @@ HELP_TEXTS = {
         "• <code>/q</code> : ᴍᴀᴋᴇ ᴀ ǫᴜᴏᴛᴇ sᴛɪᴄᴋᴇʀ\n"
         "• <code>/font [ᴛᴇxᴛ]</code> : sᴛʏʟɪsʜ ᴛᴇxᴛ\n"
         "• <code>/id</code> : ɢᴇᴛ ᴜɴɪǫᴜᴇ ɪᴅs\n"
-        "• <code>/voice [reply]</code>: Tᴇxᴛ Tᴏ Vᴏɪᴄᴇ\n"
+        "• <code>/voice [ʀᴇᴘʟʏ]</code>: Tᴇxᴛ Tᴏ Vᴏɪᴄᴇ\n"
         "• <code>/feedback</code> : ʀᴇᴘᴏʀᴛ ɪssᴜᴇs"
     ),
     "help_social": (
@@ -1691,7 +1691,7 @@ HELP_TEXTS = {
         "• <code>/kiss</code> | <code>/hug</code> | <code>/slap</code>\n"
         "• <code>/bite</code> | <code>/punch</code>\n"
         "• <code>/referral</code> : ɪɴᴠɪᴛᴇ ꜰʀɪᴇɴᴅs\n"
-        "• <code>/stats</code> : ᴄʜᴀᴛ sᴛᴀᴛɪsᴛɪᴄs"
+        "• <code>/stats</code> : ᴄʜᴀᴛ sᴛᴀᴛɪsᴛɪᴄs(ᴏᴡɴᴇʀ ᴏɴʟʏ)"
     )
 }
 
@@ -2546,78 +2546,96 @@ async def rullrank(update: Update, context: ContextTypes.DEFAULT_TYPE):
 #--
 import asyncio
 import time
+import json
+import os
 from telegram import Update
 from telegram.constants import ParseMode
-from telegram.ext import ContextTypes, CommandHandler
+from telegram.ext import ContextTypes
 
-# --- 1. CONFIGURATION & STATE ---
-# Ensure OWNER_ID is defined elsewhere in your 4000 lines.
-# This helper handles both single IDs or lists of IDs.
+HISTORY_FILE = "broadcast_history.json"
+
 def is_owner(user_id):
     if 'OWNER_ID' in globals():
         owners = OWNER_ID if isinstance(OWNER_ID, list) else [OWNER_ID]
         return user_id in owners
     return False
 
-broadcast_control = {"running": False, "cancel": False}
-broadcast_history = {"last_broadcast": []} # Stores (chat_id, msg_id) for deletion
+def load_history():
+    if os.path.exists(HISTORY_FILE):
+        with open(HISTORY_FILE, "r") as f:
+            try:
+                return json.load(f)
+            except:
+                return {"private": [], "groups": []}
+    return {"private": [], "groups": []}
 
-# --- 2. THE FORWARD ENGINE ---
-async def perform_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE, target_chats, is_group=False):
+def save_history(data):
+    with open(HISTORY_FILE, "w") as f:
+        json.dump(data, f, indent=4)
+
+broadcast_control = {"running": False, "cancel": False}
+
+async def perform_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE, target_chats, is_group=False, mode="forward"):
     if not is_owner(update.effective_user.id):
         return await update.message.reply_text("❌ Uɴᴀᴜᴛʜᴏʀɪᴢᴇᴅ")
 
     if broadcast_control["running"]:
         return await update.message.reply_text("⚠️ Aɴᴏᴛʜᴇʀ ʙʀᴏᴀᴅᴄᴀsᴛ ɪs ᴄᴜʀʀᴇɴᴛʟʏ ʀᴜɴɴɪɴɢ!")
 
-    # Determine source message
-    if update.message.reply_to_message:
-        target_msg_id = update.message.reply_to_message.message_id
-        from_chat_id = update.effective_chat.id
-    else:
-        # If not replying, we forward the command message itself
-        if not context.args:
-            return await update.message.reply_text("❌ Rᴇᴘʟʏ ᴛᴏ ᴀ ᴍᴇssᴀɢᴇ ᴛᴏ ꜰᴏʀᴡᴀʀᴅ ɪᴛ.")
-        target_msg_id = update.message.message_id
-        from_chat_id = update.effective_chat.id
+    if not update.message.reply_to_message:
+        return await update.message.reply_text("❌ Rᴇᴘʟʏ ᴛᴏ ᴀ ᴍᴇssᴀɢᴇ ᴛᴏ ʙʀᴏᴀᴅᴄᴀsᴛ.")
 
+    target_msg_id = update.message.reply_to_message.message_id
+    from_chat_id = update.effective_chat.id
     total = len(target_chats)
-    if total == 0:
-        return await update.message.reply_text("❌ Nᴏ ᴄʜᴀᴛs ꜰᴏᴜɴᴅ ɪɴ ᴅᴀᴛᴀʙᴀsᴇ.")
 
-    # Initialize Broadcast
+    if total == 0:
+        return await update.message.reply_text("❌ Nᴏ ᴄʜᴀᴛs ꜰᴏᴜɴᴅ.")
+
     broadcast_control["running"] = True
     broadcast_control["cancel"] = False
-    broadcast_history["last_broadcast"] = [] 
-
+    
+    current_results = []
     success, failed = 0, 0
     start_time = time.time()
     label = "Gʀᴏᴜᴘ" if is_group else "Pʀɪᴠᴀᴛᴇ"
-    progress_msg = await update.message.reply_text(f"🚀 Sᴛᴀʀᴛɪɴɢ {label} Fᴏʀᴡᴀʀᴅ Bʀᴏᴀᴅᴄᴀsᴛ...")
+    progress_msg = await update.message.reply_text(f"🚀 Sᴛᴀʀᴛɪɴɢ {label} ({mode}) Bʀᴏᴀᴅᴄᴀsᴛ...")
 
     for i, chat in enumerate(target_chats, start=1):
         if broadcast_control["cancel"]:
             break
 
         try:
-            # ✨ forward_message preserves the "Forwarded From" tag
-            sent = await context.bot.forward_message(
-                chat_id=chat["id"],
-                from_chat_id=from_chat_id,
-                message_id=target_msg_id
-            )
-            broadcast_history["last_broadcast"].append((chat["id"], sent.message_id))
+            if mode == "forward":
+                sent = await context.bot.forward_message(
+                    chat_id=chat["id"],
+                    from_chat_id=from_chat_id,
+                    message_id=target_msg_id
+                )
+            else:
+                sent = await context.bot.copy_message(
+                    chat_id=chat["id"],
+                    from_chat_id=from_chat_id,
+                    message_id=target_msg_id
+                )
+            
+            current_results.append({"c": chat["id"], "m": sent.message_id})
+            
+            if is_group:
+                try:
+                    await context.bot.pin_chat_message(chat_id=chat["id"], message_id=sent.message_id)
+                except: pass
+                
             success += 1
         except Exception:
             failed += 1
 
-        # Update Progress UI
         if i % 10 == 0 or i == total:
             percent = int((i / total) * 100)
             bar = "█" * (percent // 10) + "░" * (10 - (percent // 10))
             try:
                 await progress_msg.edit_text(
-                    f"📊 <b>{label} Fᴏʀᴡᴀʀᴅɪɴɢ...</b>\n\n"
+                    f"📊 <b>{label} Bʀᴏᴀᴅᴄᴀsᴛɪɴɢ...</b>\n\n"
                     f"<code>[{bar}]</code> {percent}%\n"
                     f"✅ Sᴜᴄᴄᴇss: {success}\n"
                     f"❌ Fᴀɪʟᴇᴅ: {failed}\n"
@@ -2625,62 +2643,71 @@ async def perform_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE, 
                     parse_mode=ParseMode.HTML
                 )
             except: pass
+        await asyncio.sleep(0.08)
 
-        await asyncio.sleep(0.08) # Rate limit safety
+    history = load_history()
+    history["groups" if is_group else "private"].append(current_results)
+    save_history(history)
 
     broadcast_control["running"] = False
     status = "🛑 Sᴛᴏᴘᴘᴇᴅ" if broadcast_control["cancel"] else "✅ Cᴏᴍᴘʟᴇᴛᴇᴅ"
 
     await progress_msg.edit_text(
         f"📢 <b>{label} Bʀᴏᴀᴅᴄᴀsᴛ {status}</b>\n\n"
-        f"✅ Fᴏʀᴡᴀʀᴅᴇᴅ: {success}\n"
+        f"✅ Sᴇɴᴛ: {success}\n"
         f"❌ Fᴀɪʟᴇᴅ: {failed}\n"
         f"⏱ Tɪᴍᴇ: {round(time.time() - start_time, 2)}s",
         parse_mode=ParseMode.HTML
     )
 
-# --- 3. COMMAND HANDLERS ---
-
 async def broad_c(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """/broad - Broadcast to all private chats"""
-    # Assuming 'db' is your MongoDB client and it tracks users
+    mode = "forward"
+    if context.args and context.args[0].lower() == "normal":
+        mode = "normal"
     all_privates = list(db["chats"].find({"type": "private"}))
-    await perform_broadcast(update, context, all_privates, is_group=False)
+    await perform_broadcast(update, context, all_privates, is_group=False, mode=mode)
 
 async def broad_gc(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """/gbroad - Broadcast to all groups"""
+    mode = "forward"
+    if context.args and context.args[0].lower() == "normal":
+        mode = "normal"
     all_groups = list(db["chats"].find({"type": {"$in": ["group", "supergroup"]}}))
-    await perform_broadcast(update, context, all_groups, is_group=True)
+    await perform_broadcast(update, context, all_groups, is_group=True, mode=mode)
 
 async def stop_broad(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """/stopbroad - Halts the current broadcast loop"""
     if not is_owner(update.effective_user.id): return
-    if not broadcast_control["running"]:
-        return await update.message.reply_text("❌ Nᴏ ᴀᴄᴛɪᴠᴇ ʙʀᴏᴀᴅᴄᴀsᴛ ᴛᴏ sᴛᴏᴘ.")
-
     broadcast_control["cancel"] = True
-    await update.message.reply_text("🛑 Sᴛᴏᴘ ʀᴇǫᴜᴇsᴛ sᴇɴᴛ. Tʜᴇ ʟᴏᴏᴘ ᴡɪʟʟ ʜᴀʟᴛ sʜᴏʀᴛʟʏ.")
+    await update.message.reply_text("🛑 Sᴛᴏᴘ ʀᴇǫᴜᴇsᴛ sᴇɴᴛ.")
 
 async def del_broad(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """/delbroad - Deletes all messages sent in the last broadcast"""
     if not is_owner(update.effective_user.id): return
+    if len(context.args) < 2:
+        return await update.message.reply_text("❌ Usᴀɢᴇ: /del_broad [private|groups] [number]")
 
-    history = broadcast_history["last_broadcast"]
-    if not history:
-        return await update.message.reply_text("❌ Nᴏ ʀᴇᴄᴇɴᴛ ʙʀᴏᴀᴅᴄᴀsᴛ ᴅᴀᴛᴀ ꜰᴏᴜɴᴅ.")
+    target_type = context.args[0].lower()
+    try:
+        index = int(context.args[1]) - 1
+    except:
+        return await update.message.reply_text("❌ Pʟᴇᴀsᴇ ᴘʀᴏᴠɪᴅᴇ ᴀ ᴠᴀʟɪᴅ ɴᴜᴍʙᴇʀ.")
 
-    status_msg = await update.message.reply_text("🗑️ Dᴇʟᴇᴛɪɴɢ ᴍᴇssᴀɢᴇs ꜰʀᴏᴍ ʟᴀsᴛ ʙʀᴏᴀᴅᴄᴀsᴛ...")
+    history = load_history()
+    if target_type not in history or index < 0 or index >= len(history[target_type]):
+        return await update.message.reply_text(f"❌ Bʀᴏᴀᴅᴄᴀsᴛ #{index + 1} ɴᴏᴛ ғᴏᴜɴᴅ.")
+
+    target_data = history[target_type][index]
+    status_msg = await update.message.reply_text(f"🗑️ Dᴇʟᴇᴛɪɴɢ ʙʀᴏᴀᴅᴄᴀsᴛ #{index + 1}...")
+    
     deleted = 0
-
-    for chat_id, msg_id in history:
+    for item in target_data:
         try:
-            await context.bot.delete_message(chat_id=chat_id, message_id=msg_id)
+            await context.bot.delete_message(chat_id=item["c"], message_id=item["m"])
             deleted += 1
         except: pass
         await asyncio.sleep(0.05)
 
-    broadcast_history["last_broadcast"] = [] # Clear history after deletion
-    await status_msg.edit_text(f"✅ Sᴜᴄᴄᴇssꜰᴜʟʟʏ ᴅᴇʟᴇᴛᴇᴅ {deleted} ᴍᴇssᴀɢᴇs.")
+    history[target_type].pop(index)
+    save_history(history)
+    await status_msg.edit_text(f"✅ Dᴇʟᴇᴛᴇᴅ {deleted} ᴍᴇssᴀɢᴇs ꜰʀᴏᴍ ʙʀᴏᴀᴅᴄᴀsᴛ #{index + 1}.")
 
 #===============Mini_Upgrades===============
 #--
