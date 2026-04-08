@@ -2460,81 +2460,95 @@ async def purchase(update: Update, context: ContextTypes.DEFAULT_TYPE):
 #===================top_players_command=================
 #--
 import html
+from telegram import Update
+from telegram.constants import ParseMode
+from telegram.ext import ContextTypes
 
 #=====Top_rhichest=====
 async def richest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Sort by coins (descending)
     top_list = users.find({"id": {"$ne": context.bot.id}}).sort("coins", -1).limit(10)
-    
+
     text = "🏆 <b>Tᴏᴘ 10 Rɪᴄʜᴇꜱᴛ Uꜱᴇʀꜱ:</b>\n\n"
-    
+
     for i, user in enumerate(top_list, start=1):
-        # 🛡️ FIX 1: Prevent 'NoneType' crash if a DB record is somehow null
         if not user:
             continue
-            
+
+        user_id = user.get("id")
         raw_name = user.get("name", "Uɴᴋɴᴏᴡɴ")
-        # 🛡️ FIX 2: Escape names to prevent HTML parsing crashes (Fixes the "<3" bug)
         safe_name = html.escape(str(raw_name))
         
+        # Create clickable link using User ID
+        clickable_name = f'<a href="tg://user?id={user_id}">{safe_name}</a>'
+
         coins = user.get("coins", 0)
-        # Use 💓 for premium, 👤 for normal
         icon = "💓" if user.get("premium") else "👤"
-        
-        # Display: Icon Index. Name: `Coins`
-        text += f"{icon} {i}. {safe_name}: <code>{coins:,}$</code>\n"
-    
+
+        text += f"{icon} {i}. {clickable_name}: <code>{coins:,}$</code>\n"
+
     text += "\n💓 = Pʀᴇᴍɪᴜᴍ • 👤 = Nᴏʀᴍᴀʟ\n\n"
     text += "<i>✅ Uᴘɢʀᴀᴅᴇ Tᴏ Pʀᴇᴍɪᴜᴍ : ᴄᴏᴍɪɴɢ ꜱᴏᴏɴ 🔜</i>"
-    
-    await update.message.reply_text(text, parse_mode="HTML")
+
+    await update.message.reply_text(text, parse_mode=ParseMode.HTML)
 
 #=====rankers====
 async def rankers(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Sort by Level first, then XP tie-breaker
     top_list = users.find({"id": {"$ne": context.bot.id}}).sort([("level", -1), ("xp", -1)]).limit(10)
-    
-    text = "🎖️ Tᴏᴘ 10 Gʟᴏʙᴀʟ Rᴀɴᴋᴇʀꜱ:\n\n"
-    
+
+    text = "🎖️ <b>Tᴏᴘ 10 Gʟᴏʙᴀʟ Rᴀɴᴋᴇʀꜱ:</b>\n\n"
+
     for i, user in enumerate(top_list, start=1):
-        name = user.get("name", "Uɴᴋɴᴏᴡɴ")
+        user_id = user.get("id")
+        raw_name = user.get("name", "Uɴᴋɴᴏᴡɴ")
+        safe_name = html.escape(str(raw_name))
+        
+        # Create clickable link
+        clickable_name = f'<a href="tg://user?id={user_id}">{safe_name}</a>'
+        
         lvl = user.get("level", 1)
         xp = user.get("xp", 0)
         icon = "💓" if user.get("premium") else "👤"
-        
-        # Display: Icon Index. Name: Lᴠʟ 10 (500 XP)
-        text += f"{icon} {i}. {name}: Lᴠʟ {lvl} ({xp:,} XP)\n"
-    
+
+        text += f"{icon} {i}. {clickable_name}: Lᴠʟ {lvl} ({xp:,} XP)\n"
+
     text += "\n💓 = Pʀᴇᴍɪᴜᴍ • 👤 = Nᴏʀᴍᴀʟ\n\n"
     text += "🏆 Kᴇᴇᴘ Gʀɪɴᴅɪɴɢ Tᴏ Rᴇᴀᴄʜ Tʜᴇ Tᴏᴘ!"
-    
-    await update.message.reply_text(text)
+
+    # Added parse_mode=HTML here so the links work
+    await update.message.reply_text(text, parse_mode=ParseMode.HTML)
 
 #=====killers====
 async def top_killers(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Displays the top 10 players with the highest kills"""
-    # Query: More than 0 kills, exclude the bot, sort by kills descending
     top_list = list(users.find(
         {"kills": {"$gt": 0}, "id": {"$ne": context.bot.id}}
     ).sort("kills", -1).limit(10))
 
     if not top_list:
-        return await update.message.reply_text("<b>🚫 ɴᴏ ᴋɪʟʟᴇʀs ғᴏᴜɴᴅ ʏᴇᴛ!</b>", parse_mode='HTML')
+        return await update.message.reply_text("<b>🚫 ɴᴏ ᴋɪʟʟᴇʀs ғᴏᴜɴᴅ ʏᴇᴛ!</b>", parse_mode=ParseMode.HTML)
 
     header = "<b>🩸 ᴛᴏᴘ 10 ᴅᴇᴀᴅʟɪᴇsᴛ ᴋɪʟʟᴇʀs 🩸</b>\n"
     header += "⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n"
-    
+
     entries = []
     medals = ["🥇", "🥈", "🥉", "🏅", "🏅", "🏅", "🏅", "🏅", "🏅", "🏅"]
 
     for i, user_data in enumerate(top_list):
         medal = medals[i]
-        name = user_data.get("name", "Unknown")
+        user_id = user_data.get("id")
+        raw_name = user_data.get("name", "Unknown")
+        safe_name = html.escape(str(raw_name))
+        
+        # Create clickable link
+        clickable_name = f'<a href="tg://user?id={user_id}">{safe_name}</a>'
+        
         kills = user_data.get("kills", 0)
-        entries.append(f"{medal} <b>{name}</b> — <code>{kills:,} ᴋɪʟʟs</code>")
+        entries.append(f"{medal} {clickable_name} — <code>{kills:,} ᴋɪʟʟs</code>")
 
     full_text = header + "\n".join(entries)
-    await update.message.reply_text(full_text, parse_mode='HTML')
+    await update.message.reply_text(full_text, parse_mode=ParseMode.HTML)
 
 #=======mini_games_topplayers=======
 #--
