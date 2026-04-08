@@ -907,6 +907,10 @@ import random
 import html
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
+from telegram.constants import ChatMemberStatus
+
+# Assuming 'chats' is your MongoDB collection for group settings
+# chats = db.chats 
 
 WELCOME_STYLES = [
     "🤗 𝗪𝗲𝗹𝗰𝗼𝗺𝗲 {user} 🧸✨",
@@ -914,33 +918,63 @@ WELCOME_STYLES = [
     "🤗 𝑾𝒆𝒍𝒄𝒐𝒎𝒆 {user} 🧸✨",
     "🤗 𝒲𝑒𝓁𝒸𝑜𝓂𝑒 {user} 🧸✨",
     "🤗 𝐖𝐞𝐥𝐜𝐨𝐦𝐞 {user} 🧸✨",
-    "🤗 𝘞𝘦𝘭𝘤𝘰𝘮𝘦 {user} 🧸✨",
+    "🤗 𝘞𝘦𝘭𝘤𝘰𝘮𝘦 {user}  hobby✨",
     "🤗 𝚆𝚎𝚕𝚌𝚘𝚖𝚎 {user} 𝚆𝚎𝚕𝚌𝚘𝚖𝚎",
     "🤗 𝕎𝕖𝕝𝕔𝕠𝕞𝕖 {user} 🧸✨",
     "🤗 𝓦𝓮𝓵𝓬𝓸𝓶𝓮 {user} 🧸✨"
 ]
 
+DEFAULT_LINK = "https://t.me/+wlkvrPKG8wdkMDNl"
+
+#===== Command to set the link =====
+async def set_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    user_id = update.effective_user.id
+
+    # 🛡️ Permission Check: Admin or Owner only
+    member = await context.bot.get_chat_member(chat_id, user_id)
+    if member.status not in [ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER]:
+        return await update.message.reply_text("❌ 𝖸𝗈𝗎 𝗇𝖾𝖾𝖽 𝗍𝗈 𝖻𝖾 𝖺𝗇 𝖠𝖽𝗆𝗂𝗇 𝗍𝗈 𝗎𝗌𝖾 𝗍𝗁𝗂𝗌 𝖼𝗈𝗆𝗆𝖺𝗇𝖽!")
+
+    # Check if a link was provided
+    if not context.args:
+        return await update.message.reply_text("📝 𝖴𝗌𝖺𝗀𝖾: <code>/setlink https://t.me/yourlink</code>", parse_mode="HTML")
+
+    new_link = context.args[0]
+    
+    # Save to Database
+    chats.update_one(
+        {"chat_id": chat_id},
+        {"$set": {"welcome_link": new_link}},
+        upsert=True
+    )
+
+    await update.message.reply_text(f"✅ <b>𝖶𝖾𝗅𝖼𝗈𝗆𝖾 𝗅𝗂𝗇𝗄 𝗎𝗉𝖽𝖺𝗍𝖾𝖽 𝗍𝗈:</b>\n{new_link}", parse_mode="HTML")
+
+#===== Modified Welcome Logic =====
 async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    
+    # Fetch the custom link from DB, fall back to DEFAULT_LINK if not found
+    chat_data = chats.find_one({"chat_id": chat_id})
+    group_link = chat_data.get("welcome_link", DEFAULT_LINK) if chat_data else DEFAULT_LINK
+
     for member in update.message.new_chat_members:
-        # Generate the mention link
         user = member.mention_html()
-        
-        # Pick a random style and format it
         text = random.choice(WELCOME_STYLES).format(user=user)
 
-        # Create the inline button
         keyboard = [
             [
                 InlineKeyboardButton(
                     "🐜 Jᴏɪɴ Mʏ Sᴡᴇᴇᴛ Hᴏᴍᴇ 🏡", 
-                    url="https://t.me/+wlkvrPKG8wdkMDNl"
+                    url=group_link
                 )
             ]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
-        # Send the message with the button
         await update.message.reply_html(text, reply_markup=reply_markup)
+
 
 # ===== Fun Interaction Commands =====
 
@@ -4564,6 +4598,7 @@ application.add_handler(CommandHandler("setpng", set_png))
 application.add_handler(CommandHandler("claim", claim))
 application.add_handler(CommandHandler("help", help_command)) 
 application.add_handler(CommandHandler("bal", bal))
+application.add_handler(CommandHandler("set", set_link))
 
 # Message Handlers
 application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
