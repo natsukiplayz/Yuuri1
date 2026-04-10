@@ -150,30 +150,42 @@ def save_user(data):
     users.update_one({"id": data["id"]}, {"$set": data}, upsert=True)
 
 #premium
+import asyncio
 from datetime import datetime
 
-def is_premium(user_data):
-    """Checks if a user is premium and handles expiration logic."""
+def is_premium(user_data, context=None):
+    """Checks premium status and notifies user without using await."""
     if not user_data.get("premium"):
         return False
-    
+
     expire_str = user_data.get("premium_until")
     if not expire_str:
         return False
 
     try:
         expire_time = datetime.strptime(expire_str, "%Y-%m-%d %H:%M:%S")
+        
         if datetime.utcnow() > expire_time:
-            # Time is up! Remove premium status in DB
+            user_id = user_data.get("id")
+            
+            # 1. Update Database (Sync)
             users.update_one(
-                {"id": user_data["id"]},
+                {"id": user_id},
                 {"$set": {"premium": False}, "$unset": {"premium_until": "", "membership_type": ""}}
             )
+
+            # 2. Fire-and-forget the DM notification
+            if context:
+                msg = "⌛ <b>Yᴏᴜʀ Pʀᴇᴍɪᴜᴍ Hᴀs Exᴘɪʀᴇᴅ!</b>\n\nTᴏ rᴇɴᴇᴡ, use /pay."
+                # This schedules the DM in the background without needing await
+                asyncio.create_task(
+                    context.bot.send_message(chat_id=user_id, text=msg, parse_mode='HTML')
+                )
+
             return False
         return True
     except:
         return False
-
 
 #======== load groups ====
 SAVED_GROUPS = {}
@@ -929,6 +941,8 @@ async def unblock_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"{first_name} Uɴʙʟᴏᴄᴋᴇᴅ Sᴜᴄᴄᴇꜱꜱꜰᴜʟʟʏ ✅")
 
 #premium activation
+from datetime import datetime, timedelta
+
 async def activate(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     msg = update.effective_message
@@ -946,7 +960,7 @@ async def activate(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     type_choice = context.args[0].lower()
     validity_raw = context.args[1].lower()
-    
+
     try:
         target_id = int(context.args[2])
     except ValueError:
@@ -955,12 +969,80 @@ async def activate(update: Update, context: ContextTypes.DEFAULT_TYPE):
     match = re.match(r"(\d+)d", validity_raw)
     if not match:
         return await msg.reply_text("❌ <b>Usᴇ 'd' ғᴏʀ ᴅᴀʏs (ᴇ.ɢ., 30ᴅ).</b>", parse_mode=ParseMode.HTML)
-    
+
     days_to_add = int(match.group(1))
-    target_data = users.find_one({"id": target_id})
     
-    if not target_data:
+    # Calculate expiry date
+    expiry_date = (datetime.utcnow() + timedelta(days=days_to_add)).strftime("%Y-%m-%d %H:%M:%S")
+
+    # Update Database
+    result = users.update_one(
+        {"id": target_id},
+        {
+            "$set": {
+                "premium": True,
+                "premium_until": expiry_date,
+                "membership_type": type_choice
+            }
+        }
+    )
+
+    if result.matched_count == 0:
+        return await msg.reply_text("❌ <b>Usᴇʀ ɴᴏᴛ ғᴏᴜɴᴅ ɪɴ Dᴀᴛᴀʙᴀsᴇ.</b>", parse_mode=ParseMode.HTML)
+
+    # 1. Notify the Admin
+    await msg.reply_text(f"✅ <b>Pʀᴇᴍɪᴜᴍ Aᴄᴛɪᴠᴀᴛᴇᴅ!</b>\n👤 ID: <code>{target_id}</code>\n⏳ Dᴜʀᴀᴛɪᴏɴ: {days_to_add} days", parse_mode=ParseMode.HTML)
+
+    # 2. Notify the User via DM
+    try:
+        dm_text = (
+            "🎉 <b>Hᴇʏ! Yᴏᴜʀ Pʀᴇᴍɪᴜᴍ Hᴀs Bᴇᴇɴ Aᴄᴛɪᴠᴀᴛᴇᴅ!</b>\n\n"
+            f"⏳ <b>Vᴀʟɪᴅɪᴛʏ:</b> {days_to_add} Dᴀʏs\n"
+            f"📅 <b>Exᴘɪʀᴇs ᴏɴ:</b> <code>{expiry_date}</code>\n\n"
+            "Tʜᴀɴᴋ ʏᴏᴜ ғᴏʀ ʏᴏᴜʀ sᴜᴘᴘᴏʀᴛ! ✨"
+        )
+        await context.bot.send_message(chat_id=target_id, text=dm_text, parse_mode=ParseMode.HTML)
+    except Exception as e:
+        await msg.reply_text(f"⚠️ <b>Aᴄᴛɪᴠᴀᴛᴇᴅ, ʙᴜᴛ ᴄᴏᴜʟᴅɴ'ᴛ DM ᴜsᴇʀ:</b> <code>{e}</code>", parse_mode=ParseMode.HTML)
+
+async def deactivate(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    msg = update.effective_message
+
+    if user.id != OWNER_ID:
+        return 
+
+    if not context.args:
+        return await msg.reply_text("⚠️ <b>Usᴇ:</b> <code>/deactivate [user_id]</code>", parse_mode=ParseMode.HTML)
+
+    try:
+        target_id = int(context.args[0])
+    except ValueError:
+        return await msg.reply_text("❌ <b>Iɴᴠᴀʟɪᴅ Usᴇʀ ID.</b>", parse_mode=ParseMode.HTML)
+
+    # Remove from DB
+    result = users.update_one(
+        {"id": target_id},
+        {
+            "$set": {"premium": False},
+            "$unset": {"premium_until": "", "membership_type": ""}
+        }
+    )
+
+    if result.matched_count == 0:
         return await msg.reply_text("❌ <b>Usᴇʀ ɴᴏᴛ ғᴏᴜɴᴅ.</b>", parse_mode=ParseMode.HTML)
+
+    await msg.reply_text(f"🚫 <b>Pʀᴇᴍɪᴜᴍ Dᴇᴀᴄᴛɪᴠᴀᴛᴇᴅ ғᴏʀ</b> <code>{target_id}</code>", parse_mode=ParseMode.HTML)
+
+    # Notify User via DM
+    try:
+        await context.bot.send_message(
+            chat_id=target_id, 
+            text="⚠️ <b>Yᴏᴜʀ Pʀᴇᴍɪᴜᴍ Mᴇᴍʙᴇʀsʜɪᴘ ʜᴀs ʙᴇᴇɴ ᴅᴇᴀᴄᴛɪᴠᴀᴛᴇᴅ ʙʏ owner.</b>", 
+            parse_mode=ParseMode.HTML
+        )
+    except:
+        pass # User likely blocked the bot
 
     # --- STACKING LOGIC ---
     now = datetime.utcnow()
@@ -1939,8 +2021,8 @@ async def daily(update, context):
                 "⛔ Yᴏᴜ ᴀʟʀᴇᴀᴅʏ Cʟᴀɪᴍᴇᴅ Yᴏᴜʀ Dᴀɪʟʏ Rᴇᴡᴀʀᴅ Tᴏᴅᴀʏ."
             )
 
-    # ✅ PREMIUM CHECK & REWARD
-    premium_active = is_premium(u)
+    premium_active = is_premium(u, context) 
+    
     if premium_active:
         reward = 2000
         msg_prefix = "🌟 Pʀᴇᴍɪᴜᴍ Dᴀɪʟʏ Rᴇᴡᴀʀᴅ"
@@ -1957,6 +2039,7 @@ async def daily(update, context):
     await update.message.reply_text(
         f"{msg_prefix}: +{reward:,} Cᴏɪɴs"
     )
+
 
 #====economy commands=======
 #--
@@ -1988,7 +2071,7 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     kills = data.get("kills", 0)
     
     # ✅ LIVE PREMIUM ICON CHECK
-    premium_active = is_premium(data)
+    premium_active = is_premium(data, context)
     icon = "💓" if premium_active else "👤"
 
     current_rank_data, _ = get_rank_data(lvl)
@@ -2041,7 +2124,7 @@ async def bal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     status = "💀 Dᴇᴀᴅ" if data.get("dead") else "❤️ Aʟɪᴠᴇ"
     
     # ✅ LIVE PREMIUM ICON CHECK
-    premium_active = is_premium(data)
+    premium_active = is_premium(data, context)
     icon = "💓" if premium_active else "👤"
     
     # --- WEALTH RANKING ---
@@ -2185,7 +2268,7 @@ async def givee(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await msg.reply_text("💰 Yᴏᴜ Dᴏɴ'ᴛ Hᴀᴠᴇ Eɴᴏᴜɢʜ Cᴏɪɴs")
 
     # ✅ PREMIUM TAX LOGIC
-    premium_active = is_premium(sender_data)
+    premium_active = is_premium(sender_data, context)
     tax_rate = 0.05 if premium_active else 0.10
     tax_percent = "5%" if premium_active else "10%"
     
@@ -2302,12 +2385,12 @@ async def kill(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await msg.reply_text(f"💀 {target_user.first_name} ɪꜱ ᴀʟʀᴇᴀᴅʏ ᴅᴇᴀᴅ!")
 
     # 🎲 Random rewards & ✨ Premium Boost
-    premium_active = is_premium(killer)
+    premium_active = is_premium(killer, context)
     
     if premium_active:
         reward = random.randint(500, 1200)  # Huge boost for Premium
         xp_gain = random.randint(30, 60)
-        kill_msg = f"🌟 {user.first_name} (Pʀᴇᴍɪᴜᴍ) Aɴɴɪʜɪʟᴀᴛᴇᴅ {target_user.first_name}"
+        kill_msg = f"💗 {user.first_name} (Pʀᴇᴍɪᴜᴍ) Aɴɴɪʜɪʟᴀᴛᴇᴅ {target_user.first_name}"
     else:
         reward = random.randint(200, 600)   # Increased normal reward (was 50-299)
         xp_gain = random.randint(10, 35)    # Increased normal XP (was 1-19)
@@ -2486,7 +2569,7 @@ async def protect(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = get_user(update.effective_user)
     
     # ✅ PREMIUM CHECK & LIMITATION
-    premium_active = is_premium(user)
+    premium_active = is_premium(user, context)
     
     if days > 1 and not premium_active:
         return await update.message.reply_text(
@@ -2727,7 +2810,7 @@ async def richest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         safe_name = html.escape(str(user.get("name", "Uɴᴋɴᴏᴡɴ")))
         
         # Premium Check & Icon
-        icon = "💓" if is_premium(user) else "👤"
+        icon = "💓" if is_premium(user, context) else "👤"
         clickable_name = f'<a href="tg://user?id={user_id}">{safe_name}</a>'
         coins = user.get("coins", 0)
 
@@ -2754,7 +2837,7 @@ async def rankers(update: Update, context: ContextTypes.DEFAULT_TYPE):
         safe_name = html.escape(str(user.get("name", "Uɴᴋɴᴏᴡɴ")))
         
         # Premium Check & Icon
-        icon = "💓" if is_premium(user) else "👤"
+        icon = "💓" if is_premium(user, context) else "👤"
         clickable_name = f'<a href="tg://user?id={user_id}">{safe_name}</a>'
         lvl = user.get("level", 1)
         xp = user.get("xp", 0)
@@ -2788,7 +2871,7 @@ async def top_killers(update: Update, context: ContextTypes.DEFAULT_TYPE):
         safe_name = html.escape(str(name_val))
 
         # Premium Check & Icon
-        icon = "💓" if is_premium(user) else "👤"
+        icon = "💓" if is_premium(user, context) else "👤"
         clickable_name = f'<a href="tg://user?id={user_id}">{safe_name}</a>'
         kills = user.get("kills", 0)
 
@@ -4805,6 +4888,7 @@ application.add_handler(CommandHandler("help", help_command))
 application.add_handler(CommandHandler("bal", bal))
 application.add_handler(CommandHandler("set", set_link))
 application.add_handler(CommandHandler("activate", activate))
+application.add_handler(CommandHandler("deactivate", deactivate))
 application.add_handler(CommandHandler("pay", pay))
 
 # Message Handlers
