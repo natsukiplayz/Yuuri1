@@ -2767,25 +2767,26 @@ async def rankers(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(text, parse_mode=ParseMode.HTML)
 
 # ==========================================
-# 🩸 TOP KILLERS
+# 🩸 TOP KILLERS (FIXED)
 # ==========================================
 async def top_killers(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Sort by kills (descending)
-    top_list = users.find(
-        {"kills": {"$gt": 0}, "id": {"$ne": context.bot.id}}
-    ).sort("kills", -1).limit(10)
+    # 1. Fetch data once
+    query = {"kills": {"$gt": 0}, "id": {"$ne": context.bot.id}}
+    top_list = list(users.find(query).sort("kills", -1).limit(10))
 
-    if users.count_documents({"kills": {"$gt": 0}, "id": {"$ne": context.bot.id}}) == 0:
+    # 2. Check if list is empty
+    if not top_list:
         return await update.message.reply_text("<b>🚫 Nᴏ Kɪʟʟᴇʀs Fᴏᴜɴᴅ Yᴇᴛ!</b>", parse_mode=ParseMode.HTML)
 
+    # 3. Build the message string
     text = "🏆 <b>Tᴏᴘ 10 Dᴇᴀᴅʟɪᴇsᴛ Kɪʟʟᴇʀs:</b>\n\n"
 
     for i, user in enumerate(top_list, start=1):
-        if not user: continue
-
         user_id = user.get("id")
-        safe_name = html.escape(str(user.get("name", "Uɴᴋɴᴏᴡɴ")))
-        
+        # Ensure name is a string and escape HTML special characters
+        name_val = user.get("name") or "Uɴᴋɴᴏᴡɴ"
+        safe_name = html.escape(str(name_val))
+
         # Premium Check & Icon
         icon = "💓" if is_premium(user) else "👤"
         clickable_name = f'<a href="tg://user?id={user_id}">{safe_name}</a>'
@@ -2796,24 +2797,7 @@ async def top_killers(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text += "\n💓 = Pʀᴇᴍɪᴜᴍ • 👤 = Nᴏʀᴍᴀʟ\n\n"
     text += "<i>✅ Uᴘɢʀᴀᴅᴇ Tᴏ Pʀᴇᴍɪᴜᴍ : /pay</i>"
 
-    await update.message.reply_text(text, parse_mode=ParseMode.HTML)
-
-    for i, user in enumerate(top_list, start=1):
-        if not user: continue
-
-        user_id = user.get("id")
-        safe_name = html.escape(str(user.get("name", "Uɴᴋɴᴏᴡɴ")))
-        
-        # Premium Check & Icon
-        icon = "💓" if is_premium(user) else "👤"
-        clickable_name = f'<a href="tg://user?id={user_id}">{safe_name}</a>'
-        kills = user.get("kills", 0)
-
-        text += f"{icon} {i}. {clickable_name}: <code>{kills:,} Kɪʟʟs</code>\n"
-
-    text += "\n💓 = Pʀᴇᴍɪᴜᴍ • 👤 = Nᴏʀᴍᴀʟ\n\n"
-    text += "<i>✅ Uᴘɢʀᴀᴅᴇ Tᴏ Pʀᴇᴍɪᴜᴍ : /pay</i>"
-
+    # 4. Send the message ONCE
     await update.message.reply_text(text, parse_mode=ParseMode.HTML)
 
 #=======mini_games_topplayers=======
