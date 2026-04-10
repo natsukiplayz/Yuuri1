@@ -149,6 +149,32 @@ def save_user(data):
 
     users.update_one({"id": data["id"]}, {"$set": data}, upsert=True)
 
+#premium
+from datetime import datetime
+
+def is_premium(user_data):
+    """Checks if a user is premium and handles expiration logic."""
+    if not user_data.get("premium"):
+        return False
+    
+    expire_str = user_data.get("premium_until")
+    if not expire_str:
+        return False
+
+    try:
+        expire_time = datetime.strptime(expire_str, "%Y-%m-%d %H:%M:%S")
+        if datetime.utcnow() > expire_time:
+            # Time is up! Remove premium status in DB
+            users.update_one(
+                {"id": user_data["id"]},
+                {"$set": {"premium": False}, "$unset": {"premium_until": "", "membership_type": ""}}
+            )
+            return False
+        return True
+    except:
+        return False
+
+
 #======== load groups ====
 SAVED_GROUPS = {}
 
@@ -901,6 +927,75 @@ async def unblock_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if target_id:
         users.update_one({"id": target_id}, {"$set": {"blocked": False}}, upsert=True)
         await update.message.reply_text(f"{first_name} Uɴʙʟᴏᴄᴋᴇᴅ Sᴜᴄᴄᴇꜱꜱꜰᴜʟʟʏ ✅")
+
+#premium activation
+async def activate(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    msg = update.effective_message
+
+    if user.id != OWNER_ID:
+        return 
+
+    if not context.args or len(context.args) < 3:
+        usage = (
+            "⚠️ <b>Iɴᴠᴀʟɪᴅ Usᴀɢᴇ</b>\n\n"
+            "Usᴇ: <code>/activate [premium|membership] [validity] [user_id]</code>\n"
+            "Exᴀᴍᴘʟᴇ: <code>/activate premium 15d 5773908061</code>"
+        )
+        return await msg.reply_text(usage, parse_mode=ParseMode.HTML)
+
+    type_choice = context.args[0].lower()
+    validity_raw = context.args[1].lower()
+    
+    try:
+        target_id = int(context.args[2])
+    except ValueError:
+        return await msg.reply_text("❌ <b>Iɴᴠᴀʟɪᴅ Usᴇʀ ID.</b>", parse_mode=ParseMode.HTML)
+
+    match = re.match(r"(\d+)d", validity_raw)
+    if not match:
+        return await msg.reply_text("❌ <b>Usᴇ 'd' ғᴏʀ ᴅᴀʏs (ᴇ.ɢ., 30ᴅ).</b>", parse_mode=ParseMode.HTML)
+    
+    days_to_add = int(match.group(1))
+    target_data = users.find_one({"id": target_id})
+    
+    if not target_data:
+        return await msg.reply_text("❌ <b>Usᴇʀ ɴᴏᴛ ғᴏᴜɴᴅ.</b>", parse_mode=ParseMode.HTML)
+
+    # --- STACKING LOGIC ---
+    now = datetime.utcnow()
+    current_expire_str = target_data.get("premium_until")
+    
+    if current_expire_str:
+        current_expire = datetime.strptime(current_expire_str, "%Y-%m-%d %H:%M:%S")
+        # If still active, add to existing time; otherwise start from now
+        base_time = max(current_expire, now)
+    else:
+        base_time = now
+
+    new_expire_time = base_time + timedelta(days=days_to_add)
+    new_expire_str = new_expire_time.strftime("%Y-%m-%d %H:%M:%S")
+
+    users.update_one(
+        {"id": target_id},
+        {
+            "$set": {
+                "premium": True,
+                "premium_until": new_expire_str,
+                "membership_type": type_choice
+            }
+        }
+    )
+
+    await msg.reply_text(
+        f"🌟 <b>{type_choice.upper()} Aᴄᴛɪᴠᴀᴛᴇᴅ!</b>\n"
+        f"⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n"
+        f"👤 <b>Usᴇʀ:</b> {target_data.get('name', 'Unknown')}\n"
+        f"🆔 <b>ID:</b> <code>{target_id}</code>\n"
+        f"⏳ <b>Aᴅᴅᴇᴅ:</b> <code>{days_to_add} Dᴀʏs</code>\n"
+        f"📅 <b>Nᴇᴡ Exᴘɪʀʏ:</b> <code>{new_expire_str}</code>",
+        parse_mode=ParseMode.HTML
+    )
 
 #==========welcome_message======
 import random
@@ -1844,8 +1939,15 @@ async def daily(update, context):
                 "⛔ Yᴏᴜ ᴀʟʀᴇᴀᴅʏ Cʟᴀɪᴍᴇᴅ Yᴏᴜʀ Dᴀɪʟʏ Rᴇᴡᴀʀᴅ Tᴏᴅᴀʏ."
             )
 
-    # Give reward
-    reward = random.randint(50, 120)
+    # ✅ PREMIUM CHECK & REWARD
+    premium_active = is_premium(u)
+    if premium_active:
+        reward = 2000
+        msg_prefix = "🌟 Pʀᴇᴍɪᴜᴍ Dᴀɪʟʏ Rᴇᴡᴀʀᴅ"
+    else:
+        reward = random.randint(50, 120)
+        msg_prefix = "🎁 Dᴀɪʟʏ Rᴇᴡᴀʀᴅ"
+
     u["coins"] += reward
     u["last_daily"] = today.strftime("%Y-%m-%d")
 
@@ -1853,7 +1955,7 @@ async def daily(update, context):
     users.update_one({"id": user_id}, {"$set": u})
 
     await update.message.reply_text(
-        f"🎁 Dᴀɪʟʏ Rᴇᴡᴀʀᴅ: +{reward} Cᴏɪɴs"
+        f"{msg_prefix}: +{reward:,} Cᴏɪɴs"
     )
 
 #====economy commands=======
@@ -1883,8 +1985,11 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     xp = data.get("xp", 0)
     lvl = data.get("level", 1)
     coins = data.get("coins", 0)
-    kills = data.get("kills", 0) # ⚔️ New Stat
-    premium = data.get("premium", False)
+    kills = data.get("kills", 0)
+    
+    # ✅ LIVE PREMIUM ICON CHECK
+    premium_active = is_premium(data)
+    icon = "💓" if premium_active else "👤"
 
     current_rank_data, _ = get_rank_data(lvl)
     rank_title = current_rank_data["name"]
@@ -1898,18 +2003,17 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     xp_rank = 1 + users.count_documents({"id": {"$ne": bot_id}, "$or": [{"level": {"$gt": lvl}}, {"level": lvl, "xp": {"$gt": xp}}]})
     wealth_rank = 1 + users.count_documents({"id": {"$ne": bot_id}, "coins": {"$gt": coins}})
-    kill_rank = 1 + users.count_documents({"id": {"$ne": bot_id}, "kills": {"$gt": kills}}) # ⚔️ Kill Rank
+    kill_rank = 1 + users.count_documents({"id": {"$ne": bot_id}, "kills": {"$gt": kills}})
 
     inv = data.get("inventory", [])
     inventory_str = ", ".join(inv) if inv else "Eᴍᴘᴛʏ"
     status = "💀 Dᴇᴀᴅ" if data.get("dead") else "❤️ Aʟɪᴠᴇ"
-    icon = "💓" if premium else "👤"
 
     text = (
         f"{icon} Nᴀᴍᴇ: {data.get('name', target_user.first_name)}\n"
         f"🛡️ Tɪᴛʟᴇ: {rank_title}\n"
         f"🏅 Lᴇᴠᴇʟ: {lvl}\n"
-        f"⚔️ Kɪʟʟs: {kills:,}\n"  # ⚔️ Added to display
+        f"⚔️ Kɪʟʟs: {kills:,}\n"
         f"💰 Cᴏɪɴꜱ: {coins:,}\n"
         f"🎒 Iɴᴠᴇɴᴛᴏʀʏ: {inventory_str}\n"
         f"🎯 Sᴛᴀᴛᴜꜱ: {status}\n\n"
@@ -1917,7 +2021,7 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"{bar} ({percent}%)\n\n"
         f"🌐 Gʟᴏʙᴀʟ Rᴀɴᴋ (XP): {xp_rank}\n"
         f"💸 Wᴇᴀʟᴛʜ Rᴀɴᴋ: {wealth_rank}\n"
-        f"🩸 Kɪʟʟ Rᴀɴᴋ: {kill_rank}\n" # ⚔️ Added to display
+        f"🩸 Kɪʟʟ Rᴀɴᴋ: {kill_rank}\n"
         f"🏰 Gᴜɪʟᴅ: {data.get('guild') or 'Nᴏɴᴇ'}"
     )
 
@@ -1928,7 +2032,6 @@ async def bal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     if not msg: return
 
-    # Determine who we are checking
     target_user = msg.reply_to_message.from_user if msg.reply_to_message else update.effective_user
     data = get_user(target_user) 
 
@@ -1936,8 +2039,10 @@ async def bal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     coins = data.get("coins", 0)
     kills = data.get("kills", 0)
     status = "💀 Dᴇᴀᴅ" if data.get("dead") else "❤️ Aʟɪᴠᴇ"
-    premium = data.get("premium", False)
-    icon = "💓" if premium else "👤"
+    
+    # ✅ LIVE PREMIUM ICON CHECK
+    premium_active = is_premium(data)
+    icon = "💓" if premium_active else "👤"
     
     # --- WEALTH RANKING ---
     bot_id = context.bot.id
@@ -2042,7 +2147,6 @@ async def robe(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 #======Give======
 async def givee(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
     msg = update.effective_message
     sender = update.effective_user
     reply = msg.reply_to_message
@@ -2072,18 +2176,20 @@ async def givee(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if target.id == sender.id:
         return await msg.reply_text("⚠️ Yᴏᴜ Cᴀɴ'ᴛ Gɪᴠᴇ Cᴏɪɴs Tᴏ Yᴏᴜʀsᴇʟғ")
 
-    # 🚫 block giving coins to owner
     if target.id == OWNER_ID:
         return await msg.reply_text("🧸 Nᴏᴛ Nᴇᴇᴅ Tᴏ Gɪᴠᴇ Mʏ Oᴡɴᴇʀ 🧸✨")
 
     sender_data = get_user(sender)
-    receiver_data = get_user(target)
-
+    
     if sender_data.get("coins", 0) < amount:
         return await msg.reply_text("💰 Yᴏᴜ Dᴏɴ'ᴛ Hᴀᴠᴇ Eɴᴏᴜɢʜ Cᴏɪɴs")
 
-    # ===== TAX =====
-    tax = int(amount * 0.10)
+    # ✅ PREMIUM TAX LOGIC
+    premium_active = is_premium(sender_data)
+    tax_rate = 0.05 if premium_active else 0.10
+    tax_percent = "5%" if premium_active else "10%"
+    
+    tax = int(amount * tax_rate)
     received = amount - tax
 
     # ===== XP DEDUCTION =====
@@ -2114,6 +2220,8 @@ async def givee(update: Update, context: ContextTypes.DEFAULT_TYPE):
         {"$inc": {"coins": tax}}
     )
 
+    premium_tag = "🌟 (Pʀᴇᴍɪᴜᴍ Bᴇɴᴇꜰɪᴛ)" if premium_active else ""
+
     await anim.edit_text(
 f"""
 ✅ Tʀᴀɴsᴀᴄᴛɪᴏɴ Cᴏᴍᴘʟᴇᴛᴇᴅ
@@ -2121,13 +2229,11 @@ f"""
 👤 Sᴇɴᴅᴇʀ: {sender.first_name}
 🎁 Rᴇᴄᴇɪᴠᴇʀ: {target.first_name}
 
-✅ {target.first_name} Rᴇᴄᴇɪᴠᴇᴅ ${received}
-💸 Tᴀx: ${tax} (10%)
+✅ {target.first_name} Rᴇᴄᴇɪᴠᴇᴅ ${received:,}
+💸 Tᴀx: ${tax:,} ({tax_percent}) {premium_tag}
 ⚡ Xᴘ Dᴇᴅᴜᴄᴛᴇᴅ: -{xp_loss}
 """
     )
-
-#========Kill=======
 import random
 from datetime import datetime
 from telegram import Update
@@ -2181,7 +2287,6 @@ async def kill(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # 🛡️ Protection check
     if victim.get("protect_until"):
-        # Use try/except or safe get for date parsing
         try:
             expire = datetime.strptime(victim["protect_until"], "%Y-%m-%d %H:%M:%S")
             if expire > datetime.utcnow():
@@ -2196,15 +2301,23 @@ async def kill(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if victim.get("dead", False):
         return await msg.reply_text(f"💀 {target_user.first_name} ɪꜱ ᴀʟʀᴇᴀᴅʏ ᴅᴇᴀᴅ!")
 
-    # 🎲 Random rewards
-    reward = random.randint(50, 299)
-    xp_gain = random.randint(1, 19)
+    # 🎲 Random rewards & ✨ Premium Boost
+    premium_active = is_premium(killer)
+    
+    if premium_active:
+        reward = random.randint(500, 1200)  # Huge boost for Premium
+        xp_gain = random.randint(30, 60)
+        kill_msg = f"🌟 {user.first_name} (Pʀᴇᴍɪᴜᴍ) Aɴɴɪʜɪʟᴀᴛᴇᴅ {target_user.first_name}"
+    else:
+        reward = random.randint(200, 600)   # Increased normal reward (was 50-299)
+        xp_gain = random.randint(10, 35)    # Increased normal XP (was 1-19)
+        kill_msg = f"👤 {user.first_name} Sᴛᴀʙʙᴇᴅ {target_user.first_name}"
 
     killer["coins"] = killer.get("coins", 0) + reward
     killer["xp"] = killer.get("xp", 0) + xp_gain
     killer["kills"] = killer.get("kills", 0) + 1
 
-    # 🏰 Guild XP logic (ensure add_guild_xp is defined)
+    # 🏰 Guild XP logic
     guild_name = killer.get("guild")
     if guild_name:
         try:
@@ -2227,8 +2340,8 @@ async def kill(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # 📢 Kill message
     await msg.reply_text(
-        f"👤 {user.first_name} Sᴛᴀʙʙᴇᴅ {target_user.first_name}\n"
-        f"💰 Eᴀʀɴᴇᴅ: {reward} Cᴏɪɴs\n"
+        f"{kill_msg}\n"
+        f"💰 Eᴀʀɴᴇᴅ: {reward:,} Cᴏɪɴs\n"
         f"⭐ Gᴀɪɴᴇᴅ: +{xp_gain} Xᴘ"
     )
 
@@ -2236,7 +2349,7 @@ async def kill(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if bounty_reward > 0:
         await msg.reply_text(
             f"🎯 Bᴏᴜɴᴛʏ Cʟᴀɪᴍᴇᴅ!\n"
-            f"💰 Eᴀʀɴᴇᴅ ᴇxᴛʀᴀ: {bounty_reward} Cᴏɪɴs!"
+            f"💰 Eᴀʀɴᴇᴅ ᴇxᴛʀᴀ: {bounty_reward:,} Cᴏɪɴs!"
         )
 
 # ========== BOUNTY =========
@@ -2256,7 +2369,7 @@ async def bounty(update: Update, context: ContextTypes.DEFAULT_TYPE):
     target_user = update.message.reply_to_message.from_user
     target = get_user(target_user)
 
-    if sender["coins"] < amount:
+    if sender.get("coins", 0) < amount:
         return await update.message.reply_text("❌ Nᴏᴛ ᴇɴᴏᴜɢʜ Cᴏɪɴs.")
 
     if target_user.id == update.effective_user.id:
@@ -2273,11 +2386,11 @@ async def bounty(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Fancy reply
     await update.message.reply_text(
-            f"🎯 Bᴏᴜɴᴛʏ Pʟᴀᴄᴇᴅ!\n\n"
-            f"👤 Tᴀʀɢᴇᴛ: {target_user.first_name}\n"
-            f"💰 Rᴇᴡᴀʀᴅ: {amount} Cᴏɪɴs\n\n"
-            f"⚔️ Kɪʟʟ ᴛʜᴇᴍ Tᴏ Cʟᴀɪᴍ!"
-        )
+        f"🎯 Bᴏᴜɴᴛʏ Pʟᴀᴄᴇᴅ!\n\n"
+        f"👤 Tᴀʀɢᴇᴛ: {target_user.first_name}\n"
+        f"💰 Rᴇᴡᴀʀᴅ: {amount:,} Cᴏɪɴs\n\n"
+        f"⚔️ Kɪʟʟ ᴛʜᴇᴍ Tᴏ Cʟᴀɪᴍ!"
+    )
 
 #========Revive========
 async def revive(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -2336,17 +2449,21 @@ f"""
 
 # ======= PROTECT SYSTEM =======
 from datetime import datetime, timedelta
+from telegram import Update
+from telegram.ext import ContextTypes
+from telegram.constants import ParseMode
 
 async def protect(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if not context.args:
         return await update.message.reply_text(
-            "🛡️ Pʀᴏᴛᴇᴄᴛɪᴏɴ Sʏsᴛᴇᴍ\n\n"
-            "💰 Cᴏsᴛs:\n"
-            "1ᴅ → 200$\n"
-            "2ᴅ → 400$\n"
-            "3ᴅ → 600$\n\n"
-            "Uꜱᴀɢᴇ: /protect 1d|2d|3d"
+            "🛡️ <b>Pʀᴏᴛᴇᴄᴛɪᴏɴ Sʏsᴛᴇᴍ</b>\n\n"
+            "💰 <b>Cᴏsᴛs:</b>\n"
+            "1ᴅ → 200$ (Aʟʟ Uꜱᴇʀꜱ 👤)\n"
+            "2ᴅ → 400$ (Pʀᴇᴍɪᴜᴍ Oɴʟʏ 💓)\n"
+            "3ᴅ → 600$ (Pʀᴇᴍɪᴜᴍ Oɴʟʏ 💓)\n\n"
+            "Uꜱᴀɢᴇ: <code>/protect 1d|2d|3d</code>",
+            parse_mode=ParseMode.HTML
         )
 
     arg = context.args[0].lower()
@@ -2359,37 +2476,54 @@ async def protect(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if arg not in durations:
         return await update.message.reply_text(
-            "🛡️ Iɴᴠᴀʟɪᴅ Pʀᴏᴛᴇᴄᴛɪᴏɴ Tɪᴍᴇ.\n\n"
+            "🛡️ <b>Iɴᴠᴀʟɪᴅ Pʀᴏᴛᴇᴄᴛɪᴏɴ Tɪᴍᴇ.</b>\n\n"
             "💰 Aᴛ Lᴇᴀꜱᴛ 200$ Nᴇᴇᴅᴇᴅ Fᴏʀ 1ᴅ Pʀᴏᴛᴇᴄᴛɪᴏɴ.\n"
-            "Uꜱᴀɢᴇ: /protect 1d|2d|3d"
+            "Uꜱᴀɢᴇ: <code>/protect 1d|2d|3d</code>",
+            parse_mode=ParseMode.HTML
         )
 
     days, price = durations[arg]
-
     user = get_user(update.effective_user)
+    
+    # ✅ PREMIUM CHECK & LIMITATION
+    premium_active = is_premium(user)
+    
+    if days > 1 and not premium_active:
+        return await update.message.reply_text(
+            "❌ <b>Pʀᴇᴍɪᴜᴍ Fᴇᴀᴛᴜʀᴇ Oɴʟʏ!</b>\n\n"
+            "👤 Nᴏʀᴍᴀʟ ᴜꜱᴇʀꜱ ᴄᴀɴ ᴏɴʟʏ ᴘʀᴏᴛᴇᴄᴛ ꜰᴏʀ 1ᴅ.\n"
+            "🌟 Uᴘɢʀᴀᴅᴇ ᴛᴏ Pʀᴇᴍɪᴜᴍ ᴛᴏ ᴜɴʟᴏᴄᴋ 2ᴅ ᴀɴᴅ 3ᴅ ᴘʀᴏᴛᴇᴄᴛɪᴏɴ!\n\n"
+            "<i>✅ Uᴘɢʀᴀᴅᴇ : /pay</i>",
+            parse_mode=ParseMode.HTML
+        )
 
     # 💰 Check coins
-    if user["coins"] < price:
+    if user.get("coins", 0) < price:
         return await update.message.reply_text(
-            "💰 Nᴏᴛ Eɴᴏᴜɢʜ Cᴏɪɴs.\n"
-            f"🛡️ {arg} Pʀᴏᴛᴇᴄᴛɪᴏɴ Cᴏsᴛꜱ {price}$."
+            "💰 <b>Nᴏᴛ Eɴᴏᴜɢʜ Cᴏɪɴs.</b>\n"
+            f"🛡️ {arg.upper()} Pʀᴏᴛᴇᴄᴛɪᴏɴ Cᴏsᴛꜱ {price}$.",
+            parse_mode=ParseMode.HTML
         )
 
     now = datetime.utcnow()
 
     protect_until = user.get("protect_until")
     if protect_until:
-        expire = datetime.strptime(protect_until, "%Y-%m-%d %H:%M:%S")
-        if expire > now:
-            remaining = expire - now
-            hours, remainder = divmod(int(remaining.total_seconds()), 3600)
-            minutes, _ = divmod(remainder, 60)
+        try:
+            expire = datetime.strptime(protect_until, "%Y-%m-%d %H:%M:%S")
+            if expire > now:
+                remaining = expire - now
+                hours, remainder = divmod(int(remaining.total_seconds()), 3600)
+                minutes, _ = divmod(remainder, 60)
 
-            return await update.message.reply_text(
-                "🛡️ Yᴏᴜ Aʀᴇ Aʟʀᴇᴀᴅʏ Pʀᴏᴛᴇᴄᴛᴇᴅ.\n"
-                f"⏳ Tɪᴍᴇ Lᴇꜰᴛ: {hours}ʜ {minutes}ᴍ\n"
-                f"🔒 Uɴᴛɪʟ: {protect_until}"
-            )
+                return await update.message.reply_text(
+                    "🛡️ <b>Yᴏᴜ Aʀᴇ Aʟʀᴇᴀᴅʏ Pʀᴏᴛᴇᴄᴛᴇᴅ.</b>\n"
+                    f"⏳ <b>Tɪᴍᴇ Lᴇꜰᴛ:</b> {hours}ʜ {minutes}ᴍ\n"
+                    f"🔒 <b>Uɴᴛɪʟ:</b> <code>{protect_until}</code>",
+                    parse_mode=ParseMode.HTML
+                )
+        except (ValueError, TypeError):
+            pass # Failsafe in case of corrupted date format
 
     # 💰 Deduct coins
     user["coins"] -= price
@@ -2402,13 +2536,15 @@ async def protect(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ☠️ If dead
     if user.get("dead", False):
         return await update.message.reply_text(
-            f"🛡️ Yᴏᴜ Aʀᴇ Nᴏᴡ Pʀᴏᴛᴇᴄᴛᴇᴅ Fᴏʀ {arg}.\n"
+            f"🛡️ Yᴏᴜ Aʀᴇ Nᴏᴡ Pʀᴏᴛᴇᴄᴛᴇᴅ Fᴏʀ {arg.upper()}.\n"
             "🔄 Bᴜᴛ Yᴏᴜʀ Sᴛᴀᴛᴜꜱ Iꜱ Sᴛɪʟʟ Dᴇᴀᴅ Uɴᴛɪʟ Rᴇᴠɪᴠᴇ."
         )
 
     # ✅ Normal message
+    icon = "🌟" if premium_active else "🛡️"
     await update.message.reply_text(
-        f"🛡️ Yᴏᴜ Aʀᴇ Nᴏᴡ Pʀᴏᴛᴇᴄᴛᴇᴅ Fᴏʀ {arg}."
+        f"{icon} <b>Yᴏᴜ Aʀᴇ Nᴏᴡ Pʀᴏᴛᴇᴄᴛᴇᴅ Fᴏʀ {arg.upper()}.</b>",
+        parse_mode=ParseMode.HTML
     )
 
 #========= REGISTER ========
@@ -2494,6 +2630,59 @@ async def shop(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(msg)
 
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.constants import ParseMode
+from telegram.ext import ContextTypes
+
+async def pay(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = update.effective_message
+    
+    # 🔗 Replace 'YOUR_QR_IMAGE_URL' with your actual QR link 
+    # Or use a local file path if you prefer
+    qr_url = "YOUR_QR_IMAGE_URL" 
+
+    # 💎 Premium Benefits List
+    caption = (
+        "✨ <b>Uᴘɢʀᴀᴅᴇ Tᴏ Pʀᴇᴍɪᴜᴍ</b> ✨\n"
+        "⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n"
+        "🔓 <b>Bᴇɴᴇꜰɪᴛs Yᴏᴜ Gᴇᴛ:</b>\n\n"
+        "💰 <b>Dᴀɪʟʏ Rᴇᴡᴀʀᴅ:</b> <code>$2,000</code> Fɪxᴇᴅ!\n"
+        "💸 <b>Lᴏᴡᴇʀ Tᴀx:</b> Oɴʟʏ <code>5%</code> Oɴ Gɪᴠᴇᴇ (Sᴀᴠᴇ 50%)\n"
+        "⚔️ <b>Kɪʟʟ Bᴏᴏsᴛ:</b> Hɪɢʜᴇʀ Cᴏɪɴs & XP Pᴀʏᴏᴜᴛs\n"
+        "🛡️ <b>Mᴀx Pʀᴏᴛᴇᴄᴛ:</b> Uɴʟᴏᴄᴋ <code>2ᴅ</code> & <code>3ᴅ</code> Sᴀꜰᴇᴛʏ\n"
+        "💓 <b>Exᴄʟᴜsɪᴠᴇ Iᴄᴏɴ:</b> Sʜᴏᴡ Oꜰꜰ Oɴ Lᴇᴀᴅᴇʀʙᴏᴀʀᴅs\n"
+        "🔥 <b>Pʀɪᴏʀɪᴛʏ:</b> Sᴘᴇᴄɪᴀʟ Pʀᴇᴍɪᴜᴍ Pʀᴏꜰɪʟᴇ Sᴛᴀᴛᴜs\n\n"
+        "⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n"
+        "📸 <b>Sᴄᴀɴ Tʜᴇ QR Cᴏᴅᴇ Tᴏ Pᴀʏ</b>\n"
+        "<i>Cʟɪᴄᴋ Tʜᴇ Bᴜᴛᴛᴏɴ Bᴇʟᴏᴡ Tᴏ Sᴇɴᴅ Sᴄʀᴇᴇɴsʜᴏᴛ & Aᴄᴛɪᴠᴀᴛᴇ!</i>"
+    )
+
+    # 🔘 Inline Button to your DM
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                "✨ Aᴄᴛɪᴠᴀᴛᴇ Pʀᴇᴍɪᴜᴍ ✨", 
+                url=f"tg://user?id={OWNER_ID}"
+            )
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    # If you have an image, send Photo. Otherwise, send Text.
+    try:
+        await msg.reply_photo(
+            photo=qr_url,
+            caption=caption,
+            parse_mode=ParseMode.HTML,
+            reply_markup=reply_markup
+        )
+    except Exception:
+        # Fallback if image URL is invalid
+        await msg.reply_text(
+            caption,
+            parse_mode=ParseMode.HTML,
+            reply_markup=reply_markup
+        )
 
 # ======= PURCHASE ========
 async def purchase(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -2517,15 +2706,14 @@ async def purchase(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(f"✅ {emoji} Yᴏᴜ ʙᴏᴜɢʜᴛ {font_text(item.capitalize())}")
 
-
-#===================top_players_command=================
-#--
 import html
 from telegram import Update
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
-#=====Top_rhichest=====
+# ==========================================
+# 💰 TOP RICHEST
+# ==========================================
 async def richest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Sort by coins (descending)
     top_list = users.find({"id": {"$ne": context.bot.id}}).sort("coins", -1).limit(10)
@@ -2533,83 +2721,100 @@ async def richest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = "🏆 <b>Tᴏᴘ 10 Rɪᴄʜᴇꜱᴛ Uꜱᴇʀꜱ:</b>\n\n"
 
     for i, user in enumerate(top_list, start=1):
-        if not user:
-            continue
+        if not user: continue
 
         user_id = user.get("id")
-        raw_name = user.get("name", "Uɴᴋɴᴏᴡɴ")
-        safe_name = html.escape(str(raw_name))
+        safe_name = html.escape(str(user.get("name", "Uɴᴋɴᴏᴡɴ")))
         
-        # Create clickable link using User ID
+        # Premium Check & Icon
+        icon = "💓" if is_premium(user) else "👤"
         clickable_name = f'<a href="tg://user?id={user_id}">{safe_name}</a>'
-
         coins = user.get("coins", 0)
-        icon = "💓" if user.get("premium") else "👤"
 
         text += f"{icon} {i}. {clickable_name}: <code>{coins:,}$</code>\n"
 
     text += "\n💓 = Pʀᴇᴍɪᴜᴍ • 👤 = Nᴏʀᴍᴀʟ\n\n"
-    text += "<i>✅ Uᴘɢʀᴀᴅᴇ Tᴏ Pʀᴇᴍɪᴜᴍ : ᴄᴏᴍɪɴɢ ꜱᴏᴏɴ 🔜</i>"
+    text += "<i>✅ Uᴘɢʀᴀᴅᴇ Tᴏ Pʀᴇᴍɪᴜᴍ : /pay</i>"
 
     await update.message.reply_text(text, parse_mode=ParseMode.HTML)
 
-#=====rankers====
+# ==========================================
+# 🎖️ TOP RANKERS (LEVEL/XP)
+# ==========================================
 async def rankers(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Sort by Level first, then XP tie-breaker
+    # Sort by Level first, then XP
     top_list = users.find({"id": {"$ne": context.bot.id}}).sort([("level", -1), ("xp", -1)]).limit(10)
 
     text = "🎖️ <b>Tᴏᴘ 10 Gʟᴏʙᴀʟ Rᴀɴᴋᴇʀꜱ:</b>\n\n"
 
     for i, user in enumerate(top_list, start=1):
+        if not user: continue
+
         user_id = user.get("id")
-        raw_name = user.get("name", "Uɴᴋɴᴏᴡɴ")
-        safe_name = html.escape(str(raw_name))
+        safe_name = html.escape(str(user.get("name", "Uɴᴋɴᴏᴡɴ")))
         
-        # Create clickable link
+        # Premium Check & Icon
+        icon = "💓" if is_premium(user) else "👤"
         clickable_name = f'<a href="tg://user?id={user_id}">{safe_name}</a>'
-        
         lvl = user.get("level", 1)
         xp = user.get("xp", 0)
-        icon = "💓" if user.get("premium") else "👤"
 
         text += f"{icon} {i}. {clickable_name}: Lᴠʟ {lvl} ({xp:,} XP)\n"
 
     text += "\n💓 = Pʀᴇᴍɪᴜᴍ • 👤 = Nᴏʀᴍᴀʟ\n\n"
-    text += "🏆 Kᴇᴇᴘ Gʀɪɴᴅɪɴɢ Tᴏ Rᴇᴀᴄʜ Tʜᴇ Tᴏᴘ!"
+    text += "<i>✅ Uᴘɢʀᴀᴅᴇ Tᴏ Pʀᴇᴍɪᴜᴍ : /pay</i>"
 
-    # Added parse_mode=HTML here so the links work
     await update.message.reply_text(text, parse_mode=ParseMode.HTML)
 
-#=====killers====
+# ==========================================
+# 🩸 TOP KILLERS
+# ==========================================
 async def top_killers(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Displays the top 10 players with the highest kills"""
-    top_list = list(users.find(
+    # Sort by kills (descending)
+    top_list = users.find(
         {"kills": {"$gt": 0}, "id": {"$ne": context.bot.id}}
-    ).sort("kills", -1).limit(10))
+    ).sort("kills", -1).limit(10)
 
-    if not top_list:
-        return await update.message.reply_text("<b>🚫 ɴᴏ ᴋɪʟʟᴇʀs ғᴏᴜɴᴅ ʏᴇᴛ!</b>", parse_mode=ParseMode.HTML)
+    if users.count_documents({"kills": {"$gt": 0}, "id": {"$ne": context.bot.id}}) == 0:
+        return await update.message.reply_text("<b>🚫 Nᴏ Kɪʟʟᴇʀs Fᴏᴜɴᴅ Yᴇᴛ!</b>", parse_mode=ParseMode.HTML)
 
-    header = "<b>🩸 ᴛᴏᴘ 10 ᴅᴇᴀᴅʟɪᴇsᴛ ᴋɪʟʟᴇʀs 🩸</b>\n"
-    header += "⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n"
+    text = "🏆 <b>Tᴏᴘ 10 Dᴇᴀᴅʟɪᴇsᴛ Kɪʟʟᴇʀs:</b>\n\n"
 
-    entries = []
-    medals = ["🥇", "🥈", "🥉", "🏅", "🏅", "🏅", "🏅", "🏅", "🏅", "🏅"]
+    for i, user in enumerate(top_list, start=1):
+        if not user: continue
 
-    for i, user_data in enumerate(top_list):
-        medal = medals[i]
-        user_id = user_data.get("id")
-        raw_name = user_data.get("name", "Unknown")
-        safe_name = html.escape(str(raw_name))
+        user_id = user.get("id")
+        safe_name = html.escape(str(user.get("name", "Uɴᴋɴᴏᴡɴ")))
         
-        # Create clickable link
+        # Premium Check & Icon
+        icon = "💓" if is_premium(user) else "👤"
         clickable_name = f'<a href="tg://user?id={user_id}">{safe_name}</a>'
-        
-        kills = user_data.get("kills", 0)
-        entries.append(f"{medal} {clickable_name} — <code>{kills:,} ᴋɪʟʟs</code>")
+        kills = user.get("kills", 0)
 
-    full_text = header + "\n".join(entries)
-    await update.message.reply_text(full_text, parse_mode=ParseMode.HTML)
+        text += f"{icon} {i}. {clickable_name}: <code>{kills:,} Kɪʟʟs</code>\n"
+
+    text += "\n💓 = Pʀᴇᴍɪᴜᴍ • 👤 = Nᴏʀᴍᴀʟ\n\n"
+    text += "<i>✅ Uᴘɢʀᴀᴅᴇ Tᴏ Pʀᴇᴍɪᴜᴍ : /pay</i>"
+
+    await update.message.reply_text(text, parse_mode=ParseMode.HTML)
+
+    for i, user in enumerate(top_list, start=1):
+        if not user: continue
+
+        user_id = user.get("id")
+        safe_name = html.escape(str(user.get("name", "Uɴᴋɴᴏᴡɴ")))
+        
+        # Premium Check & Icon
+        icon = "💓" if is_premium(user) else "👤"
+        clickable_name = f'<a href="tg://user?id={user_id}">{safe_name}</a>'
+        kills = user.get("kills", 0)
+
+        text += f"{icon} {i}. {clickable_name}: <code>{kills:,} Kɪʟʟs</code>\n"
+
+    text += "\n💓 = Pʀᴇᴍɪᴜᴍ • 👤 = Nᴏʀᴍᴀʟ\n\n"
+    text += "<i>✅ Uᴘɢʀᴀᴅᴇ Tᴏ Pʀᴇᴍɪᴜᴍ : /pay</i>"
+
+    await update.message.reply_text(text, parse_mode=ParseMode.HTML)
 
 #=======mini_games_topplayers=======
 #--
@@ -4615,6 +4820,8 @@ application.add_handler(CommandHandler("claim", claim))
 application.add_handler(CommandHandler("help", help_command)) 
 application.add_handler(CommandHandler("bal", bal))
 application.add_handler(CommandHandler("set", set_link))
+application.add_handler(CommandHandler("activate", activate))
+application.add_handler(CommandHandler("pay", pay))
 
 # Message Handlers
 application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
