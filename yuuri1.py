@@ -2737,6 +2737,7 @@ async def pay(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🔥 <b>Pʀɪᴏʀɪᴛʏ:</b> Sᴘᴇᴄɪᴀʟ Pʀᴇᴍɪᴜᴍ Pʀᴏꜰɪʟᴇ Sᴛᴀᴛᴜs\n\n"
         "⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n"
         "📸 <b>Sᴄᴀɴ Tʜᴇ QR Cᴏᴅᴇ Tᴏ Pᴀʏ</b>\n"
+        "✨ <b>Pᴀʏ <code>20₹</code> Fᴏʀ Aᴄᴛɪᴠᴀᴛɪᴏɴ</b>\n"
         "<i>Cʟɪᴄᴋ Tʜᴇ Bᴜᴛᴛᴏɴ Bᴇʟᴏᴡ Tᴏ Sᴇɴᴅ Sᴄʀᴇᴇɴsʜᴏᴛ & Aᴄᴛɪᴠᴀᴛᴇ!</i>"
     )
 
