@@ -1817,11 +1817,11 @@ async def referral(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     bot = await context.bot.get_me()
     unique_code = str(uuid.uuid4())[:8]
-    
+
     referrals_db.insert_one({"code": unique_code, "creator_id": user.id, "claimed_by": []})
     link = f"https://t.me/{bot.username}?start=ref_{unique_code}"
 
-    text = f"🎁 <b>ʏᴏᴜʀ ʀᴇꜰᴇʀʀᴀʟ ʟɪɴᴋ</b>\n\n🔗 <code>{link}</code>\n\nɪɴᴠɪᴛᴇ ꜰʀɪᴇɴᴅꜱ ᴜꜱɪɴɢ ᴛʜɪꜱ ʟɪɴᴋ\n💰 ʀᴇᴡᴀʀᴅ: 1000 ᴄᴏɪɴꜱ\n\n🧩 ɴᴏᴛᴇ : ᴀɴʏᴏɴᴇ ᴄᴀɴ ᴜsᴇ ᴛʜɪs ʟɪɴᴋ, ʙᴜᴛ ᴏɴʟʏ ᴏɴᴄᴇ ᴘᴇʀ ᴜsᴇʀ."
+    text = f"🎁 <b>ʏᴏᴜʀ ʀᴇꜰᴇʀʀᴀʟ ʟɪɴᴋ</b>\n\n🔗 <code>{link}</code>\n\nɪɴᴠɪᴛᴇ ꜰʀɪᴇɴᴅꜱ ᴜꜱɪɴɢ ᴛʜɪꜱ ʟɪɴᴋ\n💰 ʀᴇᴡᴀʀᴅ: 1000 ᴄᴏɪɴꜱ\n\n🧩 ɴᴏᴛᴇ : ʟɪᴍɪᴛ 100 ᴜsᴇʀs ᴘᴇʀ ʟɪɴᴋ."
     await update.message.reply_text(text, parse_mode=ParseMode.HTML)
 
 # --- 6. START COMMAND (WITH REFERRAL LOGIC) ---
@@ -1832,14 +1832,36 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if args and args[0].startswith("ref_"):
         ref_code = args[0].replace("ref_", "")
         ref_data = referrals_db.find_one({"code": ref_code})
+        
         if ref_data:
             creator_id = ref_data["creator_id"]
-            if user.id != creator_id and user.id not in ref_data.get("claimed_by", []):
-                referrals_db.update_one({"code": ref_code}, {"$push": {"claimed_by": user.id}})
-                users.update_one({"id": creator_id}, {"$inc": {"coins": 1000}})
-                try:
-                    await context.bot.send_message(creator_id, f"💰 <b>ʀᴇꜰᴇʀʀᴀʟ sᴜᴄᴄᴇss!</b>\n{user.first_name} ᴜsᴇᴅ ʏᴏᴜʀ ʟɪɴᴋ. +1000 ᴄᴏɪɴs!", parse_mode=ParseMode.HTML)
-                except: pass
+            claimed_list = ref_data.get("claimed_by", [])
+
+            # 1. Check if the link has reached the 100-user limit
+            if len(claimed_list) >= 100:
+                await update.message.reply_text("🚫 <b>ᴛʜɪs ʀᴇꜰᴇʀʀᴀʟ ʟɪɴᴋ ɪs ꜰᴜʟʟ!</b>\nɪᴛ ʜᴀs ᴀʟʀᴇᴀᴅʏ ʀᴇᴀᴄʜᴇᴅ ᴛʜᴇ ʟɪᴍɪᴛ ᴏꜰ 100 ᴜsᴇʀs.", parse_mode=ParseMode.HTML)
+            
+            # 2. Check if the user is trying to refer themselves
+            elif user.id == creator_id:
+                await update.message.reply_text("❌ <b>ʏᴏᴜ ᴄᴀɴɴᴏᴛ ᴜsᴇ ʏᴏᴜʀ ᴏᴡɴ ʟɪɴᴋ!</b>", parse_mode=ParseMode.HTML)
+
+            else:
+                # 3. Check if this user has ALREADY used ANY referral link from this specific creator before
+                already_referred = referrals_db.find_one({
+                    "creator_id": creator_id, 
+                    "claimed_by": user.id
+                })
+
+                if already_referred:
+                    await update.message.reply_text("⚠️ <b>ʏᴏᴜ ᴀʀᴇ ᴀʟʀᴇᴀᴅʏ ʀᴇɢɪsᴛᴇʀᴇᴅ ɪɴ ᴛʜᴇ ᴜsᴇʀs ʀᴇꜰᴇʀʀᴀʟ ᴄᴀɴ'ᴛ ᴜsᴇ ʜɪs ʀᴇꜰᴇʀʀᴀʟs ᴀɢᴀɪɴ.</b>", parse_mode=ParseMode.HTML)
+                
+                else:
+                    # Success: Update DB and Reward Creator
+                    referrals_db.update_one({"code": ref_code}, {"$push": {"claimed_by": user.id}})
+                    users.update_one({"id": creator_id}, {"$inc": {"coins": 1000}})
+                    try:
+                        await context.bot.send_message(creator_id, f"💰 <b>ʀᴇꜰᴇʀʀᴀʟ sᴜᴄᴄᴇss!</b>\n{user.first_name} ᴜsᴇᴅ ʏᴏᴜʀ ʟɪɴᴋ. +1000 ᴄᴏɪɴs!", parse_mode=ParseMode.HTML)
+                    except: pass
 
     get_user(user) # Sync user data
 
@@ -1866,6 +1888,7 @@ async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
             caption = f"<b>ᴡᴇʟᴄᴏᴍᴇ, {update.effective_user.first_name}!</b> 👋\n\n<blockquote>ɪ ᴀᴍ <b>ʏᴜᴜʀɪ</b>.</blockquote>"
             await query.edit_message_media(media=InputMediaPhoto(media=IMG_MAIN, caption=caption, parse_mode=ParseMode.HTML), reply_markup=get_main_keyboard(context.bot.username))
     except Exception as e: print(f"Callback Error: {e}")
+
 
 # ================= HELP SYSTEM MODULE =================
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
