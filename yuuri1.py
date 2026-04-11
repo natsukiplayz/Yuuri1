@@ -1821,7 +1821,8 @@ async def referral(update: Update, context: ContextTypes.DEFAULT_TYPE):
     referrals_db.insert_one({"code": unique_code, "creator_id": user.id, "claimed_by": []})
     link = f"https://t.me/{bot.username}?start=ref_{unique_code}"
 
-    text = f"🎁 <b>ʏᴏᴜʀ ʀᴇꜰᴇʀʀᴀʟ ʟɪɴᴋ</b>\n\n🔗 <code>{link}</code>\n\nɪɴᴠɪᴛᴇ ꜰʀɪᴇɴᴅꜱ ᴜꜱɪɴɢ ᴛʜɪꜱ ʟɪɴᴋ\n💰 ʀᴇᴡᴀʀᴅ: 1000 ᴄᴏɪɴꜱ\n\n🧩 ɴᴏᴛᴇ : ʟɪᴍɪᴛ 100 ᴜsᴇʀs ᴘᴇʀ ʟɪɴᴋ."
+    text = f"🎁 <b>ʏᴏᴜʀ ʀᴇꜰᴇʀʀᴀʟ ʟɪɴᴋ</b>\n\n🔗 <code>{link}</code>\n\nɪɴᴠɪᴛᴇ ꜰʀɪᴇɴᴅꜱ ᴜꜱɪɴɢ ᴛʜɪꜱ ʟɪɴᴋ\n💰 ʀᴇᴡᴀʀᴅ: 1000 ᴄᴏɪɴꜱ\n\n🧩 ɴᴏᴛᴇ :/n • <b>Yᴏᴜ Cᴀɴ Cʀᴇᴀᴛᴇ Mᴜʟᴛɪᴘʟᴇ Lɪɴᴋꜱ Uꜱɪɴɢ</b>: <code>/referral</code>\n• <b>Wʜᴇɴᴇᴠᴇʀ Yᴏᴜ Cʀᴇᴀᴛᴇꜱ A Rᴇꜰᴇʀʀᴀʟ Aɴᴅ Sᴏᴍᴇᴏɴᴇ Uꜱᴇꜱ Iᴛ Tʜᴇ Uꜱᴇʀ Cᴀɴ'T Uꜱᴇ Yᴏᴜʀ Rᴇꜰᴇʀʀᴀʟꜱ Aɢᴀɪɴ</b>\n"
+
     await update.message.reply_text(text, parse_mode=ParseMode.HTML)
 
 # --- 6. START COMMAND (WITH REFERRAL LOGIC) ---
