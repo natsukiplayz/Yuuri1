@@ -2630,6 +2630,74 @@ async def protect(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode=ParseMode.HTML
     )
 
+async def check_protection(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    msg = update.effective_message
+
+    # 1. Get the data of the person using the command
+    checker_data = get_user(user)
+
+    # 2. ✅ PREMIUM CHECK (Only Premium users can use this command)
+    # Using the synchronous version of is_premium we discussed
+    if not is_premium(checker_data, context):
+        return await msg.reply_text(
+            "❌ <b>Pʀᴇᴍɪᴜᴍ Oɴʟʏ Cᴏᴍᴍᴀɴᴅ!</b>\n\n"
+            "🌟 Oɴʟʏ Pʀᴇᴍɪᴜᴍ Uꜱᴇʀꜱ Cᴀɴ Cʜᴇᴄᴋ Oᴛʜᴇʀꜱ Pʀᴏᴛᴇᴄᴛɪᴏɴ Tɪᴍᴇ.\n"
+            "<i>✅ Uᴘɢʀᴀᴅᴇ : /pay</i>",
+            parse_mode=ParseMode.HTML
+        )
+
+    # 3. Check if it's a reply
+    if not msg.reply_to_message:
+        return await msg.reply_text("❌ <b>Pʟᴇᴀsᴇ Rᴇᴘʟʏ Tᴏ A Usᴇʀ Tᴏ Cʜᴇᴄᴋ Tʜᴇɪʀ Sᴛᴀᴛᴜs.</b>")
+
+    target_user = msg.reply_to_message.from_user
+    target_data = get_user(target_user) # Fetch target's data from DB
+
+    # 4. Extract Protection Info
+    protect_until = target_data.get("protect_until")
+    now = datetime.utcnow()
+    
+    status_text = "🚫 <b>Nᴏ Pʀᴏᴛᴇᴄᴛɪᴏɴ Aᴄᴛɪᴠᴇ</b>"
+    
+    if protect_until:
+        try:
+            expire = datetime.strptime(protect_until, "%Y-%m-%d %H:%M:%S")
+            if expire > now:
+                remaining = expire - now
+                hours, remainder = divmod(int(remaining.total_seconds()), 3600)
+                minutes, _ = divmod(remainder, 60)
+                status_text = (
+                    f"🛡️ <b>Sᴛᴀᴛᴜs:</b> Pʀᴏᴛᴇᴄᴛᴇᴅ\n"
+                    f"⏳ <b>Tɪᴍᴇ Lᴇғᴛ:</b> <code>{hours}ʜ {minutes}ᴍ</code>\n"
+                    f"🔒 <b>Exᴘɪʀᴇs:</b> <code>{protect_until}</code>"
+                )
+        except:
+            pass
+
+    # 5. DM the Checker
+    try:
+        dm_message = (
+            "🔍 <b>Pʀᴏᴛᴇᴄᴛɪᴏɴ Cʜᴇᴄᴋ Rᴇsᴜʟᴛ</b>\n\n"
+            f"👤 <b>Usᴇʀ:</b> <a href='tg://user?id={target_user.id}'>{html.escape(target_user.first_name)}</a>\n"
+            f"🆔 <b>ID:</b> <code>{target_user.id}</code>\n"
+            "————————————————\n"
+            f"{status_text}"
+        )
+        
+        await context.bot.send_message(chat_id=user.id, text=dm_message, parse_mode=ParseMode.HTML)
+        
+        # 6. Reply in the Group
+        await msg.reply_text("✅ <b>Pʀᴏᴛᴇᴄᴛɪᴏɴ Tɪᴍᴇ Sᴇɴᴛ Tᴏ DM</b>", parse_mode=ParseMode.HTML)
+
+    except Exception:
+        # If the checker hasn't started the bot in DM
+        await msg.reply_text(
+            "❌ <b>Cᴏᴜʟᴅ Nᴏᴛ Sᴇɴᴅ DM!</b>\n"
+            "Pʟᴇᴀꜱᴇ Sᴛᴀʀᴛ Tʜᴇ Bᴏᴛ Iɴ Pʀɪᴠᴀᴛᴇ Fɪʀꜱᴛ.",
+            parse_mode=ParseMode.HTML
+        )
+
 #========= REGISTER ========
 from telegram import Update
 from telegram.ext import ContextTypes
@@ -2719,53 +2787,54 @@ from telegram.ext import ContextTypes
 
 async def pay(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
-    
-    # 🔗 Replace 'YOUR_QR_IMAGE_URL' with your actual QR link 
-    # Or use a local file path if you prefer
+    chat_type = update.effective_chat.type
+    bot_username = context.bot.username
+
+    # 1. 📢 IF IN GROUP - Simple redirect without parameters
+    if chat_type in ["group", "supergroup"]:
+        # Just a direct link to the bot's profile
+        redirect_url = f"https://t.me/{bot_username}"
+        
+        keyboard = [[InlineKeyboardButton("💳 Cᴏɴᴛɪɴᴜᴇ Tᴏ Pᴀʏ", url=redirect_url)]]
+        
+        return await msg.reply_text(
+            "⚠️ <b>Usᴇ Tʜɪs Cᴏᴍᴍᴀɴᴅ Iɴ DM</b>\n\n"
+            "Cʟɪᴄᴋ ᴛʜᴇ ʙᴇʟᴏᴡ ʙᴜᴛᴛᴏɴ ᴛᴏ ᴄᴏɴᴛɪɴᴜᴇ!",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode=ParseMode.HTML
+        )
+
+    # 2. 💎 IF IN PRIVATE (DM) - Show info as usual
     qr_url = "YOUR_QR_IMAGE_URL" 
 
-    # 💎 Premium Benefits List
     caption = (
         "✨ <b>Uᴘɢʀᴀᴅᴇ Tᴏ Pʀᴇᴍɪᴜᴍ</b> ✨\n"
         "⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n"
         "🔓 <b>Bᴇɴᴇꜰɪᴛs Yᴏᴜ Gᴇᴛ:</b>\n\n"
         "💰 <b>Dᴀɪʟʏ Rᴇᴡᴀʀᴅ:</b> <code>$2,000</code> Fɪxᴇᴅ!\n"
-        "💸 <b>Lᴏᴡᴇʀ Tᴀx:</b> Oɴʟʏ <code>5%</code> Oɴ Gɪᴠᴇᴇ (Sᴀᴠᴇ 50%)\n"
+        "💸 <b>Lᴏᴡᴇʀ Tᴀx:</b> Oɴʟʏ <code>5%</code> Oɴ Gɪᴠᴇ\n"
         "⚔️ <b>Kɪʟʟ Bᴏᴏsᴛ:</b> Hɪɢʜᴇʀ Cᴏɪɴs & XP Pᴀʏᴏᴜᴛs\n"
         "🛡️ <b>Mᴀx Pʀᴏᴛᴇᴄᴛ:</b> Uɴʟᴏᴄᴋ <code>2ᴅ</code> & <code>3ᴅ</code> Sᴀꜰᴇᴛʏ\n"
-        "💓 <b>Exᴄʟᴜsɪᴠᴇ Iᴄᴏɴ:</b> Sʜᴏᴡ Oꜰꜰ Oɴ Lᴇᴀᴅᴇʀʙᴏᴀʀᴅs\n"
-        "🔥 <b>Pʀɪᴏʀɪᴛʏ:</b> Sᴘᴇᴄɪᴀʟ Pʀᴇᴍɪᴜᴍ Pʀᴏꜰɪʟᴇ Sᴛᴀᴛᴜs\n\n"
+        "💓 <b>Exᴄʟᴜsɪᴠᴇ Iᴄᴏɴ:</b> Sʜᴏᴡ Oɴ Lᴇᴀᴅᴇʀʙᴏᴀʀᴅs\n\n"
         "⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n"
-        "📸 <b>Sᴄᴀɴ Tʜᴇ QR Cᴏᴅᴇ Tᴏ Pᴀʏ</b>\n"
-        "✨ <b>Pᴀʏ <code>20₹</code> Fᴏʀ Aᴄᴛɪᴠᴀᴛɪᴏɴ</b>\n"
+        "📸 <b>Sᴄᴀɴ Tʜᴇ QR Cᴏᴅᴇ Tᴏ Pᴀʏ (20₹)</b>\n"
         "<i>Cʟɪᴄᴋ Tʜᴇ Bᴜᴛᴛᴏɴ Bᴇʟᴏᴡ Tᴏ Sᴇɴᴅ Sᴄʀᴇᴇɴsʜᴏᴛ & Aᴄᴛɪᴠᴀᴛᴇ!</i>"
     )
 
-    # 🔘 Inline Button to your DM
-    keyboard = [
-        [
-            InlineKeyboardButton(
-                "✨ Aᴄᴛɪᴠᴀᴛᴇ Pʀᴇᴍɪᴜᴍ ✨", 
-                url=f"tg://user?id={OWNER_ID}"
-            )
-        ]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
-    # If you have an image, send Photo. Otherwise, send Text.
+    keyboard = [[InlineKeyboardButton("✨ Sᴇɴᴅ Sᴄʀᴇᴇɴsʜᴏᴛ ✨", url=f"tg://user?id={OWNER_ID}")]]
+    
     try:
         await msg.reply_photo(
             photo=qr_url,
             caption=caption,
             parse_mode=ParseMode.HTML,
-            reply_markup=reply_markup
+            reply_markup=InlineKeyboardMarkup(keyboard)
         )
     except Exception:
-        # Fallback if image URL is invalid
         await msg.reply_text(
             caption,
             parse_mode=ParseMode.HTML,
-            reply_markup=reply_markup
+            reply_markup=InlineKeyboardMarkup(keyboard)
         )
 
 # ======= PURCHASE ========
@@ -4891,6 +4960,8 @@ application.add_handler(CommandHandler("set", set_link))
 application.add_handler(CommandHandler("activate", activate))
 application.add_handler(CommandHandler("deactivate", deactivate))
 application.add_handler(CommandHandler("pay", pay))
+application.add_handler(CommandHandler("check", check_protection))
+
 
 # Message Handlers
 application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
