@@ -2412,17 +2412,20 @@ async def kill(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if victim.get("dead", False):
         return await msg.reply_text(f"💀 {target_user.first_name} ɪꜱ ᴀʟʀᴇᴀᴅʏ ᴅᴇᴀᴅ!")
 
-    # 🎲 Random rewards & ✨ Premium Boost
+      # 🎲 Random rewards & ✨ Premium Boost
     premium_active = is_premium(killer, context)
-    
+
     if premium_active:
-        reward = random.randint(500, 1200)  # Huge boost for Premium
-        xp_gain = random.randint(30, 60)
+        # Premium: 500-1500 Coins, 35-57 XP
+        reward = random.randint(500, 1500)
+        xp_gain = random.randint(35, 57)
         kill_msg = f"💗 {user.first_name} (Pʀᴇᴍɪᴜᴍ) Aɴɴɪʜɪʟᴀᴛᴇᴅ {target_user.first_name}"
     else:
-        reward = random.randint(200, 600)   # Increased normal reward (was 50-299)
-        xp_gain = random.randint(10, 35)    # Increased normal XP (was 1-19)
+        # Normal: 100-300 Coins, 5-21 XP
+        reward = random.randint(100, 300)
+        xp_gain = random.randint(5, 21)
         kill_msg = f"👤 {user.first_name} Sᴛᴀʙʙᴇᴅ {target_user.first_name}"
+
 
     killer["coins"] = killer.get("coins", 0) + reward
     killer["xp"] = killer.get("xp", 0) + xp_gain
