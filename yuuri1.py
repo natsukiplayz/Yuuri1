@@ -2218,7 +2218,7 @@ async def robe(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if expire > datetime.utcnow():
             return await msg.reply_text(
                 "🛡️ Tʜɪꜱ Uꜱᴇʀ Iꜱ Pʀᴏᴛᴇᴄᴛᴇᴅ.\n"
-                "🔒 Yᴏᴜ Cᴀɴɴᴏᴛ Rᴏʙ Tʜᴇᴍ."
+                "🔒 Cʜᴇᴄᴋ Pʀᴏᴛᴇᴄᴛɪᴏɴ Tɪᴍᴇ » / check"
             )
 
     # 💰 Minimum coins check
@@ -2403,7 +2403,7 @@ async def kill(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if expire > datetime.utcnow():
                 return await msg.reply_text(
                     "🛡️ Tʜɪꜱ Uꜱᴇʀ Iꜱ Pʀᴏᴛᴇᴄᴛᴇᴅ.\n"
-                    "🔒 Cʜᴇᴄᴋ Pʀᴏᴛᴇᴄᴛɪᴏɴ Tɪᴍᴇ → Cᴏᴍɪɴɢ Sᴏᴏɴ 🔜"
+                    "🔒 Cʜᴇᴄᴋ Pʀᴏᴛᴇᴄᴛɪᴏɴ Tɪᴍᴇ → /check"
                 )
         except (ValueError, TypeError):
             pass
