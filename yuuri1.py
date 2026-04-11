@@ -617,19 +617,18 @@ async def redeem(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     msg = update.effective_message
 
-    # 1. USAGE CHECK
     if not context.args:
         usage = (
             "🎫 <b>𝗥𝗲𝗱𝗲𝗲𝗺 𝗖𝗼𝗱𝗲</b>\n\n"
             "Uꜱᴀɢᴇ: <code>/redeem &lt;code&gt;</code>\n\n"
-            "Exᴀᴍᴘʟᴇ:\n"
-            "• <code>/redeem GIFT10</code>"
+            "Exᴀᴍᴘʟᴇ: <code>/redeem GIFT10</code>"
         )
         return await msg.reply_text(usage, parse_mode="HTML")
 
     code_input = context.args[0].upper()
 
-    # 2. ATOMIC CHECK AND UPDATE
+    # ATOMIC CHECK AND UPDATE
+    # Note: Using redeem_col (sync) here is fine, but users_col below is async
     result = redeem_col.find_one_and_update(
         {
             "code": code_input,
@@ -640,53 +639,46 @@ async def redeem(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return_document=False 
     )
 
-    # 3. FAILURE HANDLING
     if not result:
         data = redeem_col.find_one({"code": code_input})
-        
         if not data:
             return await msg.reply_text("❌ Tʜᴀᴛ ᴄᴏᴅᴇ ɪs ɪɴᴠᴀʟɪᴅ ᴏʀ ᴇxᴘɪʀᴇᴅ!")
-
         if user.id in data.get("used_by", []):
             return await msg.reply_text("⚠️ Yᴏᴜ ʜᴀᴠᴇ ᴀʟʀᴇᴀᴅʏ ᴄʟᴀɪᴍᴇᴅ ᴛʜɪs ᴄᴏᴅᴇ!")
+        return await msg.reply_text("😔 Sᴏʀʀʏ! Tʜɪs ᴄᴏᴅᴇ ʜᴀs ʀᴇᴀᴄʜᴇᴅ ɪᴛs ᴜsᴀɢᴇ ʟɪᴍɪᴛ.")
 
-        if len(data.get("used_by", [])) >= data.get("limit", 0):
-            return await msg.reply_text("😔 Sᴏʀʀʏ! Tʜɪs ᴄᴏᴅᴇ ʜᴀs ʀᴇᴀᴄʜᴇᴅ ɪᴛs ᴜsᴀɢᴇ ʟɪᴍɪᴛ.")
-
-        return await msg.reply_text("❌ Sᴏᴍᴇᴛʜɪɴɢ ᴡᴇɴᴛ ᴡʀᴏɴɢ. Tʀʏ ᴀɢᴀɪɴ.")
-
-    # 4. PROCESS REWARD
     reward_raw = result.get("reward", "")
     reward_type, reward_val = reward_raw.split(":", 1)
     display_reward = ""
 
     try:
+        # Changed 'user_data_col' to 'users_col' and used 'await'
+        # Changed key from "user_id" to "id" to match your get_user() logic
         if reward_type == "coins":
             val = int(reward_val)
-            user_data_col.update_one({"user_id": user.id}, {"$inc": {"coins": val}}, upsert=True)
+            await users_col.update_one({"id": user.id}, {"$inc": {"coins": val}}, upsert=True)
             display_reward = f"💰 <code>{val:,} Cᴏɪɴs</code>"
 
         elif reward_type == "xp":
             val = int(reward_val)
-            user_data_col.update_one({"user_id": user.id}, {"$inc": {"xp": val}}, upsert=True)
+            await users_col.update_one({"id": user.id}, {"$inc": {"xp": val}}, upsert=True)
             display_reward = f"✨ <code>{val:,} XP</code>"
 
         elif reward_type == "item":
-            user_data_col.update_one({"user_id": user.id}, {"$push": {"inventory": reward_val}}, upsert=True)
+            await users_col.update_one({"id": user.id}, {"$push": {"inventory": reward_val}}, upsert=True)
             display_reward = f"🎁 <code>{reward_val}</code>"
 
     except (ValueError, IndexError):
         return await msg.reply_text("❌ Eʀʀᴏʀ ᴘʀᴏᴄᴇssɪɴɢ ʀᴇᴡᴀʀᴅ ᴠᴀʟᴜᴇ.")
 
-    # 5. FINAL OUTPUT
     response_text = (
         f"✅ <b>𝗥𝗲𝗱𝗲𝗲𝗺 𝗦𝘂𝗰𝗰𝗲𝘀𝘀𝗳𝘂𝗹</b>\n\n"
         f"👤 Uꜱᴇʀ : <b>{user.first_name}</b>\n"
         f"🎁 Rᴇᴡᴀʀᴅ : {display_reward}\n\n"
         "Cʜᴇᴄᴋ ʏᴏᴜʀ /status ᴛᴏ sᴇᴇ ʏᴏᴜʀ ɢʀᴏᴡᴛʜ! 🚀"
     )
-
     await msg.reply_text(response_text, parse_mode="HTML")
+
 
 #=== Quote_transformer =======
 import httpx
@@ -2177,7 +2169,6 @@ BOT_ID = None
 MAX_ROB_PER_ATTEMPT = 10000
 
 async def robe(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
     if not update.message:
         return
 
@@ -2212,8 +2203,11 @@ async def robe(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         amount = int(context.args[0])
-    except:
+    except ValueError:
         return await msg.reply_text("❌ Iɴᴠᴀʟɪᴅ Aᴍᴏᴜɴᴛ.")
+
+    if amount <= 0:
+        return await msg.reply_text("❌ Aᴍᴏᴜɴᴛ Mᴜsᴛ Bᴇ Pᴏsɪᴛɪᴠᴇ.")
 
     robber = get_user(robber_user)
     target = get_user(target_user)
@@ -2228,28 +2222,38 @@ async def robe(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
 
     # 💰 Minimum coins check
-    if robber["coins"] < 50:
+    if robber.get("coins", 0) < 50:
         return await msg.reply_text(
             "💰 Yᴏᴜ Nᴇᴇᴅ Aᴛ Lᴇᴀsᴛ 50 Cᴏɪɴs Tᴏ Rᴏʙ Sᴏᴍᴇᴏɴᴇ."
         )
 
-    steal = min(amount, target["coins"], MAX_ROB_PER_ATTEMPT)
+    # 🌟 PREMIUM LOGIC FOR MAX ROB LIMIT
+    premium_active = is_premium(robber, context)
+    max_rob_limit = 100000 if premium_active else 10000
 
-    if steal <= 0:
+    if amount > max_rob_limit:
+        user_status = "💗 Pʀᴇᴍɪᴜᴍ" if premium_active else "👤 Nᴏʀᴍᴀʟ"
         return await msg.reply_text(
-            f"💸 {target_user.first_name} Hᴀs Nᴏ Cᴏɪɴs."
+            f"❌ Aꜱ ᴀ {user_status} ᴜꜱᴇʀ, ʏᴏᴜ ᴄᴀɴ ᴏɴʟʏ ʀᴏʙ ᴜᴘ ᴛᴏ {max_rob_limit:,} ᴄᴏɪɴꜱ ᴀᴛ ᴀ ᴛɪᴍᴇ."
+        )
+
+    # 💸 STRICT AMOUNT CHECK (No Auto-Adjusting)
+    if target.get("coins", 0) < amount:
+        return await msg.reply_text(
+            f"💸 {target_user.first_name} ᴅᴏᴇꜱɴ'ᴛ ʜᴀᴠᴇ {amount:,} ᴄᴏɪɴꜱ!\n"
+            f"Tʜᴇʏ ᴏɴʟʏ ʜᴀᴠᴇ {target.get('coins', 0):,} ᴄᴏɪɴꜱ."
         )
 
     # ✅ Always success
-    robber["coins"] += steal
-    target["coins"] -= steal
+    robber["coins"] += amount
+    target["coins"] -= amount
 
     save_user(robber)
     save_user(target)
 
     await msg.reply_text(
         f"🕵️ {robber_user.first_name} Sᴜᴄᴄᴇssғᴜʟʟʏ Rᴏʙʙᴇᴅ {target_user.first_name}\n"
-        f"💰 Sᴛᴏʟᴇɴ: {steal} Cᴏɪɴs"
+        f"💰 Sᴛᴏʟᴇɴ: {amount:,} Cᴏɪɴs"
     )
 
 #======Give======
