@@ -187,6 +187,14 @@ def is_premium(user_data, context=None):
     except:
         return False
 
+#economy commands
+async def is_economy_disabled(chat_id: int) -> bool:
+    """Checks if the economy is closed in a specific group."""
+    group_data = await groups_col.find_one({"chat_id": chat_id})
+    if group_data and group_data.get("economy_closed") is True:
+        return True
+    return False
+
 #======== load groups ====
 SAVED_GROUPS = {}
 
@@ -1677,6 +1685,58 @@ async def owner_cmds(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_text(help_text, parse_mode='HTML')
 
+#economy close open system 
+async def close_economy(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """/close - Disables economy commands in the group"""
+    chat = update.effective_chat
+    user_id = update.effective_user.id
+
+    if chat.type == "private":
+        return await update.message.reply_text("❌ Tʜɪs Cᴏᴍᴍᴀɴᴅ Iꜱ Fᴏʀ Gʀᴏᴜᴘꜱ Oɴʟʏ.")
+
+    # Admin & Owner Check
+    member = await chat.get_member(user_id)
+    is_admin = member.status in ["administrator", "creator"]
+    
+    # Allow the Bot Owner to bypass this check as well
+    if not is_admin and user_id != OWNER_ID:
+        return await update.message.reply_text("❌ Oɴʟʏ Aᴅᴍɪɴs Cᴀɴ Uꜱᴇ Tʜɪꜱ Cᴏᴍᴍᴀɴᴅ.")
+
+    # Save to async groups collection
+    await groups_col.update_one(
+        {"chat_id": chat.id},
+        {"$set": {"economy_closed": True}},
+        upsert=True
+    )
+
+    await update.message.reply_text("🛑 **Eᴄᴏɴᴏᴍʏ Sʏsᴛᴇᴍ Cʟᴏsᴇᴅ**\n\nAʟʟ ᴇᴄᴏɴᴏᴍʏ ᴄᴏᴍᴍᴀɴᴅs ʜᴀᴠᴇ ʙᴇᴇɴ ᴅɪsᴀʙʟᴇᴅ ɪɴ ᴛʜɪs ɢʀᴏᴜᴘ.", parse_mode="Markdown")
+
+
+async def open_economy(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """/open - Enables economy commands in the group"""
+    chat = update.effective_chat
+    user_id = update.effective_user.id
+
+    if chat.type == "private":
+        return await update.message.reply_text("❌ Tʜɪs Cᴏᴍᴍᴀɴᴅ Iꜱ Fᴏʀ Gʀᴏᴜᴘꜱ Oɴʟʏ.")
+
+    # Admin & Owner Check
+    member = await chat.get_member(user_id)
+    is_admin = member.status in ["administrator", "creator"]
+    
+    if not is_admin and user_id != OWNER_ID:
+        return await update.message.reply_text("❌ Oɴʟʏ Aᴅᴍɪɴs Cᴀɴ Uꜱᴇ Tʜɪꜱ Cᴏᴍᴍᴀɴᴅ.")
+
+    # Save to async groups collection
+    await groups_col.update_one(
+        {"chat_id": chat.id},
+        {"$set": {"economy_closed": False}},
+        upsert=True
+    )
+
+    await update.message.reply_text("✅ **Eᴄᴏɴᴏᴍʏ Sʏsᴛᴇᴍ Oᴘᴇɴᴇᴅ**\n\nAʟʟ ᴇᴄᴏɴᴏᴍʏ ᴄᴏᴍᴍᴀɴᴅs ᴀʀᴇ ɴᴏᴡ ᴀᴄᴛɪᴠᴇ ɪɴ ᴛʜɪs ɢʀᴏᴜᴘ.", parse_mode="Markdown")
+
+
 #==================Main StartUp Of Yuuri==================
 import uuid
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
@@ -2012,31 +2072,35 @@ async def handle_help_callbacks(update: Update, context: ContextTypes.DEFAULT_TY
 from datetime import datetime
 import random
 
-async def daily(update, context):
-    user_id = update.effective_user.id
-    u = users.find_one({"id": user_id})
+async def daily(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message:
+        return
 
-    # create user if not exist
-    if not u:
-        u = {
-            "id": user_id,
-            "name": update.effective_user.first_name,
-            "coins": 0,
-            "xp": 0,
-            "level": 1,
-            "inventory": []
-        }
-        users.insert_one(u)
+    msg = update.message
+    chat = update.effective_chat
+    user = update.effective_user
+
+    # 🛑 --- ECONOMY CHECK --- 🛑
+    # We only check if the economy is disabled if they are in a group.
+    # Daily can still be claimed in the bot's private DMs if you allow it!
+    if chat.type != "private":
+        if await is_economy_disabled(chat.id):
+            return await msg.reply_text("🛑 Tʜᴇ Eᴄᴏɴᴏᴍʏ Sʏsᴛᴇᴍ Iꜱ Cᴜʀʀᴇɴᴛʟʏ Cʟᴏsᴇᴅ Iɴ Tʜɪs Gʀᴏᴜᴘ.")
+    # ---------------------------
+
+    # Fetch user using your custom function (handles creation & name updates automatically)
+    u = get_user(user)
 
     today = datetime.now().date()
 
     if "last_daily" in u:
         last_claim = datetime.strptime(u["last_daily"], "%Y-%m-%d").date()
         if last_claim == today:
-            return await update.message.reply_text(
+            return await msg.reply_text(
                 "⛔ Yᴏᴜ ᴀʟʀᴇᴀᴅʏ Cʟᴀɪᴍᴇᴅ Yᴏᴜʀ Dᴀɪʟʏ Rᴇᴡᴀʀᴅ Tᴏᴅᴀʏ."
             )
 
+    # Check premium status
     premium_active = is_premium(u, context) 
     
     if premium_active:
@@ -2046,16 +2110,16 @@ async def daily(update, context):
         reward = random.randint(50, 120)
         msg_prefix = "🎁 Dᴀɪʟʏ Rᴇᴡᴀʀᴅ"
 
+    # Add coins and update date
     u["coins"] += reward
     u["last_daily"] = today.strftime("%Y-%m-%d")
 
-    # Save user
-    users.update_one({"id": user_id}, {"$set": u})
+    # Save user using your custom save function
+    save_user(u)
 
-    await update.message.reply_text(
+    await msg.reply_text(
         f"{msg_prefix}: +{reward:,} Cᴏɪɴs"
     )
-
 
 #====economy commands=======
 #--
@@ -2063,8 +2127,16 @@ async def daily(update, context):
 async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     if not msg: return
+    chat = update.effective_chat
+    user = update.effective_user
 
-    target_user = msg.reply_to_message.from_user if msg.reply_to_message else update.effective_user
+    # 🛑 --- ECONOMY CHECK --- 🛑
+    if chat.type != "private":
+        if await is_economy_disabled(chat.id):
+            return await msg.reply_text("🛑 Tʜᴇ Eᴄᴏɴᴏᴍʏ Sʏsᴛᴇᴍ Iꜱ Cᴜʀʀᴇɴᴛʟʏ Cʟᴏsᴇᴅ Iɴ Tʜɪs Gʀᴏᴜᴘ.")
+    # ---------------------------
+
+    target_user = msg.reply_to_message.from_user if msg.reply_to_message else user
     data = get_user(target_user) 
 
     # --- ✨ AUTO-LEVEL LOGIC ---
@@ -2080,13 +2152,12 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if updated:
         save_user(data)
 
-    # --- DATA EXTRACTION ---
+    # --- DATA EXTRACTION & RANKINGS (Rest of your code remains the same) ---
     xp = data.get("xp", 0)
     lvl = data.get("level", 1)
     coins = data.get("coins", 0)
     kills = data.get("kills", 0)
     
-    # ✅ LIVE PREMIUM ICON CHECK
     premium_active = is_premium(data, context)
     icon = "💓" if premium_active else "👤"
 
@@ -2097,9 +2168,7 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     percent = int((xp / need) * 100) if need > 0 else 0
     bar = create_progress_bar(min(percent, 100))
 
-    # --- GLOBAL RANKINGS ---
     bot_id = context.bot.id
-    
     xp_rank = 1 + users.count_documents({"id": {"$ne": bot_id}, "$or": [{"level": {"$gt": lvl}}, {"level": lvl, "xp": {"$gt": xp}}]})
     wealth_rank = 1 + users.count_documents({"id": {"$ne": bot_id}, "coins": {"$gt": coins}})
     kill_rank = 1 + users.count_documents({"id": {"$ne": bot_id}, "kills": {"$gt": kills}})
@@ -2126,31 +2195,34 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await msg.reply_text(text)
 
-# ===============balance======== 
+# =============== balance =================
 async def bal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     if not msg: return
+    chat = update.effective_chat
+
+    # 🛑 --- ECONOMY CHECK --- 🛑
+    if chat.type != "private":
+        if await is_economy_disabled(chat.id):
+            return await msg.reply_text("🛑 Tʜᴇ Eᴄᴏɴᴏᴍʏ Sʏsᴛᴇᴍ Iꜱ Cᴜʀʀᴇɴᴛʟʏ Cʟᴏsᴇᴅ Iɴ Tʜɪs Gʀᴏᴜᴘ.")
+    # ---------------------------
 
     target_user = msg.reply_to_message.from_user if msg.reply_to_message else update.effective_user
     data = get_user(target_user) 
 
-    # --- DATA EXTRACTION ---
     coins = data.get("coins", 0)
     kills = data.get("kills", 0)
     status = "💀 Dᴇᴀᴅ" if data.get("dead") else "❤️ Aʟɪᴠᴇ"
     
-    # ✅ LIVE PREMIUM ICON CHECK
     premium_active = is_premium(data, context)
     icon = "💓" if premium_active else "👤"
     
-    # --- WEALTH RANKING ---
     bot_id = context.bot.id
     wealth_rank = 1 + users.count_documents({
         "id": {"$ne": bot_id}, 
         "coins": {"$gt": coins}
     })
 
-    # --- TEXT CONSTRUCTION ---
     text = (
         f"{icon} Nᴀᴍᴇ: {data.get('name', target_user.first_name)}\n"
         f"💰 Cᴏɪɴꜱ: {coins:,}\n"
@@ -2173,10 +2245,17 @@ async def robe(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     msg = update.message
+    chat = update.effective_chat
     robber_user = update.effective_user
 
+    # 🛑 --- ECONOMY CHECK --- 🛑
+    if chat.type != "private":
+        if await is_economy_disabled(chat.id):
+            return await msg.reply_text("🛑 Tʜᴇ Eᴄᴏɴᴏᴍʏ Sʏsᴛᴇᴍ Iꜱ Cᴜʀʀᴇɴᴛʟʏ Cʟᴏsᴇᴅ Iɴ Tʜɪs Gʀᴏᴜᴘ.")
+    # ---------------------------
+
     # ❌ Block in private
-    if update.effective_chat.type == "private":
+    if chat.type == "private":
         return await msg.reply_text("❌ Tʜɪs Cᴏᴍᴍᴀɴᴅ Cᴀɴ Oɴʟʏ Bᴇ Usᴇᴅ Iɴ Gʀᴏᴜᴘs.")
 
     # ❌ Must reply
@@ -2218,7 +2297,7 @@ async def robe(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if expire > datetime.utcnow():
             return await msg.reply_text(
                 "🛡️ Tʜɪꜱ Uꜱᴇʀ Iꜱ Pʀᴏᴛᴇᴄᴛᴇᴅ.\n"
-                "🔒 Cʜᴇᴄᴋ Pʀᴏᴛᴇᴄᴛɪᴏɴ Tɪᴍᴇ » / check"
+                "🔒 Cʜᴇᴄᴋ Pʀᴏᴛᴇᴄᴛɪᴏɴ Tɪᴍᴇ » /check"
             )
 
     # 💰 Minimum coins check
@@ -2237,14 +2316,14 @@ async def robe(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"❌ Aꜱ ᴀ {user_status} ᴜꜱᴇʀ, ʏᴏᴜ ᴄᴀɴ ᴏɴʟʏ ʀᴏʙ ᴜᴘ ᴛᴏ {max_rob_limit:,} ᴄᴏɪɴꜱ ᴀᴛ ᴀ ᴛɪᴍᴇ."
         )
 
-    # 💸 STRICT AMOUNT CHECK (No Auto-Adjusting)
+    # 💸 STRICT AMOUNT CHECK
     if target.get("coins", 0) < amount:
         return await msg.reply_text(
             f"💸 {target_user.first_name} ᴅᴏᴇꜱɴ'ᴛ ʜᴀᴠᴇ {amount:,} ᴄᴏɪɴꜱ!\n"
             f"Tʜᴇʏ ᴏɴʟʏ ʜᴀᴠᴇ {target.get('coins', 0):,} ᴄᴏɪɴꜱ."
         )
 
-    # ✅ Always success
+    # ✅ Success
     robber["coins"] += amount
     target["coins"] -= amount
 
@@ -2259,8 +2338,15 @@ async def robe(update: Update, context: ContextTypes.DEFAULT_TYPE):
 #======Give======
 async def givee(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
+    chat = update.effective_chat
     sender = update.effective_user
     reply = msg.reply_to_message
+
+    # 🛑 --- ECONOMY CHECK --- 🛑
+    if chat.type != "private":
+        if await is_economy_disabled(chat.id):
+            return await msg.reply_text("🛑 Tʜᴇ Eᴄᴏɴᴏᴍʏ Sʏsᴛᴇᴍ Iꜱ Cᴜʀʀᴇɴᴛʟʏ Cʟᴏsᴇᴅ Iɴ Tʜɪs Gʀᴏᴜᴘ.")
+    # ---------------------------
 
     if not reply:
         return await msg.reply_text("⚠️ Rᴇᴘʟʏ Tᴏ A Pʟᴀʏᴇʀ Tᴏ Gɪᴠᴇ Cᴏɪɴs")
@@ -2278,7 +2364,7 @@ async def givee(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         amount = int(context.args[0])
-    except:
+    except ValueError:
         return await msg.reply_text("❌ Iɴᴠᴀʟɪᴅ Aᴍᴏᴜɴᴛ")
 
     if amount <= 0:
@@ -2345,6 +2431,7 @@ f"""
 ⚡ Xᴘ Dᴇᴅᴜᴄᴛᴇᴅ: -{xp_loss}
 """
     )
+#kill
 import random
 from datetime import datetime
 from telegram import Update
@@ -2354,7 +2441,6 @@ BOT_ID = None
 
 async def kill(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global BOT_ID
-
     if BOT_ID is None:
         BOT_ID = context.bot.id
 
@@ -2362,10 +2448,17 @@ async def kill(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     msg = update.message
+    chat = update.effective_chat
     user = update.effective_user
 
+    # 🛑 --- ECONOMY CHECK --- 🛑
+    if chat.type != "private":
+        if await is_economy_disabled(chat.id):
+            return await msg.reply_text("🛑 Tʜᴇ Eᴄᴏɴᴏᴍʏ Sʏsᴛᴇᴍ Iꜱ Cᴜʀʀᴇɴᴛʟʏ Cʟᴏsᴇᴅ Iɴ Tʜɪs Gʀᴏᴜᴘ.")
+    # ---------------------------
+
     # ❌ Block in private
-    if update.effective_chat.type == "private":
+    if chat.type == "private":
         return await msg.reply_text("❌ Tʜɪs Cᴏᴍᴍᴀɴᴅ Cᴀɴ Oɴʟʏ Bᴇ Usᴇᴅ Iɴ Gʀᴏᴜᴘs.")
 
     # ❌ Must reply
@@ -2374,25 +2467,20 @@ async def kill(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     target_user = msg.reply_to_message.from_user
 
-    # ❌ Invalid target
     if not target_user:
         return await msg.reply_text("❌ Iɴᴠᴀʟɪᴅ Tᴀʀɢᴇᴛ.")
 
-    # ❌ Cannot kill any bot (including other bots in the group)
     if target_user.is_bot:
         if target_user.id == BOT_ID:
             return await msg.reply_text("😂 Nɪᴄᴇ Tʀʏ Oɴ Mᴇ!")
         return await msg.reply_text("🤖 Yᴏᴜ Cᴀɴ'ᴛ Kɪʟʟ Bᴏᴛs, Tʜᴇʏ Hᴀᴠᴇ Nᴏ Sᴏᴜʟ.")
 
-    # ❌ Cannot kill bot owner
     if target_user.id == OWNER_ID:
         return await msg.reply_text("😒 Yᴏᴜ Cᴀɴ'ᴛ Kɪʟʟ Mʏ Dᴇᴀʀᴇsᴛ Oᴡɴᴇʀ.")
 
-    # ❌ Cannot kill yourself
     if target_user.id == user.id:
         return await msg.reply_text("❌ Yᴏᴜ Cᴀɴ'ᴛ Kɪʟʟ Yᴏᴜʀsᴇʟғ.")
 
-    # ✅ Get MongoDB data
     killer = get_user(user)
     victim = get_user(target_user)
 
@@ -2401,105 +2489,80 @@ async def kill(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             expire = datetime.strptime(victim["protect_until"], "%Y-%m-%d %H:%M:%S")
             if expire > datetime.utcnow():
-                return await msg.reply_text(
-                    "🛡️ Tʜɪꜱ Uꜱᴇʀ Iꜱ Pʀᴏᴛᴇᴄᴛᴇᴅ.\n"
-                    "🔒 Cʜᴇᴄᴋ Pʀᴏᴛᴇᴄᴛɪᴏɴ Tɪᴍᴇ → /check"
-                )
+                return await msg.reply_text("🛡️ Tʜɪꜱ Uꜱᴇʀ Iꜱ Pʀᴏᴛᴇᴄᴛᴇᴅ. 🔒 Cʜᴇᴄᴋ Pʀᴏᴛᴇᴄᴛɪᴏɴ Tɪᴍᴇ → /check")
         except (ValueError, TypeError):
             pass
 
-    # ❌ Check if already dead
     if victim.get("dead", False):
         return await msg.reply_text(f"💀 {target_user.first_name} ɪꜱ ᴀʟʀᴇᴀᴅʏ ᴅᴇᴀᴅ!")
 
-      # 🎲 Random rewards & ✨ Premium Boost
+    # 🎲 Random rewards & ✨ Premium Boost
     premium_active = is_premium(killer, context)
-
     if premium_active:
-        # Premium: 500-1500 Coins, 35-57 XP
         reward = random.randint(500, 1500)
         xp_gain = random.randint(35, 57)
         kill_msg = f"💗 {user.first_name} (Pʀᴇᴍɪᴜᴍ) Aɴɴɪʜɪʟᴀᴛᴇᴅ {target_user.first_name}"
     else:
-        # Normal: 100-300 Coins, 5-21 XP
         reward = random.randint(100, 300)
         xp_gain = random.randint(5, 21)
         kill_msg = f"👤 {user.first_name} Sᴛᴀʙʙᴇᴅ {target_user.first_name}"
-
 
     killer["coins"] = killer.get("coins", 0) + reward
     killer["xp"] = killer.get("xp", 0) + xp_gain
     killer["kills"] = killer.get("kills", 0) + 1
 
-    # 🏰 Guild XP logic
-    guild_name = killer.get("guild")
-    if guild_name:
-        try:
-            await add_guild_xp(guild_name, context)
-        except NameError:
-            pass
-
-    # 🎯 Bounty reward
     bounty_reward = victim.get("bounty", 0)
     if bounty_reward > 0:
         killer["coins"] += bounty_reward
         victim["bounty"] = 0
 
-    # 💀 Mark victim dead
     victim["dead"] = True
-
-    # 💾 Save MongoDB
     save_user(killer)
     save_user(victim)
 
-    # 📢 Kill message
-    await msg.reply_text(
-        f"{kill_msg}\n"
-        f"💰 Eᴀʀɴᴇᴅ: {reward:,} Cᴏɪɴs\n"
-        f"⭐ Gᴀɪɴᴇᴅ: +{xp_gain} Xᴘ"
-    )
-
-    # 🎯 Bounty message
+    await msg.reply_text(f"{kill_msg}\n💰 Eᴀʀɴᴇᴅ: {reward:,} Cᴏɪɴs\n⭐ Gᴀɪɴᴇᴅ: +{xp_gain} Xᴘ")
     if bounty_reward > 0:
-        await msg.reply_text(
-            f"🎯 Bᴏᴜɴᴛʏ Cʟᴀɪᴍᴇᴅ!\n"
-            f"💰 Eᴀʀɴᴇᴅ ᴇxᴛʀᴀ: {bounty_reward:,} Cᴏɪɴs!"
-        )
+        await msg.reply_text(f"🎯 Bᴏᴜɴᴛʏ Cʟᴀɪᴍᴇᴅ!\n💰 Eᴀʀɴᴇᴅ ᴇxᴛʀᴀ: {bounty_reward:,} Cᴏɪɴs!")
 
 # ========== BOUNTY =========
 async def bounty(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message.reply_to_message:
-        return await update.message.reply_text("Rᴇᴘʟʏ Tᴏ Sᴏᴍᴇᴏɴᴇ Tᴏ Pʟᴀᴄᴇ Bᴏᴜɴᴛʏ.")
+    msg = update.message
+    chat = update.effective_chat
+
+    # 🛑 --- ECONOMY CHECK --- 🛑
+    if chat.type != "private":
+        if await is_economy_disabled(chat.id):
+            return await msg.reply_text("🛑 Tʜᴇ Eᴄᴏɴᴏᴍʏ Sʏsᴛᴇᴍ Iꜱ Cᴜʀʀᴇɴᴛʟʏ Cʟᴏsᴇᴅ Iɴ Tʜɪs Gʀᴏᴜᴘ.")
+    # ---------------------------
+
+    if not msg.reply_to_message:
+        return await msg.reply_text("Rᴇᴘʟʏ Tᴏ Sᴏᴍᴇᴏɴᴇ Tᴏ Pʟᴀᴄᴇ Bᴏᴜɴᴛʏ.")
 
     if not context.args:
-        return await update.message.reply_text("Use: /bounty <amount>")
+        return await msg.reply_text("Use: /bounty <amount>")
 
     try:
         amount = int(context.args[0])
     except ValueError:
-        return await update.message.reply_text("❌ Aᴍᴏᴜɴᴛ ᴍᴜsᴛ ʙᴇ ᴀ ɴᴜᴍʙᴇʀ.")
+        return await msg.reply_text("❌ Aᴍᴏᴜɴᴛ ᴍᴜsᴛ ʙᴇ ᴀ ɴᴜᴍʙᴇʀ.")
 
     sender = get_user(update.effective_user)
-    target_user = update.message.reply_to_message.from_user
+    target_user = msg.reply_to_message.from_user
     target = get_user(target_user)
 
     if sender.get("coins", 0) < amount:
-        return await update.message.reply_text("❌ Nᴏᴛ ᴇɴᴏᴜɢʜ Cᴏɪɴs.")
+        return await msg.reply_text("❌ Nᴏᴛ ᴇɴᴏᴜɢʜ Cᴏɪɴs.")
 
     if target_user.id == update.effective_user.id:
-        return await update.message.reply_text("❌ Yᴏᴜ ᴄᴀɴ'ᴛ ᴘʟᴀᴄᴇ ʙᴏᴜɴᴛʏ ᴏɴ ʏᴏᴜʀsᴇʟғ.")
+        return await msg.reply_text("❌ Yᴏᴜ ᴄᴀɴ'ᴛ ᴘʟᴀᴄᴇ ʙᴏᴜɴᴛʏ ᴏɴ ʏᴏᴜʀsᴇʟғ.")
 
-    # Deduct coins from sender
     sender["coins"] -= amount
-    # Add bounty to target
     target["bounty"] = target.get("bounty", 0) + amount
 
-    # Save to MongoDB
     save_user(sender)
     save_user(target)
 
-    # Fancy reply
-    await update.message.reply_text(
+    await msg.reply_text(
         f"🎯 Bᴏᴜɴᴛʏ Pʟᴀᴄᴇᴅ!\n\n"
         f"👤 Tᴀʀɢᴇᴛ: {target_user.first_name}\n"
         f"💰 Rᴇᴡᴀʀᴅ: {amount:,} Cᴏɪɴs\n\n"
@@ -2508,18 +2571,22 @@ async def bounty(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 #========Revive========
 async def revive(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    user = update.effective_user
     msg = update.effective_message
+    chat = update.effective_chat
+    user = update.effective_user
     reply = msg.reply_to_message
 
-    # target player
-    if reply:
-        target = reply.from_user
-    else:
-        target = user
+    # 🛑 --- ECONOMY CHECK --- 🛑
+    if chat.type != "private":
+        if await is_economy_disabled(chat.id):
+            return await msg.reply_text("🛑 Tʜᴇ Eᴄᴏɴᴏᴍʏ Sʏsᴛᴇᴍ Iꜱ Cᴜʀʀᴇɴᴛʟʏ Cʟᴏsᴇᴅ Iɴ Tʜɪs Gʀᴏᴜᴘ.")
+    # ---------------------------
 
-    data = users.find_one({"id": target.id})
+    # target player
+    target = reply.from_user if reply else user
+
+    # Use your get_user helper to ensure data consistency
+    data = get_user(target)
 
     if not data:
         return await msg.reply_text("❌ Pʟᴀʏᴇʀ Nᴏᴛ Fᴏᴜɴᴅ")
@@ -2530,7 +2597,6 @@ async def revive(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # self revive cost
     if target.id == user.id:
-
         coins = data.get("coins", 0)
 
         if coins < 400:
@@ -2538,16 +2604,13 @@ async def revive(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "💰 Yᴏᴜ Nᴇᴇᴅ 400 Cᴏɪɴs Tᴏ Rᴇᴠɪᴠᴇ Yᴏᴜʀsᴇʟғ"
             )
 
-        users.update_one(
-            {"id": user.id},
-            {"$inc": {"coins": -400}}
-        )
+        data["coins"] -= 400
 
     # revive player
-    users.update_one(
-        {"id": target.id},
-        {"$set": {"dead": False}}
-    )
+    data["dead"] = False
+    
+    # Save the updated data using your save_user helper
+    save_user(data)
 
     await msg.reply_text(
 f"""
@@ -2568,9 +2631,17 @@ from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
 
 async def protect(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = update.message
+    chat = update.effective_chat
+
+    # 🛑 --- ECONOMY CHECK --- 🛑
+    if chat.type != "private":
+        if await is_economy_disabled(chat.id):
+            return await msg.reply_text("🛑 Tʜᴇ Eᴄᴏɴᴏᴍʏ Sʏsᴛᴇᴍ Iꜱ Cᴜʀʀᴇɴᴛʟʏ Cʟᴏsᴇᴅ Iɴ Tʜɪs Gʀᴏᴜᴘ.")
+    # ---------------------------
 
     if not context.args:
-        return await update.message.reply_text(
+        return await msg.reply_text(
             "🛡️ <b>Pʀᴏᴛᴇᴄᴛɪᴏɴ Sʏsᴛᴇᴍ</b>\n\n"
             "💰 <b>Cᴏsᴛs:</b>\n"
             "1ᴅ → 200$ (Aʟʟ Uꜱᴇʀꜱ 👤)\n"
@@ -2581,114 +2652,65 @@ async def protect(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
     arg = context.args[0].lower()
-
-    durations = {
-        "1d": (1, 200),
-        "2d": (2, 400),
-        "3d": (3, 600)
-    }
+    durations = {"1d": (1, 200), "2d": (2, 400), "3d": (3, 600)}
 
     if arg not in durations:
-        return await update.message.reply_text(
-            "🛡️ <b>Iɴᴠᴀʟɪᴅ Pʀᴏᴛᴇᴄᴛɪᴏɴ Tɪᴍᴇ.</b>\n\n"
-            "💰 Aᴛ Lᴇᴀꜱᴛ 200$ Nᴇᴇᴅᴇᴅ Fᴏʀ 1ᴅ Pʀᴏᴛᴇᴄᴛɪᴏɴ.\n"
-            "Uꜱᴀɢᴇ: <code>/protect 1d|2d|3d</code>",
-            parse_mode=ParseMode.HTML
-        )
+        return await msg.reply_text("🛡️ <b>Iɴᴠᴀʟɪᴅ Pʀᴏᴛᴇᴄᴛɪᴏɴ Tɪᴍᴇ.</b>", parse_mode=ParseMode.HTML)
 
     days, price = durations[arg]
     user = get_user(update.effective_user)
     
-    # ✅ PREMIUM CHECK & LIMITATION
     premium_active = is_premium(user, context)
     
     if days > 1 and not premium_active:
-        return await update.message.reply_text(
-            "❌ <b>Pʀᴇᴍɪᴜᴍ Fᴇᴀᴛᴜʀᴇ Oɴʟʏ!</b>\n\n"
-            "👤 Nᴏʀᴍᴀʟ ᴜꜱᴇʀꜱ ᴄᴀɴ ᴏɴʟʏ ᴘʀᴏᴛᴇᴄᴛ ꜰᴏʀ 1ᴅ.\n"
-            "🌟 Uᴘɢʀᴀᴅᴇ ᴛᴏ Pʀᴇᴍɪᴜᴍ ᴛᴏ ᴜɴʟᴏᴄᴋ 2ᴅ ᴀɴᴅ 3ᴅ ᴘʀᴏᴛᴇᴄᴛɪᴏɴ!\n\n"
-            "<i>✅ Uᴘɢʀᴀᴅᴇ : /pay</i>",
-            parse_mode=ParseMode.HTML
-        )
+        return await msg.reply_text("❌ <b>Pʀᴇᴍɪᴜᴍ Fᴇᴀᴛᴜʀᴇ Oɴʟʏ!</b>", parse_mode=ParseMode.HTML)
 
-    # 💰 Check coins
     if user.get("coins", 0) < price:
-        return await update.message.reply_text(
-            "💰 <b>Nᴏᴛ Eɴᴏᴜɢʜ Cᴏɪɴs.</b>\n"
-            f"🛡️ {arg.upper()} Pʀᴏᴛᴇᴄᴛɪᴏɴ Cᴏsᴛꜱ {price}$.",
-            parse_mode=ParseMode.HTML
-        )
+        return await msg.reply_text("💰 <b>Nᴏᴛ Eɴᴏᴜɢʜ Cᴏɪɴs.</b>", parse_mode=ParseMode.HTML)
 
     now = datetime.utcnow()
-
     protect_until = user.get("protect_until")
+    
     if protect_until:
         try:
             expire = datetime.strptime(protect_until, "%Y-%m-%d %H:%M:%S")
             if expire > now:
-                remaining = expire - now
-                hours, remainder = divmod(int(remaining.total_seconds()), 3600)
-                minutes, _ = divmod(remainder, 60)
-
-                return await update.message.reply_text(
-                    "🛡️ <b>Yᴏᴜ Aʀᴇ Aʟʀᴇᴀᴅʏ Pʀᴏᴛᴇᴄᴛᴇᴅ.</b>\n"
-                    f"⏳ <b>Tɪᴍᴇ Lᴇꜰᴛ:</b> {hours}ʜ {minutes}ᴍ\n"
-                    f"🔒 <b>Uɴᴛɪʟ:</b> <code>{protect_until}</code>",
-                    parse_mode=ParseMode.HTML
-                )
+                return await msg.reply_text("🛡️ <b>Yᴏᴜ Aʀᴇ Aʟʀᴇᴀᴅʏ Pʀᴏᴛᴇᴄᴛᴇᴅ.</b>", parse_mode=ParseMode.HTML)
         except (ValueError, TypeError):
-            pass # Failsafe in case of corrupted date format
+            pass
 
-    # 💰 Deduct coins
     user["coins"] -= price
-
-    expire_time = now + timedelta(days=days)
-    user["protect_until"] = expire_time.strftime("%Y-%m-%d %H:%M:%S")
-
+    user["protect_until"] = (now + timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
     save_user(user)
 
-    # ☠️ If dead
-    if user.get("dead", False):
-        return await update.message.reply_text(
-            f"🛡️ Yᴏᴜ Aʀᴇ Nᴏᴡ Pʀᴏᴛᴇᴄᴛᴇᴅ Fᴏʀ {arg.upper()}.\n"
-            "🔄 Bᴜᴛ Yᴏᴜʀ Sᴛᴀᴛᴜꜱ Iꜱ Sᴛɪʟʟ Dᴇᴀᴅ Uɴᴛɪʟ Rᴇᴠɪᴠᴇ."
-        )
-
-    # ✅ Normal message
     icon = "🌟" if premium_active else "🛡️"
-    await update.message.reply_text(
-        f"{icon} <b>Yᴏᴜ Aʀᴇ Nᴏᴡ Pʀᴏᴛᴇᴄᴛᴇᴅ Fᴏʀ {arg.upper()}.</b>",
-        parse_mode=ParseMode.HTML
-    )
+    await msg.reply_text(f"{icon} <b>Yᴏᴜ Aʀᴇ Nᴏᴡ Pʀᴏᴛᴇᴄᴛᴇᴅ Fᴏʀ {arg.upper()}.</b>", parse_mode=ParseMode.HTML)
+
 
 async def check_protection(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = update.message
+    chat = update.effective_chat
     user = update.effective_user
-    msg = update.effective_message
 
-    # 1. Get the data of the person using the command
+    # 🛑 --- ECONOMY CHECK --- 🛑
+    if chat.type != "private":
+        if await is_economy_disabled(chat.id):
+            return await msg.reply_text("🛑 Tʜᴇ Eᴄᴏɴᴏᴍʏ Sʏsᴛᴇᴍ Iꜱ Cᴜʀʀᴇɴᴛʟʏ Cʟᴏsᴇᴅ Iɴ Tʜɪs Gʀᴏᴜᴘ.")
+    # ---------------------------
+
     checker_data = get_user(user)
 
-    # 2. ✅ PREMIUM CHECK (Only Premium users can use this command)
-    # Using the synchronous version of is_premium we discussed
     if not is_premium(checker_data, context):
-        return await msg.reply_text(
-            "❌ <b>Pʀᴇᴍɪᴜᴍ Oɴʟʏ Cᴏᴍᴍᴀɴᴅ!</b>\n\n"
-            "🌟 Oɴʟʏ Pʀᴇᴍɪᴜᴍ Uꜱᴇʀꜱ Cᴀɴ Cʜᴇᴄᴋ Oᴛʜᴇʀꜱ Pʀᴏᴛᴇᴄᴛɪᴏɴ Tɪᴍᴇ.\n"
-            "<i>✅ Uᴘɢʀᴀᴅᴇ : /pay</i>",
-            parse_mode=ParseMode.HTML
-        )
+        return await msg.reply_text("❌ <b>Pʀᴇᴍɪᴜᴍ Oɴʟʏ Cᴏᴍᴍᴀɴᴅ!</b>", parse_mode=ParseMode.HTML)
 
-    # 3. Check if it's a reply
     if not msg.reply_to_message:
-        return await msg.reply_text("❌ <b>Pʟᴇᴀsᴇ Rᴇᴘʟʏ Tᴏ A Usᴇʀ Tᴏ Cʜᴇᴄᴋ Tʜᴇɪʀ Sᴛᴀᴛᴜs.</b>")
+        return await msg.reply_text("❌ <b>Pʟᴇᴀsᴇ Rᴇᴘʟʏ Tᴏ A Usᴇʀ.</b>", parse_mode=ParseMode.HTML)
 
     target_user = msg.reply_to_message.from_user
-    target_data = get_user(target_user) # Fetch target's data from DB
+    target_data = get_user(target_user)
 
-    # 4. Extract Protection Info
     protect_until = target_data.get("protect_until")
     now = datetime.utcnow()
-    
     status_text = "🚫 <b>Nᴏ Pʀᴏᴛᴇᴄᴛɪᴏɴ Aᴄᴛɪᴠᴇ</b>"
     
     if protect_until:
@@ -2698,36 +2720,20 @@ async def check_protection(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 remaining = expire - now
                 hours, remainder = divmod(int(remaining.total_seconds()), 3600)
                 minutes, _ = divmod(remainder, 60)
-                status_text = (
-                    f"🛡️ <b>Sᴛᴀᴛᴜs:</b> Pʀᴏᴛᴇᴄᴛᴇᴅ\n"
-                    f"⏳ <b>Tɪᴍᴇ Lᴇғᴛ:</b> <code>{hours}ʜ {minutes}ᴍ</code>\n"
-                    f"🔒 <b>Exᴘɪʀᴇs:</b> <code>{protect_until}</code>"
-                )
+                status_text = f"🛡️ <b>Sᴛᴀᴛᴜs:</b> Pʀᴏᴛᴇᴄᴛᴇᴅ\n⏳ <b>Tɪᴍᴇ Lᴇғᴛ:</b> <code>{hours}ʜ {minutes}ᴍ</code>"
         except:
             pass
 
-    # 5. DM the Checker
     try:
-        dm_message = (
-            "🔍 <b>Pʀᴏᴛᴇᴄᴛɪᴏɴ Cʜᴇᴄᴋ Rᴇsᴜʟᴛ</b>\n\n"
-            f"👤 <b>Usᴇʀ:</b> <a href='tg://user?id={target_user.id}'>{html.escape(target_user.first_name)}</a>\n"
-            f"🆔 <b>ID:</b> <code>{target_user.id}</code>\n"
-            "————————————————\n"
-            f"{status_text}"
-        )
-        
-        await context.bot.send_message(chat_id=user.id, text=dm_message, parse_mode=ParseMode.HTML)
-        
-        # 6. Reply in the Group
-        await msg.reply_text("✅ <b>Pʀᴏᴛᴇᴄᴛɪᴏɴ Tɪᴍᴇ Sᴇɴᴛ Tᴏ DM</b>", parse_mode=ParseMode.HTML)
-
-    except Exception:
-        # If the checker hasn't started the bot in DM
-        await msg.reply_text(
-            "❌ <b>Cᴏᴜʟᴅ Nᴏᴛ Sᴇɴᴅ DM!</b>\n"
-            "Pʟᴇᴀꜱᴇ Sᴛᴀʀᴛ Tʜᴇ Bᴏᴛ Iɴ Pʀɪᴠᴀᴛᴇ Fɪʀꜱᴛ.",
+        await context.bot.send_message(
+            chat_id=user.id, 
+            text=f"🔍 <b>Pʀᴏᴛᴇᴄᴛɪᴏɴ Cʜᴇᴄᴋ</b>\n\n👤 <b>Usᴇʀ:</b> {target_user.first_name}\n\n{status_text}",
             parse_mode=ParseMode.HTML
         )
+        await msg.reply_text("✅ <b>Pʀᴏᴛᴇᴄᴛɪᴏɴ Tɪᴍᴇ Sᴇɴᴛ Tᴏ DM</b>", parse_mode=ParseMode.HTML)
+    except Exception:
+        await msg.reply_text("❌ <b>Cᴏᴜʟᴅ Nᴏᴛ Sᴇɴᴅ DM!</b> Sᴛᴀʀᴛ ᴛʜᴇ ʙᴏᴛ ɪɴ ᴘʀɪᴠᴀᴛᴇ.", parse_mode=ParseMode.HTML)
+
 
 #========= REGISTER ========
 from telegram import Update
@@ -2896,92 +2902,73 @@ from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
 # ==========================================
-# 💰 TOP RICHEST
+# 🏆 RICHEST USERS
 # ==========================================
 async def richest(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Sort by coins (descending)
-    top_list = users.find({"id": {"$ne": context.bot.id}}).sort("coins", -1).limit(10)
+    chat = update.effective_chat
+    # 🛑 --- ECONOMY CHECK --- 🛑
+    if chat.type != "private" and await is_economy_disabled(chat.id):
+        return await update.message.reply_text("🛑 Tʜᴇ Eᴄᴏɴᴏᴍʏ Sʏsᴛᴇᴍ Iꜱ Cᴜʀʀᴇɴᴛʟʏ Cʟᴏsᴇᴅ Iɴ Tʜɪs Gʀᴏᴜᴘ.")
 
+    top_list = users.find({"id": {"$ne": context.bot.id}}).sort("coins", -1).limit(10)
     text = "🏆 <b>Tᴏᴘ 10 Rɪᴄʜᴇꜱᴛ Uꜱᴇʀꜱ:</b>\n\n"
 
     for i, user in enumerate(top_list, start=1):
-        if not user: continue
-
         user_id = user.get("id")
         safe_name = html.escape(str(user.get("name", "Uɴᴋɴᴏᴡɴ")))
-        
-        # Premium Check & Icon
         icon = "💓" if is_premium(user, context) else "👤"
         clickable_name = f'<a href="tg://user?id={user_id}">{safe_name}</a>'
-        coins = user.get("coins", 0)
+        text += f"{icon} {i}. {clickable_name}: <code>{user.get('coins', 0):,}$</code>\n"
 
-        text += f"{icon} {i}. {clickable_name}: <code>{coins:,}$</code>\n"
-
-    text += "\n💓 = Pʀᴇᴍɪᴜᴍ • 👤 = Nᴏʀᴍᴀʟ\n\n"
-    text += "<i>✅ Uᴘɢʀᴀᴅᴇ Tᴏ Pʀᴇᴍɪᴜᴍ : /pay</i>"
-
+    text += "\n💓 = Pʀᴇᴍɪᴜᴍ • 👤 = Nᴏʀᴍᴀʟ\n\n<i>✅ Uᴘɢʀᴀᴅᴇ Tᴏ Pʀᴇᴍɪᴜᴍ : /pay</i>"
     await update.message.reply_text(text, parse_mode=ParseMode.HTML)
 
 # ==========================================
 # 🎖️ TOP RANKERS (LEVEL/XP)
 # ==========================================
 async def rankers(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Sort by Level first, then XP
-    top_list = users.find({"id": {"$ne": context.bot.id}}).sort([("level", -1), ("xp", -1)]).limit(10)
+    chat = update.effective_chat
+    # 🛑 --- ECONOMY CHECK --- 🛑
+    if chat.type != "private" and await is_economy_disabled(chat.id):
+        return await update.message.reply_text("🛑 Tʜᴇ Eᴄᴏɴᴏᴍʏ Sʏsᴛᴇᴍ Iꜱ Cᴜʀʀᴇɴᴛʟʏ Cʟᴏsᴇᴅ Iɴ Tʜɪs Gʀᴏᴜᴘ.")
 
+    top_list = users.find({"id": {"$ne": context.bot.id}}).sort([("level", -1), ("xp", -1)]).limit(10)
     text = "🎖️ <b>Tᴏᴘ 10 Gʟᴏʙᴀʟ Rᴀɴᴋᴇʀꜱ:</b>\n\n"
 
     for i, user in enumerate(top_list, start=1):
-        if not user: continue
-
         user_id = user.get("id")
         safe_name = html.escape(str(user.get("name", "Uɴᴋɴᴏᴡɴ")))
-        
-        # Premium Check & Icon
         icon = "💓" if is_premium(user, context) else "👤"
         clickable_name = f'<a href="tg://user?id={user_id}">{safe_name}</a>'
-        lvl = user.get("level", 1)
-        xp = user.get("xp", 0)
+        text += f"{icon} {i}. {clickable_name}: Lᴠʟ {user.get('level', 1)} ({user.get('xp', 0):,} XP)\n"
 
-        text += f"{icon} {i}. {clickable_name}: Lᴠʟ {lvl} ({xp:,} XP)\n"
-
-    text += "\n💓 = Pʀᴇᴍɪᴜᴍ • 👤 = Nᴏʀᴍᴀʟ\n\n"
-    text += "<i>✅ Uᴘɢʀᴀᴅᴇ Tᴏ Pʀᴇᴍɪᴜᴍ : /pay</i>"
-
+    text += "\n💓 = Pʀᴇᴍɪᴜᴍ • 👤 = Nᴏʀᴍᴀʟ\n\n<i>✅ Uᴘɢʀᴀᴅᴇ Tᴏ Pʀᴇᴍɪᴜᴍ : /pay</i>"
     await update.message.reply_text(text, parse_mode=ParseMode.HTML)
 
 # ==========================================
-# 🩸 TOP KILLERS (FIXED)
+# 🩸 TOP KILLERS
 # ==========================================
 async def top_killers(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # 1. Fetch data once
+    chat = update.effective_chat
+    # 🛑 --- ECONOMY CHECK --- 🛑
+    if chat.type != "private" and await is_economy_disabled(chat.id):
+        return await update.message.reply_text("🛑 Tʜᴇ Eᴄᴏɴᴏᴍʏ Sʏsᴛᴇᴍ Iꜱ Cᴜʀʀᴇɴᴛʟʏ Cʟᴏsᴇᴅ Iɴ Tʜɪs Gʀᴏᴜᴘ.")
+
     query = {"kills": {"$gt": 0}, "id": {"$ne": context.bot.id}}
     top_list = list(users.find(query).sort("kills", -1).limit(10))
 
-    # 2. Check if list is empty
     if not top_list:
         return await update.message.reply_text("<b>🚫 Nᴏ Kɪʟʟᴇʀs Fᴏᴜɴᴅ Yᴇᴛ!</b>", parse_mode=ParseMode.HTML)
 
-    # 3. Build the message string
     text = "🏆 <b>Tᴏᴘ 10 Dᴇᴀᴅʟɪᴇsᴛ Kɪʟʟᴇʀs:</b>\n\n"
-
     for i, user in enumerate(top_list, start=1):
         user_id = user.get("id")
-        # Ensure name is a string and escape HTML special characters
-        name_val = user.get("name") or "Uɴᴋɴᴏᴡɴ"
-        safe_name = html.escape(str(name_val))
-
-        # Premium Check & Icon
+        safe_name = html.escape(str(user.get("name", "Uɴᴋɴᴏᴡɴ")))
         icon = "💓" if is_premium(user, context) else "👤"
         clickable_name = f'<a href="tg://user?id={user_id}">{safe_name}</a>'
-        kills = user.get("kills", 0)
+        text += f"{icon} {i}. {clickable_name}: <code>{user.get('kills', 0):,} Kɪʟʟs</code>\n"
 
-        text += f"{icon} {i}. {clickable_name}: <code>{kills:,} Kɪʟʟs</code>\n"
-
-    text += "\n💓 = Pʀᴇᴍɪᴜᴍ • 👤 = Nᴏʀᴍᴀʟ\n\n"
-    text += "<i>✅ Uᴘɢʀᴀᴅᴇ Tᴏ Pʀᴇᴍɪᴜᴍ : /pay</i>"
-
-    # 4. Send the message ONCE
+    text += "\n💓 = Pʀᴇᴍɪᴜᴍ • 👤 = Nᴏʀᴍᴀʟ\n\n<i>✅ Uᴘɢʀᴀᴅᴇ Tᴏ Pʀᴇᴍɪᴜᴍ : /pay</i>"
     await update.message.reply_text(text, parse_mode=ParseMode.HTML)
 
 #=======mini_games_topplayers=======
