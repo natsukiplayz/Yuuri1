@@ -4979,6 +4979,8 @@ application.add_handler(CommandHandler("activate", activate))
 application.add_handler(CommandHandler("deactivate", deactivate))
 application.add_handler(CommandHandler("pay", pay))
 application.add_handler(CommandHandler("check", check_protection))
+application.add_handler(CommandHandler("close", close_economy))
+application.add_handler(CommandHandler("open", open_economy))
 
 
 # Message Handlers
