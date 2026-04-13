@@ -4400,16 +4400,9 @@ from telegram.ext import ContextTypes
 from telegram.error import BadRequest
 from telegram.constants import ParseMode
 
-def load_db():
-    if not os.path.exists("warnings.json"):
-        with open("warnings.json", "w") as f:
-            json.dump({}, f)
-    with open("warnings.json", "r") as f:
-        return json.load(f)
-
-def save_db(data):
-    with open("warnings.json", "w") as f:
-        json.dump(data, f, indent=4)
+# Use a simple dictionary for memory-based storage (resets on restart)
+# If you need persistence, you must use a proper database like MongoDB/SQL.
+temp_warn_db = {}
 
 async def warn(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -4433,33 +4426,28 @@ async def warn(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if str(target_id) == str(OWNER_ID):
             return await message.reply_text("👑 Eʜᴇʜᴇ... Tʜᴀᴛ's Mʏ Oᴡɴᴇʀ! I Cᴀɴ'ᴛ Wᴀʀɴ Tʜᴇ Kɪɴɢ. 🫠")
 
-if target_member.status == ChatMemberStatus.OWNER:
-    return await message.reply_text("👑 Gʀᴏᴜᴘ Oᴡɴᴇʀ Cᴀɴ'ᴛ Bᴇ Wᴀʀɴᴇᴅ...")
+        if target_member.status == ChatMemberStatus.OWNER:
+            return await message.reply_text("👑 Gʀᴏᴜᴘ Oᴡɴᴇʀ Cᴀɴ'ᴛ Bᴇ Wᴀʀɴᴇᴅ...")
 
-if target_member.status == ChatMemberStatus.ADMINISTRATOR:
-    return await message.reply_text("⚠️ Yᴏᴜ Cᴀɴ'ᴛ Wᴀʀɴ A Fᴇʟʟᴏᴡ Aᴅᴍɪɴ! 🙀")
-            
+        if target_member.status == ChatMemberStatus.ADMINISTRATOR:
+            return await message.reply_text("⚠️ Yᴏᴜ Cᴀɴ'ᴛ Wᴀʀɴ A Fᴇʟʟᴏᴡ Aᴅᴍɪɴ! 🙀")
     except BadRequest:
         pass
 
-    db = load_db()
-    chat_id_str = str(chat.id)
-    target_id_str = str(target_id)
-
-    if chat_id_str not in db:
-        db[chat_id_str] = {}
-    if target_id_str not in db[chat_id_str]:
-        db[chat_id_str][target_id_str] = 0
-
-    db[chat_id_str][target_id_str] += 1
-    warn_count = db[chat_id_str][target_id_str]
-    save_db(db)
+    # Use the in-memory dictionary
+    chat_id = str(chat.id)
+    target_id = str(target_id)
+    
+    if chat_id not in temp_warn_db:
+        temp_warn_db[chat_id] = {}
+    
+    temp_warn_db[chat_id][target_id] = temp_warn_db[chat_id].get(target_id, 0) + 1
+    warn_count = temp_warn_db[chat_id][target_id]
 
     if warn_count >= 3:
         try:
             await chat.ban_member(target_id)
-            db[chat_id_str][target_id_str] = 0
-            save_db(db)
+            temp_warn_db[chat_id][target_id] = 0
             await message.reply_text(f"<b>🛑 {name} ʀᴇᴀᴄʜᴇᴅ 3 ᴡᴀʀɴs ᴀɴᴅ ᴡᴀs ʙᴀɴɴᴇᴅ!</b>", parse_mode=ParseMode.HTML)
         except BadRequest:
             await message.reply_text("❌ I ᴅᴏɴ'ᴛ ʜᴀᴠᴇ ᴘᴇʀᴍɪssɪᴏɴ ᴛᴏ ʙᴀɴ ᴛʜɪs ᴜsᴇʀ!")
@@ -4467,52 +4455,25 @@ if target_member.status == ChatMemberStatus.ADMINISTRATOR:
         await message.reply_text(f"<b>⚠️ {name} ʜᴀs ʙᴇᴇɴ ᴡᴀʀɴᴇᴅ. ({warn_count}/3)</b>", parse_mode=ParseMode.HTML)
 
 async def unwarn(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
     chat = update.effective_chat
-    message = update.effective_message
-
-    if chat.type == 'private':
-        return await message.reply_text("⚠️ ᴛʜɪs ᴄᴏᴍᴍᴀɴᴅ ᴏɴʟʏ ᴡᴏʀᴋs ɪɴ ɢʀᴏᴜᴘs!")
-
-    if str(user.id) != str(OWNER_ID):
-        if not await is_admin(update, context, user.id):
-            return await message.reply_text("🧐 Oᴘᴘs! Yᴏᴜ Nᴇᴇᴅ Tᴏ Bᴇ Aᴅᴍɪɴ Tᴏ Rᴇsᴇᴛ Wᴀʀɴs... 🧩")
-
     target_id, name = await resolve_user_all(update, context)
-    if not target_id:
-        return await message.reply_text("<code>⚠️ ᴜsᴀɢᴇ: /ᴜɴᴡᴀʀɴ @ᴜsᴇʀɴᴀᴍᴇ ᴏʀ ʀᴇᴘʟʏ ᴛᴏ ᴀ ᴜsᴇʀ</code>", parse_mode=ParseMode.HTML)
-
-    db = load_db()
-    chat_id_str = str(chat.id)
-    target_id_str = str(target_id)
-
-    if chat_id_str in db and target_id_str in db[chat_id_str]:
-        db[chat_id_str][target_id_str] = 0
-        save_db(db)
-
-    await message.reply_text(f"<b>✅ ᴡᴀʀɴs ғᴏʀ {name} ʜᴀs ʙᴇᴇɴ ʀᴇsᴇᴛ.</b>", parse_mode=ParseMode.HTML)
+    if target_id:
+        if str(chat.id) in temp_warn_db:
+            temp_warn_db[str(chat.id)][str(target_id)] = 0
+        await update.effective_message.reply_text(f"<b>✅ ᴡᴀʀɴs ғᴏʀ {name} ʜᴀs ʙᴇᴇɴ ʀᴇsᴇᴛ.</b>", parse_mode=ParseMode.HTML)
 
 async def warnings(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
-    message = update.effective_message
-
-    if chat.type == 'private':
-        return await message.reply_text("⚠️ ᴛʜɪs ᴄᴏᴍᴍᴀɴᴅ ᴏɴʟʏ ᴡᴏʀᴋs ɪɴ ɢʀᴏᴜᴘs!")
-
     target_id, name = await resolve_user_all(update, context)
-    if not target_id:
-        return await message.reply_text("<code>⚠️ ᴜsᴀɢᴇ: /ᴡᴀʀɴɪɴɢs @ᴜsᴇʀɴᴀᴍᴇ ᴏʀ ʀᴇᴘʟʏ ᴛᴏ ᴀ ᴜsᴇʀ</code>", parse_mode=ParseMode.HTML)
+    warn_count = temp_warn_db.get(str(chat.id), {}).get(str(target_id), 0)
+    await update.effective_message.reply_text(f"<b>📊 {name} ᴄᴜʀʀᴇɴᴛʟʏ ʜᴀs {warn_count}/3 ᴡᴀʀɴs.</b>", parse_mode=ParseMode.HTML)
 
-    db = load_db()
-    chat_id_str = str(chat.id)
-    target_id_str = str(target_id)
+from telegram import Update
+from telegram.constants import ParseMode
+from telegram.error import BadRequest
+from telegram.ext import ContextTypes
 
-    warn_count = 0
-    if chat_id_str in db and target_id_str in db[chat_id_str]:
-        warn_count = db[chat_id_str][target_id_str]
-
-    await message.reply_text(f"<b>📊 {name} ᴄᴜʀʀᴇɴᴛʟʏ ʜᴀs {warn_count}/3 ᴡᴀʀɴs.</b>", parse_mode=ParseMode.HTML)
-
+# Pin Message Command
 async def pin_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat = update.effective_chat
@@ -4528,22 +4489,16 @@ async def pin_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         target_user = message.reply_to_message.from_user
         name = target_user.first_name if target_user else "sʏsᴛᴇᴍ"
-
         await context.bot.pin_chat_message(
             chat_id=chat.id,
             message_id=message.reply_to_message.message_id,
             disable_notification=False
         )
-
-        response = (
-            f"ᴜsᴇʀ: <b>{name}</b>\n"
-            "sᴛᴀᴛᴜs: ᴘɪɴɴᴇᴅ"
-        )
-        await message.reply_text(response, parse_mode=ParseMode.HTML)
-
+        await message.reply_text(f"ᴜsᴇʀ: <b>{name}</b>\nstatus: ᴘɪɴɴᴇᴅ", parse_mode=ParseMode.HTML)
     except BadRequest as e:
         await message.reply_text(f"❌ API ᴇʀʀᴏʀ: {str(e).lower()}")
 
+# Unpin Message Command
 async def unpin_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat = update.effective_chat
@@ -4557,23 +4512,15 @@ async def unpin_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if message.reply_to_message:
             target_user = message.reply_to_message.from_user
             name = target_user.first_name if target_user else "sʏsᴛᴇᴍ"
-            await context.bot.unpin_chat_message(
-                chat_id=chat.id,
-                message_id=message.reply_to_message.message_id
-            )
+            await context.bot.unpin_chat_message(chat_id=chat.id, message_id=message.reply_to_message.message_id)
         else:
             name = "ʟᴀᴛᴇsᴛ ᴘɪɴ"
             await context.bot.unpin_chat_message(chat_id=chat.id)
-
-        response = (
-            f"ᴜsᴇʀ: <b>{name}</b>\n"
-            "sᴛᴀᴛᴜs: ᴜɴᴘɪɴɴᴇᴅ"
-        )
-        await message.reply_text(response, parse_mode=ParseMode.HTML)
-
+        await message.reply_text(f"ᴜsᴇʀ: <b>{name}</b>\nstatus: ᴜɴᴘɪɴɴᴇᴅ", parse_mode=ParseMode.HTML)
     except BadRequest as e:
         await message.reply_text(f"❌ API ᴇʀʀᴏʀ: {str(e).lower()}")
 
+# Purge Command
 async def purge(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat = update.effective_chat
@@ -4592,12 +4539,9 @@ async def purge(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         message_id = message.reply_to_message.message_id
         delete_ids = list(range(message_id, message.message_id))
-        
         for i in range(0, len(delete_ids), 100):
             await context.bot.delete_messages(chat_id=chat.id, message_ids=delete_ids[i:i+100])
-
         await message.delete()
-        
         await chat.send_message("sᴛᴀᴛᴜs: ᴘᴜʀɢᴇ ᴄᴏᴍᴘʟᴇᴛᴇ")
     except BadRequest as e:
         await message.reply_text(f"❌ API ᴇʀʀᴏʀ: {str(e).lower()}")
