@@ -12,12 +12,12 @@ from io import BytesIO
 
 import requests
 import httpx
+from telegram.constants import ParseMode
 from fastapi import FastAPI, Request  
 from pymongo import MongoClient
 
-from telegram import InputSticker, Update, InlineKeyboardButton, InlineKeyboardMarkup, ChatPermissions
-from telegram.constants import ChatAction, ParseMode, ChatMemberStatus
-from telegram.error import BadRequest
+from telegram import InputSticker, Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.constants import ChatAction
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -27,8 +27,8 @@ from telegram.ext import (
     filters,
     JobQueue
 )
-
 from motor.motor_asyncio import AsyncIOMotorClient
+
 from datetime import datetime, timezone
 
 # ================= WEBHOOK SETUP =================
@@ -199,15 +199,15 @@ async def is_economy_disabled(chat_id: int) -> bool:
 SAVED_GROUPS = {}
 
 def load_groups_from_db():
-    """Sync: Loads groups from MongoDB into the local SAVED_GROUPS dictionary safely."""
+    """Sync: Loads groups from MongoDB into the local SAVED_GROUPS dictionary"""
     global SAVED_GROUPS
     try:
         SAVED_GROUPS.clear()
         cursor = groups_collection.find({}) 
         for doc in cursor:
-            # Use .get() to provide a default value (e.g., 0) if 'pos' is missing
-            pos = int(doc.get("pos", 0))
-            SAVED_GROUPS[pos] = {"name": doc.get("name", "Unknown"), "url": doc.get("url", "#")}
+            # Ensure the position is an integer for the dictionary key
+            pos = int(doc["pos"])
+            SAVED_GROUPS[pos] = {"name": doc["name"], "url": doc["url"]}
         logging.info(f"✅ Loaded {len(SAVED_GROUPS)} groups from Database.")
     except Exception as e:
         logging.error(f"❌ DB Load Error: {e}")
