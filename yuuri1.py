@@ -4433,11 +4433,11 @@ async def warn(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if str(target_id) == str(OWNER_ID):
             return await message.reply_text("👑 Eʜᴇʜᴇ... Tʜᴀᴛ's Mʏ Oᴡɴᴇʀ! I Cᴀɴ'ᴛ Wᴀʀɴ Tʜᴇ Kɪɴɢ. 🫠")
 
-        if target_member.status == 'creator':
-            return await message.reply_text("👑 Gʀᴏᴜᴘ Oᴡɴᴇʀ Cᴀɴ'ᴛ Bᴇ Wᴀʀɴᴇᴅ. Tʜᴇʏ Mᴀᴋᴇ Tʜᴇ Rᴜʟᴇs!")
+if target_member.status == ChatMemberStatus.OWNER:
+    return await message.reply_text("👑 Gʀᴏᴜᴘ Oᴡɴᴇʀ Cᴀɴ'ᴛ Bᴇ Wᴀʀɴᴇᴅ...")
 
-        if target_member.status == 'administrator':
-            return await message.reply_text("⚠️ Yᴏᴜ Cᴀɴ'ᴛ Wᴀʀɴ A Fᴇʟʟᴏᴡ Aᴅᴍɪɴ! 🙀")
+if target_member.status == ChatMemberStatus.ADMINISTRATOR:
+    return await message.reply_text("⚠️ Yᴏᴜ Cᴀɴ'ᴛ Wᴀʀɴ A Fᴇʟʟᴏᴡ Aᴅᴍɪɴ! 🙀")
             
     except BadRequest:
         pass
