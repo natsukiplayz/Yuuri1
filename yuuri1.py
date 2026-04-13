@@ -12,12 +12,12 @@ from io import BytesIO
 
 import requests
 import httpx
-from telegram.constants import ParseMode
 from fastapi import FastAPI, Request  
 from pymongo import MongoClient
 
-from telegram import InputSticker, Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.constants import ChatAction
+from telegram import InputSticker, Update, InlineKeyboardButton, InlineKeyboardMarkup, ChatPermissions
+from telegram.constants import ChatAction, ParseMode
+from telegram.error import BadRequest
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -28,8 +28,8 @@ from telegram.ext import (
     JobQueue
 )
 from motor.motor_asyncio import AsyncIOMotorClient
-
 from datetime import datetime, timezone
+
 
 # ================= WEBHOOK SETUP =================
 app = FastAPI()
