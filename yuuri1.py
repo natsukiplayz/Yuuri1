@@ -2633,13 +2633,16 @@ from telegram.constants import ParseMode
 async def protect(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
     chat = update.effective_chat
+    user_data = update.effective_user
 
     # 🛑 --- ECONOMY CHECK --- 🛑
+    # Note: Ensure 'is_economy_disabled' is defined in your main script
     if chat.type != "private":
         if await is_economy_disabled(chat.id):
             return await msg.reply_text("🛑 Tʜᴇ Eᴄᴏɴᴏᴍʏ Sʏsᴛᴇᴍ Iꜱ Cᴜʀʀᴇɴᴛʟʏ Cʟᴏsᴇᴅ Iɴ Tʜɪs Gʀᴏᴜᴘ.")
     # ---------------------------
 
+    # Help Menu
     if not context.args:
         return await msg.reply_text(
             "🛡️ <b>Pʀᴏᴛᴇᴄᴛɪᴏɴ Sʏsᴛᴇᴍ</b>\n\n"
@@ -2658,34 +2661,55 @@ async def protect(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await msg.reply_text("🛡️ <b>Iɴᴠᴀʟɪᴅ Pʀᴏᴛᴇᴄᴛɪᴏɴ Tɪᴍᴇ.</b>", parse_mode=ParseMode.HTML)
 
     days, price = durations[arg]
-    user = get_user(update.effective_user)
     
+    # Database helper functions (Ensure these exist in your bot)
+    user = get_user(user_data) 
     premium_active = is_premium(user, context)
-    
+
+    # Premium validation
     if days > 1 and not premium_active:
         return await msg.reply_text("❌ <b>Pʀᴇᴍɪᴜᴍ Fᴇᴀᴛᴜʀᴇ Oɴʟʏ!</b>", parse_mode=ParseMode.HTML)
 
+    # Balance validation
     if user.get("coins", 0) < price:
         return await msg.reply_text("💰 <b>Nᴏᴛ Eɴᴏᴜɢʜ Cᴏɪɴs.</b>", parse_mode=ParseMode.HTML)
 
+    # ⏳ --- EXISTING PROTECTION CHECK --- ⏳
     now = datetime.utcnow()
     protect_until = user.get("protect_until")
-    
+
     if protect_until:
         try:
             expire = datetime.strptime(protect_until, "%Y-%m-%d %H:%M:%S")
             if expire > now:
-                return await msg.reply_text("🛡️ <b>Yᴏᴜ Aʀᴇ Aʟʀᴇᴀᴅʏ Pʀᴏᴛᴇᴄᴛᴇᴅ.</b>", parse_mode=ParseMode.HTML)
+                # Calculate time difference
+                diff = expire - now
+                d = diff.days
+                h = diff.seconds // 3600
+                m = (diff.seconds // 60) % 60
+                
+                # Format time string in stylized font
+                t_str = f"{d}ᴅ {h}ʜ {m}ᴍ" if d > 0 else f"{h}ʜ {m}ᴍ"
+                
+                return await msg.reply_text(
+                    f"🛡️ <b>Yᴏᴜʀ Aʟʀᴇᴀᴅʏ Pʀᴏᴛᴇᴄᴛᴇᴅ</b>\n"
+                    f"⌛ <b>Rᴇᴍᴀɪɴɪɴɢ Tɪᴍᴇ:</b> <code>{t_str}</code>",
+                    parse_mode=ParseMode.HTML
+                )
         except (ValueError, TypeError):
             pass
+    # -------------------------------------
 
+    # Process Purchase
     user["coins"] -= price
     user["protect_until"] = (now + timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
     save_user(user)
 
-    icon = "🌟" if premium_active else "🛡️"
-    await msg.reply_text(f"{icon} <b>Yᴏᴜ Aʀᴇ Nᴏᴡ Pʀᴏᴛᴇᴄᴛᴇᴅ Fᴏʀ {arg.upper()}.</b>", parse_mode=ParseMode.HTML)
-
+    icon = "💗" if premium_active else "🛡️"
+    await msg.reply_text(
+        f"{icon} <b>Yᴏᴜ Aʀᴇ Nᴏᴡ Pʀᴏᴛᴇᴄᴛᴇᴅ Fᴏʀ {arg.upper()}.</b>", 
+        parse_mode=ParseMode.HTML
+    )
 
 async def check_protection(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
