@@ -2636,7 +2636,6 @@ async def protect(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_data = update.effective_user
 
     # 🛑 --- ECONOMY CHECK --- 🛑
-    # Note: Ensure 'is_economy_disabled' is defined in your main script
     if chat.type != "private":
         if await is_economy_disabled(chat.id):
             return await msg.reply_text("🛑 Tʜᴇ Eᴄᴏɴᴏᴍʏ Sʏsᴛᴇᴍ Iꜱ Cᴜʀʀᴇɴᴛʟʏ Cʟᴏsᴇᴅ Iɴ Tʜɪs Gʀᴏᴜᴘ.")
@@ -2660,21 +2659,21 @@ async def protect(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if arg not in durations:
         return await msg.reply_text("🛡️ <b>Iɴᴠᴀʟɪᴅ Pʀᴏᴛᴇᴄᴛɪᴏɴ Tɪᴍᴇ.</b>", parse_mode=ParseMode.HTML)
 
-    days, price = durations[arg]
+    days_to_add, price = durations[arg]
     
-    # Database helper functions (Ensure these exist in your bot)
+    # Database helper functions
     user = get_user(user_data) 
     premium_active = is_premium(user, context)
 
     # Premium validation
-    if days > 1 and not premium_active:
+    if days_to_add > 1 and not premium_active:
         return await msg.reply_text("❌ <b>Pʀᴇᴍɪᴜᴍ Fᴇᴀᴛᴜʀᴇ Oɴʟʏ!</b>", parse_mode=ParseMode.HTML)
 
     # Balance validation
     if user.get("coins", 0) < price:
         return await msg.reply_text("💰 <b>Nᴏᴛ Eɴᴏᴜɢʜ Cᴏɪɴs.</b>", parse_mode=ParseMode.HTML)
 
-    # ⏳ --- EXISTING PROTECTION CHECK --- ⏳
+    # ⏳ --- UPDATED PROTECTION CHECK (00d 00h 00m 00s) --- ⏳
     now = datetime.utcnow()
     protect_until = user.get("protect_until")
 
@@ -2684,12 +2683,13 @@ async def protect(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if expire > now:
                 # Calculate time difference
                 diff = expire - now
-                d = diff.days
-                h = diff.seconds // 3600
-                m = (diff.seconds // 60) % 60
                 
-                # Format time string in stylized font
-                t_str = f"{d}ᴅ {h}ʜ {m}ᴍ" if d > 0 else f"{h}ʜ {m}ᴍ"
+                days = diff.days
+                hours, remainder = divmod(diff.seconds, 3600)
+                minutes, seconds = divmod(remainder, 60)
+                
+                # Format: 00ᴅ 00ʜ 00ᴍ 00ꜱ
+                t_str = f"{days:02d}ᴅ {hours:02d}ʜ {minutes:02d}ᴍ {seconds:02d}ꜱ"
                 
                 return await msg.reply_text(
                     f"🛡️ <b>Yᴏᴜʀ Aʟʀᴇᴀᴅʏ Pʀᴏᴛᴇᴄᴛᴇᴅ</b>\n"
@@ -2698,14 +2698,14 @@ async def protect(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
         except (ValueError, TypeError):
             pass
-    # -------------------------------------
+    # ------------------------------------------------------
 
     # Process Purchase
     user["coins"] -= price
-    user["protect_until"] = (now + timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
+    user["protect_until"] = (now + timedelta(days=days_to_add)).strftime("%Y-%m-%d %H:%M:%S")
     save_user(user)
 
-    icon = "💗" if premium_active else "🛡️"
+    icon = "🌟" if premium_active else "🛡️"
     await msg.reply_text(
         f"{icon} <b>Yᴏᴜ Aʀᴇ Nᴏᴡ Pʀᴏᴛᴇᴄᴛᴇᴅ Fᴏʀ {arg.upper()}.</b>", 
         parse_mode=ParseMode.HTML
