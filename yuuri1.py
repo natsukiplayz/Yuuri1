@@ -2489,7 +2489,7 @@ async def kill(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             expire = datetime.strptime(victim["protect_until"], "%Y-%m-%d %H:%M:%S")
             if expire > datetime.utcnow():
-                return await msg.reply_text("🛡️ Tʜɪꜱ Uꜱᴇʀ Iꜱ Pʀᴏᴛᴇᴄᴛᴇᴅ. 🔒 Cʜᴇᴄᴋ Pʀᴏᴛᴇᴄᴛɪᴏɴ Tɪᴍᴇ → /check")
+                return await msg.reply_text("🛡️ Tʜɪꜱ Uꜱᴇʀ Iꜱ Pʀᴏᴛᴇᴄᴛᴇᴅ.\n 🔒 Cʜᴇᴄᴋ Pʀᴏᴛᴇᴄᴛɪᴏɴ Tɪᴍᴇ → /check")
         except (ValueError, TypeError):
             pass
 
