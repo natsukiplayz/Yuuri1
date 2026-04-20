@@ -4941,15 +4941,15 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
         return 
 
 # --- 1. INITIALIZE APPLICATION (GLOBAL SCOPE) ---
-# This replaces your 'app =' inside the main function
+# We removed .job_queue(JobQueue()) to fix the Python 3.14 weakref error.
+# The library will initialize the JobQueue automatically.
 application = (
     ApplicationBuilder()
     .token(BOT_TOKEN)
-    .job_queue(JobQueue())
-    .connect_timeout(40.0)
-    .read_timeout(40.0)
-    .write_timeout(40.0)
-    .pool_timeout(40.0)
+    .connect_timeout(60.0)
+    .read_timeout(60.0)
+    .write_timeout(60.0)
+    .pool_timeout(60.0)
     .build()
 )
 
