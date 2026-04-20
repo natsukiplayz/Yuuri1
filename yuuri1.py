@@ -149,6 +149,85 @@ def save_user(data):
 
     users.update_one({"id": data["id"]}, {"$set": data}, upsert=True)
 
+from fastapi import FastAPI, Request
+from datetime import datetime, timedelta
+
+# Assuming 'app' is already defined as app = FastAPI()
+
+@app.post("/payment_webhook")
+async def premium_auto_activate(request: Request):
+    data = await request.json()
+    raw_note = data.get("note", "") 
+
+    # We use "PREMIUM" now, not "Elite"
+    if "PREMIUM" in raw_note:
+        try:
+            # Note format from Website: PREMIUM-7-5773908061
+            parts = raw_note.split("-")
+            days_to_add = int(parts[1])
+            target_id = int(parts[2])
+
+            # Amount Mapping
+            if days_to_add == 7:
+                amount, label = 20.0, "1 Week(s)"
+            elif days_to_add == 30:
+                amount, label = 49.0, "1 Month(s)"
+            elif days_to_add == 60:
+                amount, label = 100.0, "2 Month(s)"
+            else:
+                amount, label = 0.0, f"{days_to_add} Day(s)"
+
+            # --- EXPIRY LOGIC ---
+            now = datetime.utcnow()
+            target_data = users.find_one({"id": target_id})
+            if not target_data:
+                return {"status": "user_not_found"}
+
+            current_expire_str = target_data.get("premium_until")
+            if current_expire_str:
+                current_expire = datetime.strptime(current_expire_str, "%Y-%m-%d %H:%M:%S")
+                base_time = max(current_expire, now)
+            else:
+                base_time = now
+
+            new_expire_time = base_time + timedelta(days=days_to_add)
+            new_expire_str = new_expire_time.strftime("%Y-%m-%d %H:%M:%S")
+
+            # --- UPDATE DATABASE ---
+            users.update_one(
+                {"id": target_id},
+                {"$set": {"premium": True, "premium_until": new_expire_str}}
+            )
+
+            # --- GET LOG GROUP ---
+            log_config = db.settings.find_one({"config": "log_group"})
+            # Default to OWNER_ID if no group is connected yet
+            target_chat = log_config["group_id"] if log_config else OWNER_ID
+
+            # --- FORMATTED LOG MESSAGE ---
+            log_text = (
+                "💰 <b>Nᴇᴡ Pᴀʏᴍᴇɴᴛ Rᴇᴄᴇɪᴠᴇᴅ!</b>\n\n"
+                f"👤 <b>User ID:</b> <code>{target_id}</code>\n"
+                f"💵 <b>Amount:</b> ₹{amount}\n"
+                f"⏳ <b>Premium Added:</b> {label}\n"
+                f"📅 <b>Expiry:</b> <code>{new_expire_str}</code>\n"
+                f"🔗 <b>User Link:</b> <a href='tg://user?id={target_id}'>Profile</a>"
+            )
+
+            # Send to Connected Group
+            await bot.send_message(target_chat, log_text, parse_mode="HTML")
+            
+            # Send Success to User
+            await bot.send_message(target_id, "🎉 <b>Yᴏᴜʀ Pʀᴇᴍɪᴜᴍ ʜᴀs ʙᴇᴇɴ ᴀᴄᴛɪᴠᴀᴛᴇᴅ!</b>")
+
+            return {"status": "success"}
+        except Exception as e:
+            print(f"Error: {e}")
+            return {"status": "error"}
+
+    return {"status": "ignored"}
+
+
 #premium
 import asyncio
 from datetime import datetime
@@ -4898,6 +4977,21 @@ async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         print("Auto-reply error:", e)
 
+# Function for /connect command
+async def connect_log_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != OWNER_ID:
+        return
+    
+    group_id = update.effective_chat.id
+    # Save to settings
+    await db.settings.update_one(
+        {"config": "log_group"},
+        {"$set": {"group_id": group_id}},
+        upsert=True
+    )
+    await update.message.reply_text("✅ <b>Gʀᴏᴜᴘ Cᴏɴɴᴇᴄᴛᴇᴅ Sᴜᴄᴄᴇssғᴜʟʟʏ!</b>\nPremium logs will be sent here.")
+
+
 # ---------------- CALLBACKS & ERROR HANDLING ----------------
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -5005,6 +5099,7 @@ application.add_handler(CommandHandler("pay", pay))
 application.add_handler(CommandHandler("check", check_protection))
 application.add_handler(CommandHandler("close", close_economy))
 application.add_handler(CommandHandler("open", open_economy))
+application.add_handler(CommandHandler("connect", connect_log_group))
 
 # Message Handlers
 application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
@@ -5048,6 +5143,77 @@ async def auto_revive_free(context: ContextTypes.DEFAULT_TYPE):
         print(f"⚠️ Auto-revive error: {e}")
 
 # --- 3. FASTAPI WEBHOOK LOGIC ---
+# --- ADD THIS BELOW YOUR EXISTING @app.post("/webhook") ---
+
+@app.post("/payment_webhook")
+async def premium_auto_activate(request: Request):
+    """The entry point for MacroDroid/Phone notifications"""
+    data = await request.json()
+    raw_note = data.get("note", "") 
+
+    if "PREMIUM" in raw_note:
+        try:
+            # Note format: PREMIUM-7-5773908061
+            parts = raw_note.split("-")
+            days_to_add = int(parts[1])
+            target_id = int(parts[2])
+
+            # Map the price for the log
+            prices = {7: (20.0, "1 Week"), 30: (49.0, "1 Month"), 60: (100.0, "2 Months")}
+            amount, label = prices.get(days_to_add, (0.0, f"{days_to_add} Days"))
+
+            # Logic to handle Premium Stacking
+            now = datetime.utcnow()
+            # Note: Since you are using Motor/MongoDB, ensure 'users' is defined
+            target_data = await users.find_one({"id": target_id})
+            
+            if not target_data:
+                return {"status": "user_not_found"}
+
+            current_expire_str = target_data.get("premium_until")
+            if current_expire_str:
+                current_expire = datetime.strptime(current_expire_str, "%Y-%m-%d %H:%M:%S")
+                base_time = max(current_expire, now)
+            else:
+                base_time = now
+
+            new_expire_time = base_time + timedelta(days=days_to_add)
+            new_expire_str = new_expire_time.strftime("%Y-%m-%d %H:%M:%S")
+
+            # Update DB
+            await users.update_one(
+                {"id": target_id},
+                {"$set": {"premium": True, "premium_until": new_expire_str}}
+            )
+
+            # Get the Connected Group ID from your settings collection
+            log_config = await db.settings.find_one({"config": "log_group"})
+            target_chat = log_config["group_id"] if log_config else OWNER_ID
+
+            # Format the Premium Log Message
+            log_text = (
+                "💰 <b>Nᴇᴡ Pᴀʏᴍᴇɴᴛ Rᴇᴄᴇɪᴠᴇᴅ!</b>\n\n"
+                f"👤 <b>User ID:</b> <code>{target_id}</code>\n"
+                f"💵 <b>Amount:</b> ₹{amount}\n"
+                f"⏳ <b>Premium Added:</b> {label}\n"
+                f"📅 <b>Expiry:</b> <code>{new_expire_str}</code>\n"
+                f"🔗 <b>User Link:</b> <a href='tg://user?id={target_id}'>Profile</a>"
+            )
+
+            # Send to Log Group
+            await application.bot.send_message(target_chat, log_text, parse_mode="HTML")
+            
+            # Notify User
+            await application.bot.send_message(target_id, "🎉 <b>Yᴏᴜʀ Pʀᴇᴍɪᴜᴍ ʜᴀs ʙᴇᴇɴ ᴀᴄᴛɪᴠᴀᴛᴇᴅ!</b>")
+
+            return {"status": "success"}
+        except Exception as e:
+            print(f"Payment Webhook Error: {e}")
+            return {"status": "error"}
+
+    return {"status": "ignored"}
+
+
 from fastapi import FastAPI, Request
 import uvicorn
 
