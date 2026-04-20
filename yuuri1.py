@@ -2849,6 +2849,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
+# --- PAY COMMAND ---
 async def pay(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     user_id = update.effective_user.id
@@ -2857,9 +2858,10 @@ async def pay(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # 🔗 Links
     website_url = "https://yuuri_premium.oneapp.dev/"
-    benefits_link = "https://t.me/ig_yuukii/51" # Replace with your post link
+    benefits_link = "https://t.me/ig_yuukii/51" 
+    banner_url = "https://i.ibb.co/GQPQGdNF/x.jpg"
 
-    # 1. 📢 GROUP REDIRECT
+    # 1. 📢 GROUP REDIRECT (Keep your business in DMs)
     if chat_type in ["group", "supergroup"]:
         redirect_url = f"https://t.me/{bot_username}?start=pay"
         keyboard = [[InlineKeyboardButton("💳 Cᴏɴᴛɪɴᴜᴇ Tᴏ Pᴀʏ", url=redirect_url)]]
@@ -2870,12 +2872,13 @@ async def pay(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
     # 2. 💎 CHECK PREMIUM STATUS
-    user_data = await users.find_one({"id": user_id})
+    # FIX: Changed 'users' to 'users_col' to match your Async MongoDB setup
+    user_data = await users_col.find_one({"id": user_id})
+    
     is_premium = user_data.get("premium", False) if user_data else False
     expiry_date = user_data.get("premium_until", "N/A") if user_data else "N/A"
 
     if is_premium:
-        # Message for existing Premium users
         text = (
             f"💓 <b>Yᴏᴜ ᴀʀᴇ ᴀʟʀᴇᴀᴅʏ ᴀ Pʀᴇᴍɪᴜᴍ Uꜱᴇʀ.</b>\n"
             f"⏳ <b>Pʀᴇᴍɪᴜᴍ Vᴀʟɪᴅ Uɴᴛɪʟ:</b> <code>{expiry_date}</code>\n"
@@ -2888,7 +2891,6 @@ async def pay(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("💎 Pʀᴇᴍɪᴜᴍ Bᴇɴᴇғɪᴛs", url=benefits_link)]
         ]
     else:
-        # Message for New users
         text = (
             "💓 <b>Yᴜᴜʀɪ Pʀᴇᴍɪᴜᴍ Aᴄᴄᴇꜱꜱ</b>\n\n"
             "⚠️ <b>Iᴍᴘᴏʀᴛᴀɴᴛ:</b> Eɴᴛᴇʀ Yᴏᴜʀ Tᴇʟᴇɢʀᴀᴍ ID Iɴ Tʜᴇ ID Fɪᴇʟᴅ.\n"
@@ -2899,15 +2901,20 @@ async def pay(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("💗 Pʀᴇᴍɪᴜᴍ Bᴇɴᴇғɪᴛs 💗", url=benefits_link)]
         ]
 
-    # Use a nice Premium banner image
-    banner_url = "https://i.ibb.co/GQPQGdNF/x.jpg" # Change to your image link
-
-    await msg.reply_photo(
-        photo=banner_url,
-        caption=text,
-        parse_mode=ParseMode.HTML,
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+    try:
+        await msg.reply_photo(
+            photo=banner_url,
+            caption=text,
+            parse_mode=ParseMode.HTML,
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    except Exception as e:
+        # Fallback if the banner URL is broken
+        await msg.reply_text(
+            text,
+            parse_mode=ParseMode.HTML,
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
 
 # ======= PURCHASE ========
 async def purchase(update: Update, context: ContextTypes.DEFAULT_TYPE):
