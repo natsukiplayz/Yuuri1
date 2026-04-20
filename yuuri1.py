@@ -4920,7 +4920,7 @@ async def connect_log_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # FIX: Ensure you are using 'await' with the motor method
     # and verify that 'db' is your Motor client database instance
     try:
-        await db.settings.update_one(
+        await async_db.settings.update_one(
             {"config": "log_group"},
             {"$set": {"group_id": group_id}},
             upsert=True
@@ -5158,8 +5158,6 @@ async def premium_auto_activate(request: Request):
 
 from fastapi import FastAPI, Request
 import uvicorn
-
-app = FastAPI()
 
 @app.post("/webhook")
 async def webhook(request: Request):
