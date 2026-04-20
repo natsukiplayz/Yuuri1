@@ -2848,55 +2848,63 @@ from telegram.ext import ContextTypes
 
 async def pay(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
+    user_id = update.effective_user.id
     chat_type = update.effective_chat.type
     bot_username = context.bot.username
+    
+    # 🔗 Links
+    website_url = "https://yuuri_premium.oneapp.dev/"
+    benefits_link = "https://t.me/ig_yuukii/51" # Replace with your post link
 
-    # 1. 📢 IF IN GROUP - Simple redirect without parameters
+    # 1. 📢 GROUP REDIRECT
     if chat_type in ["group", "supergroup"]:
-        # Just a direct link to the bot's profile
-        redirect_url = f"https://t.me/{bot_username}"
-        
+        redirect_url = f"https://t.me/{bot_username}?start=pay"
         keyboard = [[InlineKeyboardButton("💳 Cᴏɴᴛɪɴᴜᴇ Tᴏ Pᴀʏ", url=redirect_url)]]
-        
         return await msg.reply_text(
-            "⚠️ <b>Usᴇ Tʜɪs Cᴏᴍᴍᴀɴᴅ Iɴ DM</b>\n\n"
-            "Cʟɪᴄᴋ ᴛʜᴇ ʙᴇʟᴏᴡ ʙᴜᴛᴛᴏɴ ᴛᴏ ᴄᴏɴᴛɪɴᴜᴇ!",
+            "⚠️ <b>Usᴇ Tʜɪs Cᴏᴍᴍᴀɴᴅ Iɴ DM</b>\n\nCʟɪᴄᴋ ᴛʜᴇ ʙᴇʟᴏᴡ ʙᴜᴛᴛᴏɴ ᴛᴏ ᴄᴏɴᴛɪɴᴜᴇ!",
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode=ParseMode.HTML
         )
 
-    # 2. 💎 IF IN PRIVATE (DM) - Show info as usual
-    qr_url = "YOUR_QR_IMAGE_URL" 
+    # 2. 💎 CHECK PREMIUM STATUS
+    user_data = await users.find_one({"id": user_id})
+    is_premium = user_data.get("premium", False) if user_data else False
+    expiry_date = user_data.get("premium_until", "N/A") if user_data else "N/A"
 
-    caption = (
-        "✨ <b>Uᴘɢʀᴀᴅᴇ Tᴏ Pʀᴇᴍɪᴜᴍ</b> ✨\n"
-        "⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n"
-        "🔓 <b>Bᴇɴᴇꜰɪᴛs Yᴏᴜ Gᴇᴛ:</b>\n\n"
-        "💰 <b>Dᴀɪʟʏ Rᴇᴡᴀʀᴅ:</b> <code>$2,000</code> Fɪxᴇᴅ!\n"
-        "💸 <b>Lᴏᴡᴇʀ Tᴀx:</b> Oɴʟʏ <code>5%</code> Oɴ Gɪᴠᴇ\n"
-        "⚔️ <b>Kɪʟʟ Bᴏᴏsᴛ:</b> Hɪɢʜᴇʀ Cᴏɪɴs & XP Pᴀʏᴏᴜᴛs\n"
-        "🛡️ <b>Mᴀx Pʀᴏᴛᴇᴄᴛ:</b> Uɴʟᴏᴄᴋ <code>2ᴅ</code> & <code>3ᴅ</code> Sᴀꜰᴇᴛʏ\n"
-        "💓 <b>Exᴄʟᴜsɪᴠᴇ Iᴄᴏɴ:</b> Sʜᴏᴡ Oɴ Lᴇᴀᴅᴇʀʙᴏᴀʀᴅs\n\n"
-        "⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n"
-        "📸 <b>Sᴄᴀɴ Tʜᴇ QR Cᴏᴅᴇ Tᴏ Pᴀʏ (20₹)</b>\n"
-        "<i>Cʟɪᴄᴋ Tʜᴇ Bᴜᴛᴛᴏɴ Bᴇʟᴏᴡ Tᴏ Sᴇɴᴅ Sᴄʀᴇᴇɴsʜᴏᴛ & Aᴄᴛɪᴠᴀᴛᴇ!</i>"
+    if is_premium:
+        # Message for existing Premium users
+        text = (
+            f"💓 <b>Yᴏᴜ ᴀʀᴇ ᴀʟʀᴇᴀᴅʏ ᴀ Pʀᴇᴍɪᴜᴍ Uꜱᴇʀ.</b>\n"
+            f"⏳ <b>Pʀᴇᴍɪᴜᴍ Vᴀʟɪᴅ Uɴᴛɪʟ:</b> <code>{expiry_date}</code>\n"
+            f"🔄 <i>Iꜰ Yᴏᴜ Rᴇʙᴜʏ Tʜᴇ Pʀᴇᴍɪᴜᴍ, Yᴏᴜʀ Pʀᴇᴍɪᴜᴍ Wɪʟʟ Bᴇ Exᴛᴇɴᴅᴇᴅ.</i>\n\n"
+            f"👉 <b>Gɪꜰᴛ Tᴏ A Fʀɪᴇɴᴅ:</b>\n"
+            f"⚠️ <b>Iᴍᴘᴏʀᴛᴀɴᴛ:</b> Eɴᴛᴇʀ Tʜᴇɪʀ Tᴇʟᴇɢʀᴀᴍ ID Iɴ Tʜᴇ Wᴇʙsɪᴛᴇ."
+        )
+        keyboard = [
+            [InlineKeyboardButton("🎁 Gɪғᴛ Pʀᴇᴍɪᴜᴍ", url=website_url)],
+            [InlineKeyboardButton("💎 Pʀᴇᴍɪᴜᴍ Bᴇɴᴇғɪᴛs", url=benefits_link)]
+        ]
+    else:
+        # Message for New users
+        text = (
+            "💓 <b>Yᴜᴜʀɪ Pʀᴇᴍɪᴜᴍ Aᴄᴄᴇꜱꜱ</b>\n\n"
+            "⚠️ <b>Iᴍᴘᴏʀᴛᴀɴᴛ:</b> Eɴᴛᴇʀ Yᴏᴜʀ Tᴇʟᴇɢʀᴀᴍ ID Iɴ Tʜᴇ ID Fɪᴇʟᴅ.\n"
+            "👉 <b>Cʜᴇᴄᴋ Tᴇʟᴇɢʀᴀᴍ Iᴅ:</b> <code>/id</code>"
+        )
+        keyboard = [
+            [InlineKeyboardButton("💗 Pᴀʏ Nᴏᴡ 💗", url=website_url)],
+            [InlineKeyboardButton("💗 Pʀᴇᴍɪᴜᴍ Bᴇɴᴇғɪᴛs 💗", url=benefits_link)]
+        ]
+
+    # Use a nice Premium banner image
+    banner_url = "https://i.ibb.co/GQPQGdNF/x.jpg" # Change to your image link
+
+    await msg.reply_photo(
+        photo=banner_url,
+        caption=text,
+        parse_mode=ParseMode.HTML,
+        reply_markup=InlineKeyboardMarkup(keyboard)
     )
-
-    keyboard = [[InlineKeyboardButton("✨ Sᴇɴᴅ Sᴄʀᴇᴇɴsʜᴏᴛ ✨", url=f"tg://user?id={OWNER_ID}")]]
-    
-    try:
-        await msg.reply_photo(
-            photo=qr_url,
-            caption=caption,
-            parse_mode=ParseMode.HTML,
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
-    except Exception:
-        await msg.reply_text(
-            caption,
-            parse_mode=ParseMode.HTML,
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
 
 # ======= PURCHASE ========
 async def purchase(update: Update, context: ContextTypes.DEFAULT_TYPE):
