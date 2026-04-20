@@ -1921,6 +1921,39 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     get_user(user) # Sync user data
 
+    # --- 6.1 WEBSITE PAYMENT BRIDGE ---
+    if args and args[0].startswith("recharge_"):
+        try:
+            # Extract data from payload: recharge_USERID_CODE
+            payload_parts = args[0].split("_")
+            target_uid = int(payload_parts[1])
+            recharge_code = payload_parts[2]
+
+            # 1. Notify the Log Group (Set via /connect)
+            log_config = await async_db.settings.find_one({"config": "log_group"})
+            target_chat = log_config["group_id"] if log_config else OWNER_ID
+
+            alert_text = (
+                "💳 <b>Gᴏᴏɢʟᴇ Pʟᴀʏ Cᴏᴅᴇ Sᴜʙᴍɪᴛᴛᴇᴅ</b>\n\n"
+                f"👤 <b>User ID:</b> <code>{target_uid}</code>\n"
+                f"🔑 <b>Code:</b> <code>{recharge_code}</code>\n"
+                f"💰 <b>Plan:</b> Check website selection\n\n"
+                f"<i>Verify and use:</i> <code>/activate premium 7d {target_uid}</code>"
+            )
+            
+            await context.bot.send_message(chat_id=target_chat, text=alert_text, parse_mode=ParseMode.HTML)
+
+            # 2. Confirm to the User
+            return await update.message.reply_text(
+                "✅ <b>Sᴜʙᴍɪssɪᴏɴ Rᴇᴄᴇɪᴠᴇᴅ!</b>\n\n"
+                "Yᴏᴜʀ ₹20 Rᴇᴄʜᴀʀɢᴇ Cᴏᴅᴇ ʜᴀs ʙᴇᴇɴ sᴇɴᴛ ᴛᴏ RJ ғᴏʀ ᴠᴇʀɪғɪᴄᴀᴛɪᴏɴ.\n"
+                "ᴘʟᴇᴀsᴇ ᴡᴀɪᴛ 𝟷𝟻-𝟹𝟶 ᴍɪɴᴜᴛᴇs.",
+                parse_mode=ParseMode.HTML
+            )
+        except Exception as e:
+            print(f"Website Bridge Error: {e}")
+
+
     caption = (
         f"<b>ᴡᴇʟᴄᴏᴍᴇ, {user.first_name}!</b> 👋\n\n"
         f"<blockquote>ɪ ᴀᴍ <b>ʏᴜᴜʀɪ</b> — ʜᴇʀᴇ ᴛᴏ ᴇɴʜᴀɴᴄᴇ ʏᴏᴜʀ ᴇxᴘᴇʀɪᴇɴᴄᴇ ᴏɴ ᴛᴇʟᴇɢʀᴀᴍ. ᴇɴᴊᴏʏ ʏᴏᴜʀ ᴊᴏᴜʀɴᴇʏ ᴡɪᴛʜ ᴍᴇ!\n\n"
