@@ -29,7 +29,7 @@ from telegram.ext import (
 )
 from motor.motor_asyncio import AsyncIOMotorClient
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 # ================= WEBHOOK SETUP =================
 app = FastAPI()
@@ -87,7 +87,10 @@ feedback_db = db["feedbacks"]
 # --- ASYNC COLLECTIONS (Specifically for 'await' commands) ---
 image_db = async_db["command_images"]
 users_col = async_db["users"]
-groups_col = async_db["saved_groups"] 
+groups_col = async_db["saved_groups"]
+users_sync = sync_db["users"]
+users_async = async_db["users"]
+settings_async = async_db["settings"]
 
 # ================= LOG =================
 logging.basicConfig(level=logging.INFO)
