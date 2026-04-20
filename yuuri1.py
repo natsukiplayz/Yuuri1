@@ -4900,17 +4900,27 @@ async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Function for /connect command
 async def connect_log_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Check if the user is the owner (RJ)
     if update.effective_user.id != OWNER_ID:
         return
     
     group_id = update.effective_chat.id
-    # Save to settings
-    await db.settings.update_one(
-        {"config": "log_group"},
-        {"$set": {"group_id": group_id}},
-        upsert=True
-    )
-    await update.message.reply_text("✅ <b>Gʀᴏᴜᴘ Cᴏɴɴᴇᴄᴛᴇᴅ Sᴜᴄᴄᴇssғᴜʟʟʏ!</b>\nPremium logs will be sent here.")
+    
+    # FIX: Ensure you are using 'await' with the motor method
+    # and verify that 'db' is your Motor client database instance
+    try:
+        await db.settings.update_one(
+            {"config": "log_group"},
+            {"$set": {"group_id": group_id}},
+            upsert=True
+        )
+        
+        await update.message.reply_text(
+            f"✅ <b>Gʀᴏᴜᴘ Cᴏɴɴᴇᴄᴛᴇᴅ Sᴜᴄᴄᴇssғᴜʟʟʏ!</b>\n"
+            f"Pʀᴇᴍɪᴜᴍ logs will now be sent to this chat."
+        )
+    except Exception as e:
+        print(f"Database Error in /connect: {e}")
 
 
 # ---------------- CALLBACKS & ERROR HANDLING ----------------
