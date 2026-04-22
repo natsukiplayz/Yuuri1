@@ -4866,7 +4866,7 @@ async def ask_ai_async(chat_id: int, text: str, username: str):
                     # If it's a 401 or 400 error, there's no point in trying again
                     break 
 
-        return "⚠️ Iᴍ A Bɪᴛ Tɪʀᴇᴅ Sᴏ Pʟᴇᴀꜱᴇ 🥺"
+        return "baad mai baat karungi busy hu👀"
 
     except Exception as e:
         print("AI ERROR:", e)
