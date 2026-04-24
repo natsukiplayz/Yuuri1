@@ -41,7 +41,7 @@ BOT_START_TIME = datetime.now(timezone.utc)
 
 from fastapi.middleware.cors import CORSMiddleware
 
-App.add_middleware(
+app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], 
     allow_credentials=True,
