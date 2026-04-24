@@ -10,6 +10,10 @@ import base64
 import io
 from io import BytesIO
 
+import cloudinary
+import cloudinary.uploader
+from fastapi import UploadFile, File, Form, HTTPException
+
 import requests
 import httpx
 from telegram.constants import ParseMode
@@ -53,8 +57,61 @@ DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
 RAW_GROQ_KEYS = os.getenv("GROQ_KEYS")
 GROQ_KEYS = [k.strip() for k in RAW_GROQ_KEYS.split(",") if k.strip()] if RAW_GROQ_KEYS else []
 
-PRIMARY_MODEL = "llama-3.3-70b-versatile"
-FALLBACK_MODEL = "llama-3.1-8b-instant"
+PRIMARY_MODEL = "moonshotai/kimi-k2-instruct-0905"
+FALLBACK_MODEL = "moonshotai/kimi-k2-instruct-0905"
+
+# ================= CLOUDINARY CONFIG =================
+# ================= CLOUDINARY CONFIG (SECURE) =================
+import cloudinary
+import cloudinary.uploader
+
+CLOUDINARY_CLOUD_NAME = os.getenv("CLOUDINARY_CLOUD_NAME", "Dbunajbpk")
+CLOUDINARY_API_KEY = os.getenv("CLOUDINARY_API_KEY")
+CLOUDINARY_API_SECRET = os.getenv("CLOUDINARY_API_SECRET")
+
+cloudinary.config( 
+    cloud_name = CLOUDINARY_CLOUD_NAME, 
+    api_key = CLOUDINARY_API_KEY, 
+    api_secret = CLOUDINARY_API_SECRET 
+)
+
+# ================= DATABASE CONNECTION =================
+# Ensure your MongoDB client and 'db' variable are defined here
+client = AsyncIOMotorClient(MONGO_URI)
+db = client.yuuri_bot  # Replace 'yuuri_bot' with your actual database name
+
+# ================= WEBSITE API ROUTES =================
+
+@app.post("/api/upload-design")
+async def upload_design(title: str = Form(...), file: UploadFile = File(...)):
+    try:
+        # Upload to Cloudinary
+        result = cloudinary.uploader.upload(file.file)
+        image_url = result.get("secure_url")
+
+        # Save to MongoDB
+        await db.designs.insert_one({
+            "title": title,
+            "image_url": image_url,
+            "created_at": datetime.now(timezone.utc)
+        })
+        
+        return {"status": "success", "url": image_url}
+    except Exception as e:
+        logging.error(f"Upload Error: {e}")
+        raise HTTPException(status_code=500, detail="Upload failed")
+
+@app.get("/api/get-designs")
+async def get_designs():
+    try:
+        # Fetch latest 20 designs
+        cursor = db.designs.find().sort("_id", -1).limit(20)
+        designs = await cursor.to_list(length=20)
+        for d in designs:
+            d["_id"] = str(d["_id"])  # Convert ObjectId to string
+        return designs
+    except Exception as e:
+        return []
 
 # ================= MONGODB SETUP (UNIFIED) =================
 from pymongo import MongoClient
