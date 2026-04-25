@@ -219,6 +219,23 @@ def save_user(data):
 
     users.update_one({"id": data["id"]}, {"$set": data}, upsert=True)
 
+async def auto_coin_gift(context: ContextTypes.DEFAULT_TYPE):
+    # 1. Generate a random number between 100 and 500
+    gift_amount = random.randint(100, 500)
+
+    # 2. Update the Database
+    # We use 'update_many' to talk to ALL users at once.
+    # {} means "find every user".
+    # "$inc" means "increment" (add to their current coins).
+    await users_async.update_many(
+        {}, 
+        {"$inc": {"coins": gift_amount}}
+    )
+
+    # 3. Log it so you know it worked
+    print(f"DEBUG: Automatically gave {gift_amount} coins to everyone!")
+
+
 #premium
 import asyncio
 from datetime import datetime
@@ -5286,6 +5303,8 @@ async def on_startup():
     await application.start()
     
     application.job_queue.run_repeating(auto_revive_free, interval=21600, first=10)
+
+    application.job_queue.run_repeating(auto_coin_gift, interval=86400, first=60)
     
     print(f"🚀 Webhook set to {webhook_url}")
 
