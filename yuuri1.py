@@ -220,20 +220,33 @@ def save_user(data):
     users.update_one({"id": data["id"]}, {"$set": data}, upsert=True)
 
 async def auto_coin_gift(context: ContextTypes.DEFAULT_TYPE):
-    # 1. Generate a random number between 100 and 500
-    gift_amount = random.randint(100, 500)
+    """Background task: Gives coins and then notifies the group."""
+    try:
+        # 1. Roll the dice for the amount
+        gift_amount = random.randint(100, 500)
+        
+        # 2. Update the Database (The Action)
+        result = await users_async.update_many(
+            {}, 
+            {"$inc": {"coins": gift_amount}}
+        )
+        print(f"💰 [AUTO-GIFT] Gave {gift_amount} coins to {result.modified_count} users.")
 
-    # 2. Update the Database
-    # We use 'update_many' to talk to ALL users at once.
-    # {} means "find every user".
-    # "$inc" means "increment" (add to their current coins).
-    await users_async.update_many(
-        {}, 
-        {"$inc": {"coins": gift_amount}}
-    )
+        # 3. Notify the Group (The Confirmation)
+        # Place it right here, still inside the 'try' block!
+        # Make sure the chat_id is your actual Group ID (usually starts with -100)
+        await context.bot.send_message(
+            chat_id=-1003562158604, 
+            text=(
+                f"🎁 <b>Gʟᴏʙᴀʟ Gɪғᴛ!</b>\n\n"
+                f"Yuuri has dropped 💰 <b>{gift_amount} coins</b> into everyone's pockets!\n"
+                f"Check your /bal to see your new wealth!"
+            ),
+            parse_mode='HTML'
+        )
 
-    # 3. Log it so you know it worked
-    print(f"DEBUG: Automatically gave {gift_amount} coins to everyone!")
+    except Exception as e:
+        print(f"⚠️ Auto-gift error: {e}")
 
 
 #premium
