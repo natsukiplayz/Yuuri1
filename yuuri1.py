@@ -2287,14 +2287,12 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     user = update.effective_user
 
-    # 🛑 --- ECONOMY CHECK --- 🛑
-    if chat.type != "private":
-        if await is_economy_disabled(chat.id):
-            return await msg.reply_text("🛑 Tʜᴇ Eᴄᴏɴᴏᴍʏ Sʏsᴛᴇᴍ Iꜱ Cᴜʀʀᴇɴᴛʟʏ Cʟᴏsᴇᴅ Iɴ Tʜɪs Gʀᴏᴜᴘ.")
-    # ---------------------------
+    if chat.type != "private" and await is_economy_disabled(chat.id):
+        return await msg.reply_text("🛑 Tʜᴇ Eᴄᴏɴᴏᴍʏ Sʏsᴛᴇᴍ Iꜱ Cᴜʀʀᴇɴᴛʟʏ Cʟᴏsᴇᴅ Iɴ Tʜɪs Gʀᴏᴜᴘ.")
 
     target_user = msg.reply_to_message.from_user if msg.reply_to_message else user
     data = get_user(target_user) 
+    icon = get_user_icon(data, context) # ✅ Custom Icon Logic
 
     # --- ✨ AUTO-LEVEL LOGIC ---
     updated = False
@@ -2306,25 +2304,12 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
             updated = True
         else:
             break
-    if updated:
-        save_user(data)
+    if updated: save_user(data)
 
-    # --- DATA EXTRACTION & RANKINGS (Rest of your code remains the same) ---
-    xp = data.get("xp", 0)
-    lvl = data.get("level", 1)
-    coins = data.get("coins", 0)
-    kills = data.get("kills", 0)
-    
-    premium_active = is_premium(data, context)
-# Logic: Use custom icon if premium, otherwise default to 💓 (premium) or 👤 (free)
-if premium_active:
-    icon = data.get("custom_icon", "💓")
-else:
-    icon = "👤"
-
+    xp, lvl = data.get("xp", 0), data.get("level", 1)
+    coins, kills = data.get("coins", 0), data.get("kills", 0)
     current_rank_data, _ = get_rank_data(lvl)
-    rank_title = current_rank_data["name"]
-
+    
     need = int(100 * (1.5 ** (lvl - 1)))
     percent = int((xp / need) * 100) if need > 0 else 0
     bar = create_progress_bar(min(percent, 100))
@@ -2334,69 +2319,41 @@ else:
     wealth_rank = 1 + users.count_documents({"id": {"$ne": bot_id}, "coins": {"$gt": coins}})
     kill_rank = 1 + users.count_documents({"id": {"$ne": bot_id}, "kills": {"$gt": kills}})
 
-    inv = data.get("inventory", [])
-    inventory_str = ", ".join(inv) if inv else "Eᴍᴘᴛʏ"
     status = "💀 Dᴇᴀᴅ" if data.get("dead") else "❤️ Aʟɪᴠᴇ"
 
     text = (
-        f"{icon} Nᴀᴍᴇ: {data.get('name', target_user.first_name)}\n"
-        f"🛡️ Tɪᴛʟᴇ: {rank_title}\n"
-        f"🏅 Lᴇᴠᴇʟ: {lvl}\n"
-        f"⚔️ Kɪʟʟs: {kills:,}\n"
-        f"💰 Cᴏɪɴꜱ: {coins:,}\n"
-        f"🎒 Iɴᴠᴇɴᴛᴏʀʏ: {inventory_str}\n"
-        f"🎯 Sᴛᴀᴛᴜꜱ: {status}\n\n"
-        f"📊 Pʀᴏɢʀᴇꜱꜱ: {xp:,} / {need:,} XP\n"
+        f"{icon} <b>Nᴀᴍᴇ:</b> {data.get('name', target_user.first_name)}\n"
+        f"🛡️ <b>Tɪᴛʟᴇ:</b> {current_rank_data['name']}\n"
+        f"🏅 <b>Lᴇᴠᴇʟ:</b> {lvl}\n"
+        f"⚔️ <b>Kɪʟʟs:</b> {kills:,}\n"
+        f"💰 <b>Cᴏɪɴꜱ:</b> {coins:,}\n"
+        f"🎯 <b>Sᴛᴀᴛᴜꜱ:</b> {status}\n\n"
+        f"📊 <b>Pʀᴏɢʀᴇꜱꜱ:</b> {xp:,} / {need:,} XP\n"
         f"{bar} ({percent}%)\n\n"
-        f"🌐 Gʟᴏʙᴀʟ Rᴀɴᴋ (XP): {xp_rank}\n"
-        f"💸 Wᴇᴀʟᴛʜ Rᴀɴᴋ: {wealth_rank}\n"
-        f"🩸 Kɪʟʟ Rᴀɴᴋ: {kill_rank}\n"
-        f"🏰 Gᴜɪʟᴅ: {data.get('guild') or 'Nᴏɴᴇ'}"
+        f"🌐 <b>Gʟᴏʙᴀʟ Rᴀɴᴋ:</b> #{xp_rank}\n"
+        f"💸 <b>Wᴇᴀʟᴛʜ Rᴀɴᴋ:</b> #{wealth_rank}"
     )
+    await msg.reply_text(text, parse_mode='HTML')
 
-    await msg.reply_text(text)
-
-# =============== balance =================
 async def bal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     if not msg: return
     chat = update.effective_chat
 
-    # 🛑 --- ECONOMY CHECK --- 🛑
-    if chat.type != "private":
-        if await is_economy_disabled(chat.id):
-            return await msg.reply_text("🛑 Tʜᴇ Eᴄᴏɴᴏᴍʏ Sʏsᴛᴇᴍ Iꜱ Cᴜʀʀᴇɴᴛʟʏ Cʟᴏsᴇᴅ Iɴ Tʜɪs Gʀᴏᴜᴘ.")
-    # ---------------------------
+    if chat.type != "private" and await is_economy_disabled(chat.id):
+        return await msg.reply_text("🛑 Tʜᴇ Eᴄᴏɴᴏᴍʏ Sʏsᴛᴇᴍ Iꜱ Cᴜʀʀᴇɴᴛʟʏ Cʟᴏsᴇᴅ Iɴ Tʜɪs Gʀᴏᴜᴘ.")
 
     target_user = msg.reply_to_message.from_user if msg.reply_to_message else update.effective_user
     data = get_user(target_user) 
-
-    coins = data.get("coins", 0)
-    kills = data.get("kills", 0)
-    status = "💀 Dᴇᴀᴅ" if data.get("dead") else "❤️ Aʟɪᴠᴇ"
-    
-    premium_active = is_premium(data, context)
-# Logic: Use custom icon if premium, otherwise default to 💓 (premium) or 👤 (free)
-if premium_active:
-    icon = data.get("custom_icon", "💓")
-else:
-    icon = "👤"
-    
-    bot_id = context.bot.id
-    wealth_rank = 1 + users.count_documents({
-        "id": {"$ne": bot_id}, 
-        "coins": {"$gt": coins}
-    })
+    icon = get_user_icon(data, context) # ✅ Custom Icon Logic
 
     text = (
-        f"{icon} Nᴀᴍᴇ: {data.get('name', target_user.first_name)}\n"
-        f"💰 Cᴏɪɴꜱ: {coins:,}\n"
-        f"💸 Wᴇᴀʟᴛʜ Rᴀɴᴋ: {wealth_rank}\n"
-        f"🎯 Sᴛᴀᴛᴜꜱ: {status}\n"
-        f"⚔️ Kɪʟʟs: {kills:,}"
+        f"{icon} <b>Nᴀᴍᴇ:</b> {target_user.first_name}\n"
+        f"💰 <b>Cᴏɪɴꜱ:</b> {data.get('coins', 0):,}\n"
+        f"⚔️ <b>Kɪʟʟs:</b> {data.get('kills', 0):,}"
     )
+    await msg.reply_text(text, parse_mode='HTML')
 
-    await msg.reply_text(text)
 
 # ======== ROB SYSTEM ========
 from datetime import datetime
@@ -2405,6 +2362,9 @@ BOT_ID = None
 
 MAX_ROB_PER_ATTEMPT = 10000
 
+# ==========================================
+# 🕵️ ROB SYSTEM (UPDATED WITH CUSTOM ICONS)
+# ==========================================
 async def robe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message:
         return
@@ -2417,7 +2377,6 @@ async def robe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if chat.type != "private":
         if await is_economy_disabled(chat.id):
             return await msg.reply_text("🛑 Tʜᴇ Eᴄᴏɴᴏᴍʏ Sʏsᴛᴇᴍ Iꜱ Cᴜʀʀᴇɴᴛʟʏ Cʟᴏsᴇᴅ Iɴ Tʜɪs Gʀᴏᴜᴘ.")
-    # ---------------------------
 
     # ❌ Block in private
     if chat.type == "private":
@@ -2430,7 +2389,7 @@ async def robe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     target_user = msg.reply_to_message.from_user
 
     # ❌ Cannot rob bot
-    if target_user.id == BOT_ID or target_user.is_bot:
+    if target_user.id == context.bot.id or target_user.is_bot:
         return await msg.reply_text("🤖 Yᴏᴜ Cᴀɴɴᴏᴛ Rᴏʙ A Bᴏᴛ.")
 
     # ❌ Cannot rob yourself
@@ -2458,22 +2417,30 @@ async def robe(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # 🛡️ Protection check
     if target.get("protect_until"):
-        expire = datetime.strptime(target["protect_until"], "%Y-%m-%d %H:%M:%S")
-        if expire > datetime.utcnow():
-            return await msg.reply_text(
-                "🛡️ Tʜɪꜱ Uꜱᴇʀ Iꜱ Pʀᴏᴛᴇᴄᴛᴇᴅ.\n"
-                "🔒 Cʜᴇᴄᴋ Pʀᴏᴛᴇᴄᴛɪᴏɴ Tɪᴍᴇ » /check"
-            )
+        try:
+            expire = datetime.strptime(target["protect_until"], "%Y-%m-%d %H:%M:%S")
+            if expire > datetime.utcnow():
+                return await msg.reply_text(
+                    "🛡️ Tʜɪꜱ Uꜱᴇʀ Iꜱ Pʀᴏᴛᴇᴄᴛᴇᴅ.\n"
+                    "🔒 Cʜᴇᴄᴋ Pʀᴏᴛᴇᴄᴛɪᴏɴ Tɪᴍᴇ » /check"
+                )
+        except (ValueError, TypeError):
+            pass
 
     # 💰 Minimum coins check
     if robber.get("coins", 0) < 50:
-        return await msg.reply_text(
-            "💰 Yᴏᴜ Nᴇᴇᴅ Aᴛ Lᴇᴀsᴛ 50 Cᴏɪɴs Tᴏ Rᴏʙ Sᴏᴍᴇᴏɴᴇ."
-        )
+        return await msg.reply_text("💰 Yᴏᴜ Nᴇᴇᴅ Aᴛ Lᴇᴀsᴛ 50 Cᴏɪɴs Tᴏ Rᴏʙ Sᴏᴍᴇᴏɴᴇ.")
 
-    # 🌟 PREMIUM LOGIC FOR MAX ROB LIMIT
+    # ✨ --- CUSTOM EMOJI & PREMIUM LOGIC --- ✨
     premium_active = is_premium(robber, context)
-    max_rob_limit = 100000 if premium_active else 10000
+    
+    # Define icon based on custom set emoji
+    if premium_active:
+        icon = robber.get("custom_icon", "💓")
+        max_rob_limit = 100000 
+    else:
+        icon = "👤"
+        max_rob_limit = 10000
 
     if amount > max_rob_limit:
         user_status = "💗 Pʀᴇᴍɪᴜᴍ" if premium_active else "👤 Nᴏʀᴍᴀʟ"
@@ -2481,23 +2448,25 @@ async def robe(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"❌ Aꜱ ᴀ {user_status} ᴜꜱᴇʀ, ʏᴏᴜ ᴄᴀɴ ᴏɴʟʏ ʀᴏʙ ᴜᴘ ᴛᴏ {max_rob_limit:,} ᴄᴏɪɴꜱ ᴀᴛ ᴀ ᴛɪᴍᴇ."
         )
 
-    # 💸 STRICT AMOUNT CHECK
+    # 💸 Balance check
     if target.get("coins", 0) < amount:
         return await msg.reply_text(
             f"💸 {target_user.first_name} ᴅᴏᴇꜱɴ'ᴛ ʜᴀᴠᴇ {amount:,} ᴄᴏɪɴꜱ!\n"
             f"Tʜᴇʏ ᴏɴʟʏ ʜᴀᴠᴇ {target.get('coins', 0):,} ᴄᴏɪɴꜱ."
         )
 
-    # ✅ Success
+    # ✅ Success Execution
     robber["coins"] += amount
     target["coins"] -= amount
 
     save_user(robber)
     save_user(target)
 
+    # Final result using the custom icon
     await msg.reply_text(
-        f"🕵️ {robber_user.first_name} Sᴜᴄᴄᴇssғᴜʟʟʏ Rᴏʙʙᴇᴅ {target_user.first_name}\n"
-        f"💰 Sᴛᴏʟᴇɴ: {amount:,} Cᴏɪɴs"
+        f"{icon} <b>{robber_user.first_name} Sᴜᴄᴄᴇssғᴜʟʟʏ Rᴏʙʙᴇᴅ {target_user.first_name}</b>\n"
+        f"💰 <b>Sᴛᴏʟᴇɴ:</b> <code>{amount:,}$</code>",
+        parse_mode='HTML'
     )
 
 #======Give======
@@ -2525,7 +2494,7 @@ async def givee(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await msg.reply_text("🤖 Yᴏᴜ Cᴀɴ'ᴛ Gɪᴠᴇ Cᴏɪɴs Tᴏ Bᴏᴛs")
 
     if not context.args:
-        return await msg.reply_text("⚠️ Usᴀɢᴇ: /givee <amount>")
+        return await msg.reply_text("⚠️ Usᴀɢᴇ: /give <amount>")
 
     try:
         amount = int(context.args[0])
@@ -2604,6 +2573,9 @@ from telegram.ext import ContextTypes
 
 BOT_ID = None
 
+# ==========================================
+# 🩸 KILL SYSTEM (CUSTOM EMOJI INTEGRATED)
+# ==========================================
 async def kill(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global BOT_ID
     if BOT_ID is None:
@@ -2617,10 +2589,8 @@ async def kill(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
 
     # 🛑 --- ECONOMY CHECK --- 🛑
-    if chat.type != "private":
-        if await is_economy_disabled(chat.id):
-            return await msg.reply_text("🛑 Tʜᴇ Eᴄᴏɴᴏᴍʏ Sʏsᴛᴇᴍ Iꜱ Cᴜʀʀᴇɴᴛʟʏ Cʟᴏsᴇᴅ Iɴ Tʜɪs Gʀᴏᴜᴘ.")
-    # ---------------------------
+    if chat.type != "private" and await is_economy_disabled(chat.id):
+        return await msg.reply_text("🛑 Tʜᴇ Eᴄᴏɴᴏᴍʏ Sʏsᴛᴇᴍ Iꜱ Cᴜʀʀᴇɴᴛʟʏ Cʟᴏsᴇᴅ Iɴ Tʜɪs Gʀᴏᴜᴘ.")
 
     # ❌ Block in private
     if chat.type == "private":
@@ -2631,10 +2601,10 @@ async def kill(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await msg.reply_text("⚠️ Rᴇᴘʟʏ Tᴏ Sᴏᴍᴇᴏɴᴇ Yᴏᴜ Wᴀɴᴛ Tᴏ Kɪʟʟ.")
 
     target_user = msg.reply_to_message.from_user
-
     if not target_user:
         return await msg.reply_text("❌ Iɴᴠᴀʟɪᴅ Tᴀʀɢᴇᴛ.")
 
+    # 🤖 Bot/Owner Checks
     if target_user.is_bot:
         if target_user.id == BOT_ID:
             return await msg.reply_text("😂 Nɪᴄᴇ Tʀʏ Oɴ Mᴇ!")
@@ -2661,17 +2631,22 @@ async def kill(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if victim.get("dead", False):
         return await msg.reply_text(f"💀 {target_user.first_name} ɪꜱ ᴀʟʀᴇᴀᴅʏ ᴅᴇᴀᴅ!")
 
-    # 🎲 Random rewards & ✨ Premium Boost
+    # ✨ --- CUSTOM EMOJI & REWARD LOGIC --- ✨
     premium_active = is_premium(killer, context)
+    
     if premium_active:
+        # Pull custom emoji or default to pink heart
+        icon = killer.get("custom_icon", "💓")
         reward = random.randint(500, 1500)
         xp_gain = random.randint(35, 57)
-        kill_msg = f"💗 {user.first_name} (Pʀᴇᴍɪᴜᴍ) Aɴɴɪʜɪʟᴀᴛᴇᴅ {target_user.first_name}"
+        kill_msg = f"{icon} <b>{user.first_name} Aɴɴɪʜɪʟᴀᴛᴇᴅ {target_user.first_name}</b>"
     else:
+        icon = "👤"
         reward = random.randint(100, 300)
         xp_gain = random.randint(5, 21)
-        kill_msg = f"👤 {user.first_name} Sᴛᴀʙʙᴇᴅ {target_user.first_name}"
+        kill_msg = f"{icon} <b>{user.first_name} Sᴛᴀʙʙᴇᴅ {target_user.first_name}</b>"
 
+    # Update database
     killer["coins"] = killer.get("coins", 0) + reward
     killer["xp"] = killer.get("xp", 0) + xp_gain
     killer["kills"] = killer.get("kills", 0) + 1
@@ -2685,9 +2660,17 @@ async def kill(update: Update, context: ContextTypes.DEFAULT_TYPE):
     save_user(killer)
     save_user(victim)
 
-    await msg.reply_text(f"{kill_msg}\n💰 Eᴀʀɴᴇᴅ: {reward:,} Cᴏɪɴs\n⭐ Gᴀɪɴᴇᴅ: +{xp_gain} Xᴘ")
+    # Output Results
+    response = (
+        f"{kill_msg}\n"
+        f"💰 <b>Eᴀʀɴᴇᴅ:</b> <code>{reward:,}$</code>\n"
+        f"⭐ <b>Gᴀɪɴᴇᴅ:</b> <code>+{xp_gain} XP</code>"
+    )
+    
     if bounty_reward > 0:
-        await msg.reply_text(f"🎯 Bᴏᴜɴᴛʏ Cʟᴀɪᴍᴇᴅ!\n💰 Eᴀʀɴᴇᴅ ᴇxᴛʀᴀ: {bounty_reward:,} Cᴏɪɴs!")
+        response += f"\n\n🎯 <b>Bᴏᴜɴᴛʏ Cʟᴀɪᴍᴇᴅ!</b>\n💰 <b>Eᴀʀɴᴇᴅ ᴇxᴛʀᴀ:</b> <code>{bounty_reward:,}$</code>"
+
+    await msg.reply_text(response, parse_mode='HTML')
 
 # ========== BOUNTY =========
 async def bounty(update: Update, context: ContextTypes.DEFAULT_TYPE):
