@@ -5262,7 +5262,7 @@ application.add_handler(CommandHandler("close", close_economy))
 application.add_handler(CommandHandler("open", open_economy))
 application.add_handler(CommandHandler("connect", connect_log_group))
 application.add_handler(CommandHandler("seticon", set_icon))
-
+application.add_handler(CommandHandler("denyicon", deny_icon))
 
 # Message Handlers
 application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
