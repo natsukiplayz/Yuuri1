@@ -2318,17 +2318,15 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     target_user = msg.reply_to_message.from_user if msg.reply_to_message else user
     data = get_user(target_user) 
-    
-    # ✅ This now works because we defined the function above!
     icon = get_user_icon(data, context) 
 
     # --- ✨ AUTO-LEVEL LOGIC ---
     updated = False
     while True:
-        need = int(100 * (1.5 ** (data["level"] - 1)))
-        if data["xp"] >= need:
+        need = int(100 * (1.5 ** (max(1, data.get("level", 1)) - 1)))
+        if data.get("xp", 0) >= need and data.get("level", 1) < 100: # Cap at 100 if you want
             data["xp"] -= need
-            data["level"] += 1
+            data["level"] = data.get("level", 1) + 1
             updated = True
         else:
             break
@@ -2336,16 +2334,21 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     xp, lvl = data.get("xp", 0), data.get("level", 1)
     coins, kills = data.get("coins", 0), data.get("kills", 0)
-    current_rank_data, _ = get_rank_data(lvl)
+    inventory = data.get("inventory", [])
+    inv_text = ", ".join(inventory) if inventory else "Nᴏɴᴇ"
     
+    current_rank_data, _ = get_rank_data(lvl)
     need = int(100 * (1.5 ** (lvl - 1)))
     percent = int((xp / need) * 100) if need > 0 else 0
-    bar = create_progress_bar(min(percent, 100))
+    bar = create_progress_bar(min(max(0, percent), 100))
 
     bot_id = context.bot.id
     xp_rank = 1 + users.count_documents({"id": {"$ne": bot_id}, "$or": [{"level": {"$gt": lvl}}, {"level": lvl, "xp": {"$gt": xp}}]})
     wealth_rank = 1 + users.count_documents({"id": {"$ne": bot_id}, "coins": {"$gt": coins}})
+    kill_rank = 1 + users.count_documents({"id": {"$ne": bot_id}, "kills": {"$gt": kills}})
+    
     status = "💀 Dᴇᴀᴅ" if data.get("dead") else "❤️ Aʟɪᴠᴇ"
+    guild = data.get("guild", "Nᴏɴᴇ")
 
     text = (
         f"{icon} <b>Nᴀᴍᴇ:</b> {data.get('name', target_user.first_name)}\n"
@@ -2353,11 +2356,14 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"🏅 <b>Lᴇᴠᴇʟ:</b> {lvl}\n"
         f"⚔️ <b>Kɪʟʟs:</b> {kills:,}\n"
         f"💰 <b>Cᴏɪɴꜱ:</b> {coins:,}\n"
+        f"🎒 <b>Iɴᴠᴇɴᴛᴏʀʏ:</b> {inv_text}\n"
         f"🎯 <b>Sᴛᴀᴛᴜꜱ:</b> {status}\n\n"
         f"📊 <b>Pʀᴏɢʀᴇꜱꜱ:</b> {xp:,} / {need:,} XP\n"
         f"{bar} ({percent}%)\n\n"
-        f"🌐 <b>Gʟᴏʙᴀʟ Rᴀɴᴋ:</b> #{xp_rank}\n"
-        f"💸 <b>Wᴇᴀʟᴛʜ Rᴀɴᴋ:</b> #{wealth_rank}"
+        f"🌐 <b>Gʟᴏʙᴀʟ Rᴀɴᴋ (XP):</b> {xp_rank}\n"
+        f"💸 <b>Wᴇᴀʟᴛʜ Rᴀɴᴋ:</b> {wealth_rank}\n"
+        f"🩸 <b>Kɪʟʟ Rᴀɴᴋ:</b> {kill_rank}\n"
+        f"🏰 <b>Gᴜɪʟᴅ:</b> {guild}"
     )
     await msg.reply_text(text, parse_mode='HTML')
 
@@ -2374,13 +2380,21 @@ async def bal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = get_user(target_user) 
     icon = get_user_icon(data, context) 
 
+    coins = data.get("coins", 0)
+    kills = data.get("kills", 0)
+    status = "💀 Dᴇᴀᴅ" if data.get("dead") else "❤️ Aʟɪᴠᴇ"
+    
+    bot_id = context.bot.id
+    wealth_rank = 1 + users.count_documents({"id": {"$ne": bot_id}, "coins": {"$gt": coins}})
+
     text = (
         f"{icon} <b>Nᴀᴍᴇ:</b> {target_user.first_name}\n"
-        f"💰 <b>Cᴏɪɴꜱ:</b> {data.get('coins', 0):,}\n"
-        f"⚔️ <b>Kɪʟʟs:</b> {data.get('kills', 0):,}"
+        f"💰 <b>Cᴏɪɴꜱ:</b> {coins:,}\n"
+        f"💸 <b>Wᴇᴀʟᴛʜ Rᴀɴᴋ:</b> {wealth_rank}\n"
+        f"🎯 <b>Sᴛᴀᴛᴜꜱ:</b> {status}\n"
+        f"⚔️ <b>Kɪʟʟs:</b> {kills:,}"
     )
     await msg.reply_text(text, parse_mode='HTML')
-
 
 # ======== ROB SYSTEM ========
 from datetime import datetime
