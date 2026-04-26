@@ -1179,6 +1179,30 @@ async def deactivate(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode=ParseMode.HTML
     )
 
+async def set_icon(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = update.effective_message
+    user = update.effective_user
+    
+    # 1. Get user data
+    data = get_user(user)
+    
+    # 2. Security Check: Premium Only
+    if not is_premium(data, context):
+        return await msg.reply_text("❌ <b>Tʜɪs ɪs ᴀ Pʀᴇᴍɪᴜᴍ-Oɴʟʏ ғᴇᴀᴛᴜʀᴇ!</b>\nUsᴇ /pay ᴛᴏ ᴜᴘɢʀᴀᴅᴇ.", parse_mode='HTML')
+
+    # 3. Check if an emoji was provided
+    if not context.args:
+        return await msg.reply_text("❓ <b>Usᴀɢᴇ:</b> /seticon <emoji>\nExᴀᴍᴘʟᴇ: <code>/seticon 🔥</code>", parse_mode='HTML')
+
+    new_icon = context.args[0]
+
+    # 4. Save to Database
+    data["custom_icon"] = new_icon
+    save_user(data)
+
+    await msg.reply_text(f"✅ <b>Iᴄᴏɴ Uᴘᴅᴀᴛᴇᴅ!</b>\nYour profile icon is now: {new_icon}", parse_mode='HTML')
+
+
 #==========welcome_message======
 import random
 import html
@@ -2292,7 +2316,11 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     kills = data.get("kills", 0)
     
     premium_active = is_premium(data, context)
-    icon = "💓" if premium_active else "👤"
+# Logic: Use custom icon if premium, otherwise default to 💓 (premium) or 👤 (free)
+if premium_active:
+    icon = data.get("custom_icon", "💓")
+else:
+    icon = "👤"
 
     current_rank_data, _ = get_rank_data(lvl)
     rank_title = current_rank_data["name"]
@@ -2348,7 +2376,11 @@ async def bal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     status = "💀 Dᴇᴀᴅ" if data.get("dead") else "❤️ Aʟɪᴠᴇ"
     
     premium_active = is_premium(data, context)
-    icon = "💓" if premium_active else "👤"
+# Logic: Use custom icon if premium, otherwise default to 💓 (premium) or 👤 (free)
+if premium_active:
+    icon = data.get("custom_icon", "💓")
+else:
+    icon = "👤"
     
     bot_id = context.bot.id
     wealth_rank = 1 + users.count_documents({
@@ -3073,12 +3105,19 @@ from telegram import Update
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
+# Helper to get the correct icon for leaderboards
+def get_leaderboard_icon(user_data, context):
+    """Returns custom emoji for premium, default heart for premium, or silhouette for free."""
+    if is_premium(user_data, context):
+        # Use custom_icon if it exists, otherwise default to 💓
+        return user_data.get("custom_icon", "💓")
+    return "👤"
+
 # ==========================================
 # 🏆 RICHEST USERS
 # ==========================================
 async def richest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
-    # 🛑 --- ECONOMY CHECK --- 🛑
     if chat.type != "private" and await is_economy_disabled(chat.id):
         return await update.message.reply_text("🛑 Tʜᴇ Eᴄᴏɴᴏᴍʏ Sʏsᴛᴇᴍ Iꜱ Cᴜʀʀᴇɴᴛʟʏ Cʟᴏsᴇᴅ Iɴ Tʜɪs Gʀᴏᴜᴘ.")
 
@@ -3088,11 +3127,11 @@ async def richest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for i, user in enumerate(top_list, start=1):
         user_id = user.get("id")
         safe_name = html.escape(str(user.get("name", "Uɴᴋɴᴏᴡɴ")))
-        icon = "💓" if is_premium(user, context) else "👤"
+        icon = get_leaderboard_icon(user, context) # ✅ Custom Icon System
         clickable_name = f'<a href="tg://user?id={user_id}">{safe_name}</a>'
         text += f"{icon} {i}. {clickable_name}: <code>{user.get('coins', 0):,}$</code>\n"
 
-    text += "\n💓 = Pʀᴇᴍɪᴜᴍ • 👤 = Nᴏʀᴍᴀʟ\n\n<i>✅ Uᴘɢʀᴀᴅᴇ Tᴏ Pʀᴇᴍɪᴜᴍ : /pay</i>"
+    text += "\n✨ = Cᴜsᴛᴏᴍ • 💓 = Pʀᴇᴍɪᴜᴍ • 👤 = Nᴏʀᴍᴀʟ\n\n<i>✅ Uᴘɢʀᴀᴅᴇ Tᴏ Pʀᴇᴍɪᴜᴍ : /pay</i>"
     await update.message.reply_text(text, parse_mode=ParseMode.HTML)
 
 # ==========================================
@@ -3100,7 +3139,6 @@ async def richest(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ==========================================
 async def rankers(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
-    # 🛑 --- ECONOMY CHECK --- 🛑
     if chat.type != "private" and await is_economy_disabled(chat.id):
         return await update.message.reply_text("🛑 Tʜᴇ Eᴄᴏɴᴏᴍʏ Sʏsᴛᴇᴍ Iꜱ Cᴜʀʀᴇɴᴛʟʏ Cʟᴏsᴇᴅ Iɴ Tʜɪs Gʀᴏᴜᴘ.")
 
@@ -3110,11 +3148,11 @@ async def rankers(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for i, user in enumerate(top_list, start=1):
         user_id = user.get("id")
         safe_name = html.escape(str(user.get("name", "Uɴᴋɴᴏᴡɴ")))
-        icon = "💓" if is_premium(user, context) else "👤"
+        icon = get_leaderboard_icon(user, context) # ✅ Custom Icon System
         clickable_name = f'<a href="tg://user?id={user_id}">{safe_name}</a>'
         text += f"{icon} {i}. {clickable_name}: Lᴠʟ {user.get('level', 1)} ({user.get('xp', 0):,} XP)\n"
 
-    text += "\n💓 = Pʀᴇᴍɪᴜᴍ • 👤 = Nᴏʀᴍᴀʟ\n\n<i>✅ Uᴘɢʀᴀᴅᴇ Tᴏ Pʀᴇᴍɪᴜᴍ : /pay</i>"
+    text += "\n✨ = Cᴜsᴛᴏᴍ • 💓 = Pʀᴇᴍɪᴜᴍ • 👤 = Nᴏʀᴍᴀʟ\n\n<i>✅ Uᴘɢʀᴀᴅᴇ Tᴏ Pʀᴇᴍɪᴜᴍ : /pay</i>"
     await update.message.reply_text(text, parse_mode=ParseMode.HTML)
 
 # ==========================================
@@ -3122,7 +3160,6 @@ async def rankers(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ==========================================
 async def top_killers(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
-    # 🛑 --- ECONOMY CHECK --- 🛑
     if chat.type != "private" and await is_economy_disabled(chat.id):
         return await update.message.reply_text("🛑 Tʜᴇ Eᴄᴏɴᴏᴍʏ Sʏsᴛᴇᴍ Iꜱ Cᴜʀʀᴇɴᴛʟʏ Cʟᴏsᴇᴅ Iɴ Tʜɪs Gʀᴏᴜᴘ.")
 
@@ -3136,11 +3173,11 @@ async def top_killers(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for i, user in enumerate(top_list, start=1):
         user_id = user.get("id")
         safe_name = html.escape(str(user.get("name", "Uɴᴋɴᴏᴡɴ")))
-        icon = "💓" if is_premium(user, context) else "👤"
+        icon = get_leaderboard_icon(user, context) # ✅ Custom Icon System
         clickable_name = f'<a href="tg://user?id={user_id}">{safe_name}</a>'
         text += f"{icon} {i}. {clickable_name}: <code>{user.get('kills', 0):,} Kɪʟʟs</code>\n"
 
-    text += "\n💓 = Pʀᴇᴍɪᴜᴍ • 👤 = Nᴏʀᴍᴀʟ\n\n<i>✅ Uᴘɢʀᴀᴅᴇ Tᴏ Pʀᴇᴍɪᴜᴍ : /pay</i>"
+    text += "\n✨ = Cᴜsᴛᴏᴍ • 💓 = Pʀᴇᴍɪᴜᴍ • 👤 = Nᴏʀᴍᴀʟ\n\n<i>✅ Uᴘɢʀᴀᴅᴇ Tᴏ Pʀᴇᴍɪᴜᴍ : /pay</i>"
     await update.message.reply_text(text, parse_mode=ParseMode.HTML)
 
 #=======mini_games_topplayers=======
@@ -5179,6 +5216,8 @@ application.add_handler(CommandHandler("check", check_protection))
 application.add_handler(CommandHandler("close", close_economy))
 application.add_handler(CommandHandler("open", open_economy))
 application.add_handler(CommandHandler("connect", connect_log_group))
+application.add_handler(CommandHandler("seticon", set_icon))
+
 
 # Message Handlers
 application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
