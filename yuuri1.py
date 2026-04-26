@@ -478,6 +478,15 @@ def get_fancy_text(text, font_type):
 
     return " ".join(final_output)
 
+def get_user_icon(user_data, context):
+    """Checks for premium status and returns either a custom icon or default icons."""
+    if is_premium(user_data, context):
+        # Return their custom icon if set, otherwise the default premium heart
+        return user_data.get("custom_icon", "💓")
+    # Default for non-premium users
+    return "👤"
+
+
 #============ Side_Features ========
 #--
 import html
@@ -1179,28 +1188,45 @@ async def deactivate(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode=ParseMode.HTML
     )
 
+# ============ SET ICON ============
 async def set_icon(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
+    if not msg: return
     user = update.effective_user
-    
+
     # 1. Get user data
     data = get_user(user)
-    
+
     # 2. Security Check: Premium Only
     if not is_premium(data, context):
-        return await msg.reply_text("❌ <b>Tʜɪs ɪs ᴀ Pʀᴇᴍɪᴜᴍ-Oɴʟʏ ғᴇᴀᴛᴜʀᴇ!</b>\nUsᴇ /pay ᴛᴏ ᴜᴘɢʀᴀᴅᴇ.", parse_mode='HTML')
+        return await msg.reply_text(
+            "❌ <b>Tʜɪs ɪs ᴀ Pʀᴇᴍɪᴜᴍ-Oɴʟʏ ғᴇᴀᴛᴜʀᴇ!</b>\n"
+            "Usᴇ /pay ᴛᴏ ᴜᴘɢʀᴀᴅᴇ ʏᴏᴜʀ ᴀᴄᴄᴏᴜɴᴛ.", 
+            parse_mode='HTML'
+        )
 
-    # 3. Check if an emoji was provided
+    # 3. 🛑 --- USAGE CHECK --- 🛑
+    # If the user sends just /seticon without anything else:
     if not context.args:
-        return await msg.reply_text("❓ <b>Usᴀɢᴇ:</b> /seticon <emoji>\nExᴀᴍᴘʟᴇ: <code>/seticon 🔥</code>", parse_mode='HTML')
+        return await msg.reply_text(
+            "⚠️ <b>Uꜱᴀɢᴇ:</b> <code>/seticon <emoji></code>\n\n"
+            "✨ <b>Exᴀᴍᴘʟᴇ:</b> <code>/seticon 🔥</code>\n"
+            "<i>Sets a custom icon for your /profile and /bal</i>", 
+            parse_mode='HTML'
+        )
 
+    # 4. Extract the emoji (takes the first thing after the command)
     new_icon = context.args[0]
 
-    # 4. Save to Database
+    # 5. Save to Database
     data["custom_icon"] = new_icon
     save_user(data)
 
-    await msg.reply_text(f"✅ <b>Iᴄᴏɴ Uᴘᴅᴀᴛᴇᴅ!</b>\nYour profile icon is now: {new_icon}", parse_mode='HTML')
+    await msg.reply_text(
+        f"✅ <b>Iᴄᴏɴ Uᴘᴅᴀᴛᴇᴅ!</b>\n"
+        f"Yᴏᴜʀ ᴘʀᴏғɪʟᴇ ɪᴄᴏɴ ɪs ɴᴏᴡ: {new_icon}", 
+        parse_mode='HTML'
+    )
 
 
 #==========welcome_message======
@@ -2280,7 +2306,7 @@ async def daily(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 #====economy commands=======
 #--
-# ======== PROFILE =======
+# ============ PROFILE ============
 async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     if not msg: return
@@ -2292,7 +2318,9 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     target_user = msg.reply_to_message.from_user if msg.reply_to_message else user
     data = get_user(target_user) 
-    icon = get_user_icon(data, context) # ✅ Custom Icon Logic
+    
+    # ✅ This now works because we defined the function above!
+    icon = get_user_icon(data, context) 
 
     # --- ✨ AUTO-LEVEL LOGIC ---
     updated = False
@@ -2317,8 +2345,6 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     bot_id = context.bot.id
     xp_rank = 1 + users.count_documents({"id": {"$ne": bot_id}, "$or": [{"level": {"$gt": lvl}}, {"level": lvl, "xp": {"$gt": xp}}]})
     wealth_rank = 1 + users.count_documents({"id": {"$ne": bot_id}, "coins": {"$gt": coins}})
-    kill_rank = 1 + users.count_documents({"id": {"$ne": bot_id}, "kills": {"$gt": kills}})
-
     status = "💀 Dᴇᴀᴅ" if data.get("dead") else "❤️ Aʟɪᴠᴇ"
 
     text = (
@@ -2335,6 +2361,7 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await msg.reply_text(text, parse_mode='HTML')
 
+# ============ BALANCE ============
 async def bal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     if not msg: return
@@ -2345,7 +2372,7 @@ async def bal(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     target_user = msg.reply_to_message.from_user if msg.reply_to_message else update.effective_user
     data = get_user(target_user) 
-    icon = get_user_icon(data, context) # ✅ Custom Icon Logic
+    icon = get_user_icon(data, context) 
 
     text = (
         f"{icon} <b>Nᴀᴍᴇ:</b> {target_user.first_name}\n"
