@@ -1188,46 +1188,67 @@ async def deactivate(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode=ParseMode.HTML
     )
 
+# --- ADD THIS AT THE TOP WITH YOUR OTHER CONSTANTS ---
+BANNED_ICONS = ["🖕", "💩", "🤡", "❌", "🫧", "🫥", "🌚", "👾", "👽", "🤖", "🫦", "👅", "👄", "💢", "💨"]
+
 # ============ SET ICON ============
 async def set_icon(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     if not msg: return
     user = update.effective_user
 
-    # 1. Get user data
     data = get_user(user)
 
-    # 2. Security Check: Premium Only
+    # 1. Premium Check
     if not is_premium(data, context):
-        return await msg.reply_text(
-            "❌ <b>Tʜɪs ɪs ᴀ Pʀᴇᴍɪᴜᴍ-Oɴʟʏ ғᴇᴀᴛᴜʀᴇ!</b>\n"
-            "Usᴇ /pay ᴛᴏ ᴜᴘɢʀᴀᴅᴇ ʏᴏᴜʀ ᴀᴄᴄᴏᴜɴᴛ.", 
-            parse_mode='HTML'
-        )
+        return await msg.reply_text("❌ <b>Tʜɪs ɪs ᴀ Pʀᴇᴍɪᴜᴍ-Oɴʟʏ ғᴇᴀᴛᴜʀᴇ!</b>\nUsᴇ /pay ᴛᴏ ᴜᴘɢʀᴀᴅᴇ.", parse_mode='HTML')
 
-    # 3. 🛑 --- USAGE CHECK --- 🛑
-    # If the user sends just /seticon without anything else:
+    # 2. Usage Check
     if not context.args:
         return await msg.reply_text(
-            "⚠️ <b>Uꜱᴀɢᴇ:</b> <code>/seticon <emoji></code>\n\n"
-            "✨ <b>Exᴀᴍᴘʟᴇ:</b> <code>/seticon 🔥</code>\n"
-            "<i>Sets a custom icon for your /profile and /bal</i>", 
+            "⚠️ <b>Uꜱᴀɢᴇ:</b> <code>/seticon <emoji></code>\n"
+            "✨ <b>Exᴀᴍᴘʟᴇ:</b> <code>/seticon 🔥</code>", 
             parse_mode='HTML'
         )
 
-    # 4. Extract the emoji (takes the first thing after the command)
     new_icon = context.args[0]
 
-    # 5. Save to Database
+    # 3. 🚫 --- BLACKLIST CHECK --- 🚫
+    # Get extra banned icons from DB (optional helper)
+    # global_data = db.settings.find_one({"id": "bot_settings"}) or {}
+    # db_banned = global_data.get("denied_icons", [])
+    
+    if new_icon in BANNED_ICONS: # or new_icon in db_banned:
+        return await msg.reply_text(
+            f"⚠️ <b>Tʜɪꜱ ɪᴄᴏɴ ({new_icon}) ɪꜱ ɴᴏᴛ ᴀʟʟᴏᴡᴇᴅ.</b>\nPʟᴇᴀꜱᴇ ᴄʜᴏᴏꜱᴇ ᴀɴᴏᴛʜᴇʀ.", 
+            parse_mode='HTML'
+        )
+
+    # 4. Save to Database
     data["custom_icon"] = new_icon
     save_user(data)
 
-    await msg.reply_text(
-        f"✅ <b>Iᴄᴏɴ Uᴘᴅᴀᴛᴇᴅ!</b>\n"
-        f"Yᴏᴜʀ ᴘʀᴏғɪʟᴇ ɪᴄᴏɴ ɪs ɴᴏᴡ: {new_icon}", 
-        parse_mode='HTML'
-    )
+    await msg.reply_text(f"✅ <b>Iᴄᴏɴ Uᴘᴅᴀᴛᴇᴅ!</b>\nYᴏᴜʀ ᴘʀᴏғɪʟᴇ ɪᴄᴏɴ ɪs ɴᴏᴡ: {new_icon}", parse_mode='HTML')
 
+
+# ============ DENY ICON (OWNER ONLY) ============
+async def deny_icon(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    if user.id != OWNER_ID:
+        return # Silent fail for non-owners
+
+    if not context.args:
+        return await update.message.reply_text("⚠️ Usage: /denyicon <emoji>")
+
+    icon_to_block = context.args[0]
+    
+    if icon_to_block not in BANNED_ICONS:
+        BANNED_ICONS.append(icon_to_block)
+        # If using MongoDB, save it here:
+        # db.settings.update_one({"id": "bot_settings"}, {"$addToSet": {"denied_icons": icon_to_block}}, upsert=True)
+        await update.message.reply_text(f"🚫 Icon {icon_to_block} has been added to the blacklist.")
+    else:
+        await update.message.reply_text("ℹ️ This icon is already blacklisted.")
 
 #==========welcome_message======
 import random
