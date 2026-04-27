@@ -67,8 +67,8 @@ DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
 RAW_GROQ_KEYS = os.getenv("GROQ_KEYS")
 GROQ_KEYS = [k.strip() for k in RAW_GROQ_KEYS.split(",") if k.strip()] if RAW_GROQ_KEYS else []
 
-PRIMARY_MODEL = "moonshotai/kimi-k2-instruct-0905"
-FALLBACK_MODEL = "moonshotai/kimi-k2-instruct-0905"
+PRIMARY_MODEL = "llama-3.1-70b-versatile"
+FALLBACK_MODEL = "mixtral-8x7b-32768"
 
 # ================= CLOUDINARY CONFIG =================
 # ================= CLOUDINARY CONFIG (SECURE) =================
