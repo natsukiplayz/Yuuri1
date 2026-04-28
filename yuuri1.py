@@ -265,7 +265,7 @@ def is_premium(user_data, context=None):
     try:
         expire_time = datetime.strptime(expire_str, "%Y-%m-%d %H:%M:%S")
         
-        if datetime.utcnow() > expire_time:
+        if datetime.now(timezone.utc).replace(tzinfo=None) > expire_time:
             user_id = user_data.get("id")
             
             # 1. Update Database (Sync)
@@ -299,16 +299,17 @@ async def is_economy_disabled(chat_id: int) -> bool:
 SAVED_GROUPS = {}
 
 def load_groups_from_db():
-    """Sync: Loads groups from MongoDB into the local SAVED_GROUPS dictionary"""
     global SAVED_GROUPS
     try:
         SAVED_GROUPS.clear()
         cursor = groups_collection.find({}) 
         for doc in cursor:
-            # Ensure the position is an integer for the dictionary key
-            pos = int(doc["pos"])
-            SAVED_GROUPS[pos] = {"name": doc["name"], "url": doc["url"]}
-        logging.info(f"✅ Loaded {len(SAVED_GROUPS)} groups from Database.")
+            # Use .get() to avoid crashing if 'pos' is missing
+            pos_val = doc.get("pos")
+            if pos_val is not None:
+                pos = int(pos_val)
+                SAVED_GROUPS[pos] = {"name": doc.get("name", "Unknown"), "url": doc.get("url", "")}
+        logging.info(f"✅ Loaded {len(SAVED_GROUPS)} groups.")
     except Exception as e:
         logging.error(f"❌ DB Load Error: {e}")
 
