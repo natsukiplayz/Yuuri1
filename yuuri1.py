@@ -2332,6 +2332,7 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if chat.type != "private" and await is_economy_disabled(chat.id):
         return await msg.reply_text("🛑 Tʜᴇ Eᴄᴏɴᴏᴍʏ Sʏsᴛᴇᴍ Iꜱ Cᴜʀʀᴇɴᴛʟʏ Cʟᴏsᴇᴅ Iɴ Tʜɪs Gʀᴏᴜᴘ.")
 
+    # Fixed: Correctly targets the replied user or the sender
     target_user = msg.reply_to_message.from_user if msg.reply_to_message else user
     data = get_user(target_user) 
     icon = get_user_icon(data, context) 
@@ -2340,7 +2341,7 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     updated = False
     while True:
         need = int(100 * (1.5 ** (max(1, data.get("level", 1)) - 1)))
-        if data.get("xp", 0) >= need and data.get("level", 1) < 100: # Cap at 100 if you want
+        if data.get("xp", 0) >= need and data.get("level", 1) < 100:
             data["xp"] -= need
             data["level"] = data.get("level", 1) + 1
             updated = True
@@ -2392,6 +2393,7 @@ async def bal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if chat.type != "private" and await is_economy_disabled(chat.id):
         return await msg.reply_text("🛑 Tʜᴇ Eᴄᴏɴᴏᴍʏ Sʏsᴛᴇᴍ Iꜱ Cᴜʀʀᴇɴᴛʟʏ Cʟᴏsᴇᴅ Iɴ Tʜɪs Gʀᴏᴜᴘ.")
 
+    # Fixed: Logic ensures anyone can check their own or a replied user's balance
     target_user = msg.reply_to_message.from_user if msg.reply_to_message else update.effective_user
     data = get_user(target_user) 
     icon = get_user_icon(data, context) 
@@ -2411,6 +2413,7 @@ async def bal(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"⚔️ <b>Kɪʟʟs:</b> {kills:,}"
     )
     await msg.reply_text(text, parse_mode='HTML')
+
 
 # ======== ROB SYSTEM ========
 from datetime import datetime
@@ -2916,32 +2919,34 @@ async def protect(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode=ParseMode.HTML
     )
 
+# --- CHECK PROTECTION ---
 async def check_protection(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = update.message
+    msg = update.effective_message
     chat = update.effective_chat
     user = update.effective_user
 
-    # 🛑 --- ECONOMY CHECK --- 🛑
+    # 1. Economy Check
     if chat.type != "private":
         if await is_economy_disabled(chat.id):
-            return await msg.reply_text("🛑 Tʜᴇ Eᴄᴏɴᴏᴍʏ Sʏsᴛᴇᴍ Iꜱ Cᴜʀʀᴇɴᴛʟʏ Cʟᴏsᴇᴅ Iɴ Tʜɪs Gʀᴏᴜᴘ.")
-    # ---------------------------
+            return await msg.reply_text("🛑 Tʜᴇ Eᴄᴏɴᴏᴍʏ Sʏꜱᴛᴇᴍ Iꜱ Cᴜʀʀᴇɴᴛʟʏ Cʟᴏꜱᴇᴅ Iɴ Tʜɪꜱ Gʀᴏᴜᴘ.")
 
     checker_data = get_user(user)
 
+    # 2. Premium Check
     if not is_premium(checker_data, context):
         return await msg.reply_text("❌ <b>Pʀᴇᴍɪᴜᴍ Oɴʟʏ Cᴏᴍᴍᴀɴᴅ!</b>", parse_mode=ParseMode.HTML)
 
+    # 3. Usage Check
     if not msg.reply_to_message:
-        return await msg.reply_text("❌ <b>Pʟᴇᴀsᴇ Rᴇᴘʟʏ Tᴏ A Usᴇʀ.</b>", parse_mode=ParseMode.HTML)
+        return await msg.reply_text("❌ <b>Pʟᴇᴀꜱᴇ Rᴇᴘʟʏ Tᴏ A Uꜱᴇʀ.</b>", parse_mode=ParseMode.HTML)
 
     target_user = msg.reply_to_message.from_user
     target_data = get_user(target_user)
 
     protect_until = target_data.get("protect_until")
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None) # Python 3.14 compatible
     status_text = "🚫 <b>Nᴏ Pʀᴏᴛᴇᴄᴛɪᴏɴ Aᴄᴛɪᴠᴇ</b>"
-    
+
     if protect_until:
         try:
             expire = datetime.strptime(protect_until, "%Y-%m-%d %H:%M:%S")
@@ -2949,20 +2954,35 @@ async def check_protection(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 remaining = expire - now
                 hours, remainder = divmod(int(remaining.total_seconds()), 3600)
                 minutes, _ = divmod(remainder, 60)
-                status_text = f"🛡️ <b>Sᴛᴀᴛᴜs:</b> Pʀᴏᴛᴇᴄᴛᴇᴅ\n⏳ <b>Tɪᴍᴇ Lᴇғᴛ:</b> <code>{hours}ʜ {minutes}ᴍ</code>"
+                status_text = f"🛡️ <b>Sᴛᴀᴛᴜꜱ:</b> Pʀᴏᴛᴇᴄᴛᴇᴅ\n⏳ <b>Tɪᴍᴇ Lᴇғᴛ:</b> <code>{hours}ʜ {minutes}ᴍ</code>"
         except:
             pass
 
     try:
+        # Send Private DM
         await context.bot.send_message(
             chat_id=user.id, 
-            text=f"🔍 <b>Pʀᴏᴛᴇᴄᴛɪᴏɴ Cʜᴇᴄᴋ</b>\n\n👤 <b>Usᴇʀ:</b> {target_user.first_name}\n\n{status_text}",
+            text=f"🔍 <b>Pʀᴏᴛᴇᴄᴛɪᴏɴ Cʜᴇᴄᴋ</b>\n\n👤 <b>Uꜱᴇʀ:</b> {target_user.first_name}\n\n{status_text}",
             parse_mode=ParseMode.HTML
         )
-        await msg.reply_text("✅ <b>Pʀᴏᴛᴇᴄᴛɪᴏɴ Tɪᴍᴇ Sᴇɴᴛ Tᴏ DM</b>", parse_mode=ParseMode.HTML)
-    except Exception:
-        await msg.reply_text("❌ <b>Cᴏᴜʟᴅ Nᴏᴛ Sᴇɴᴅ DM!</b> Sᴛᴀʀᴛ ᴛʜᴇ ʙᴏᴛ ɪɴ ᴘʀɪᴠᴀᴛᴇ.", parse_mode=ParseMode.HTML)
+        
+        # 4. Inline Button Setup
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("Oᴘᴇɴ DM 💸", url=f"t.me/{context.bot.username}")]
+        ])
 
+        # Public Response
+        await msg.reply_text(
+            "✅ <b>Pʀᴏᴛᴇᴄᴛɪᴏɴ Tɪᴍᴇ Sᴇɴᴛ Tᴏ DM</b>", 
+            parse_mode=ParseMode.HTML,
+            reply_markup=keyboard
+        )
+
+    except Exception:
+        await msg.reply_text(
+            "❌ <b>Cᴏᴜʟᴅ Nᴏᴛ Sᴇɴᴅ DM!</b> Sᴛᴀʀᴛ ᴛʜᴇ ʙᴏᴛ ɪɴ ᴘʀɪᴠᴀᴛᴇ.", 
+            parse_mode=ParseMode.HTML
+        )
 
 #========= REGISTER ========
 from telegram import Update
