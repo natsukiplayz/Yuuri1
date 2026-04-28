@@ -4491,6 +4491,19 @@ async def unmute(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ================= PROMOTION SYSTEM =================
 from telegram.error import BadRequest
 
+# --- AUTH HELPER ---
+async def is_user_allowed(chat, user_id):
+    """Checks if a user is the Bot Owner, Group Creator, or an Admin with promote rights."""
+    if user_id == OWNER_ID:
+        return True
+    
+    member = await chat.get_member(user_id)
+    if member.status == 'creator':
+        return True
+    if member.status == 'administrator' and getattr(member, 'can_promote_members', False):
+        return True
+    return False
+
 # --- PROMOTE USER ---
 async def promote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
@@ -4500,14 +4513,25 @@ async def promote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     target_id, name = await resolve_user_all(update, context) 
     if not target_id:
-        return await message.reply_text("<code>⚠️ Uꜱᴀɢᴇ: /promote @username or reply [1/2/3]</code>", parse_mode=ParseMode.HTML)
+        return await message.reply_text("⚠️ Uꜱᴀɢᴇ:<code> /promote @username or reply [1/2/3]</code>", parse_mode=ParseMode.HTML)
 
     try:
         target_member = await chat.get_member(target_id)
         if target_member.status == 'creator':
             return await message.reply_text("👑 Gʀᴏᴜᴘ Oᴡɴᴇʀ Cᴀɴ'ᴛ Bᴇ Pʀᴏᴍᴏᴛᴇᴅ.")
+        
+        # Check if they are already admin
         if target_member.status == 'administrator':
-            return await message.reply_text("👀 Yᴏᴜ'ʀᴇ Aʟʀᴇᴀᴅʏ Aʀᴇ Aɴ Aᴅᴍɪɴ 😮‍💨")
+            return await message.reply_text("👀 Yᴏᴜ'ʀᴇ Aʟʀᴇᴀᴅʏ Aɴ Aᴅᴍɪɴ 😮‍💨")
+
+        # Auth Check for the person sending the command
+        if not await is_user_allowed(chat, user.id):
+            return await message.reply_text("🧐 Oᴏᴘs! Yᴏᴜ Nᴇᴇᴅ Tᴏ Bᴇ Aᴅᴍɪɴ Tᴏ Pʀᴏᴍᴏᴛᴇ Oᴛʜᴇʀs... 🧩")
+
+        # Bot Permission Check
+        bot_member = await chat.get_member(context.bot.id)
+        if not getattr(bot_member, 'can_promote_members', False):
+            return await message.reply_text("💠 Eʜᴇʜᴇ... Cᴀɴ Gɪᴠᴇ Mᴇ Fᴜʟʟ Pᴏᴡᴇʀ Aᴅᴍɪɴ? Sᴏ I Aʟꜱᴏ Cᴀɴ... 😁🫠")
 
         level = 1
         if args:
@@ -4522,16 +4546,6 @@ async def promote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
             2: {"can_change_info": True, "can_delete_messages": True, "can_invite_users": True, "can_pin_messages": True, "can_manage_chat": True, "can_restrict_members": True, "can_manage_video_chats": True, "can_post_stories": True, "can_edit_stories": True, "can_delete_stories": True},
             3: {"can_change_info": True, "can_delete_messages": True, "can_invite_users": True, "can_pin_messages": True, "can_manage_chat": True, "can_restrict_members": True, "can_promote_members": True, "can_manage_video_chats": True, "can_post_stories": True, "can_edit_stories": True, "can_delete_stories": True},
         }
-
-        # Auth Check
-        if str(user.id) != str(OWNER_IDS):
-            sender_member = await chat.get_member(user.id)
-            if sender_member.status not in ["administrator", "creator"] or not sender_member.can_promote_members:
-                return await message.reply_text("🧐 Oᴏᴘs! Yᴏᴜ Nᴇᴇᴅ Tᴏ Bᴇ Aᴅᴍɪɴ Tᴏ Pʀᴏᴍᴏᴛᴇ Oᴛʜᴇʀs... 🧩")
-
-        bot_member = await chat.get_member(context.bot.id)
-        if not bot_member.can_promote_members:
-            return await message.reply_text("💠 Eʜᴇʜᴇ... Cᴀɴ Gɪᴠᴇ Mᴇ Fᴜʟʟ Pᴏᴡᴇʀ Aᴅᴍɪɴ? Sᴏ I Aʟꜱᴏ Cᴀɴ... 😁🫠")
 
         await context.bot.promote_chat_member(chat.id, target_id, **perms[level])
         
@@ -4549,19 +4563,18 @@ async def demote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     target_id, name = await resolve_user_all(update, context) 
     if not target_id:
-        return await message.reply_text("<code>⚠️ Uꜱᴀɢᴇ: /demote @username or reply</code>", parse_mode=ParseMode.HTML)
+        return await message.reply_text("⚠️ Uꜱᴀɢᴇ:<code> /demote @username or reply</code>", parse_mode=ParseMode.HTML)
 
     try:
-        # Bot check
         target_member = await chat.get_member(target_id)
+        
+        # Bot check
         if target_member.user.is_bot:
             return await message.reply_text("👀 I cannot demote bots 👾")
 
         # Auth Check
-        if str(user.id) != str(OWNER_IDS):
-            sender_member = await chat.get_member(user.id)
-            if sender_member.status not in ["administrator", "creator"] or not sender_member.can_promote_members:
-                return await message.reply_text("🧐 Yᴏᴜ ɴᴇᴇᴅ 'Aᴅᴅ Nᴇᴡ Aᴅᴍɪɴs' ᴘᴇʀᴍɪssɪᴏɴ!")
+        if not await is_user_allowed(chat, user.id):
+            return await message.reply_text("🧐 Yᴏᴜ ɴᴇᴇᴅ 'Aᴅᴅ Nᴇᴡ Aᴅᴍɪɴs' ᴘᴇʀᴍɪssɪᴏɴ!")
 
         if target_member.status == 'creator':
             return await message.reply_text("👑 Gʀᴏᴜᴘ Oᴡɴᴇʀ Cᴀɴ'ᴛ Bᴇ Dᴇᴍᴏᴛᴇᴅ.")
@@ -4569,7 +4582,6 @@ async def demote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if target_member.status != 'administrator':
             return await message.reply_text(f"⚠️ <b>{name}</b> ɪs ɴᴏᴛ ᴀɴ ᴀᴅᴍɪɴ!", parse_mode=ParseMode.HTML)
 
-        # Strip all rights
         await context.bot.promote_chat_member(
             chat.id, target_id,
             can_change_info=False, can_delete_messages=False, can_invite_users=False,
@@ -4589,15 +4601,11 @@ async def set_admin_title(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.effective_message
     args = context.args
 
-    # Check if command was a reply or had username
     target_id, name = await resolve_user_all(update, context)
-    
-    # Title logic: extract from args
-    # If replied: /title [text] -> args is the title
-    # If username used: /title @user [text] -> args[1:] is the title
     if not target_id:
         return await message.reply_text("<code>⚠️ Uꜱᴀɢᴇ: /title @username [text] or reply</code>", parse_mode=ParseMode.HTML)
 
+    # Determine title text
     if message.reply_to_message:
         title = " ".join(args)
     else:
@@ -4610,13 +4618,10 @@ async def set_admin_title(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await message.reply_text("❌ Tɪᴛʟᴇ ɪs ᴛᴏᴏ ʟᴏɴɢ! Mᴀx 16 characters.")
 
     try:
-        # Auth: Sender must be admin with promote rights or OWNER
-        if str(user.id) != str(OWNER_IDS):
-            sender = await chat.get_member(user.id)
-            if sender.status not in ["administrator", "creator"] or not sender.can_promote_members:
-                return await message.reply_text("🧐 Yᴏᴜ ɴᴇᴇᴅ 'Aᴅᴅ Nᴇᴡ Aᴅᴍɪɴs' ᴘᴇʀᴍɪssɪᴏɴ!")
+        # Auth Check
+        if not await is_user_allowed(chat, user.id):
+            return await message.reply_text("🧐 Yᴏᴜ ɴᴇᴇᴅ 'Aᴅᴅ Nᴇᴡ Aᴅᴍɪɴs' ᴘᴇʀᴍɪssɪᴏɴ!")
 
-        # Target must be an admin
         target_member = await chat.get_member(target_id)
         if target_member.status not in ["administrator", "creator"]:
             return await message.reply_text("⚠️ I can only set titles for Admins!")
