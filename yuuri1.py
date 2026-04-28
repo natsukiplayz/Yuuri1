@@ -4582,6 +4582,11 @@ async def demote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await message.reply_text("⚠️ Oɴʟʏ Aᴅᴍɪɴꜱ Cᴀɴ Dᴇᴍᴏᴛᴇ Uꜱᴇʀꜱ!", parse_mode=ParseMode.HTML)
 
     try:
+        # 1. Check Bot's actual rights first to be sure
+        bot_member = await chat.get_member(context.bot.id)
+        if not getattr(bot_member, 'can_promote_members', False):
+             return await message.reply_text("⚠️ I Nᴇᴇᴅ Aᴅᴅ Nᴇᴡ Aᴅᴍɪɴꜱ Pᴇʀᴍɪꜱꜱɪᴏɴ Tᴏ Dᴇᴍᴏᴛᴇ Uꜱᴇʀꜱ.", parse_mode=ParseMode.HTML)
+
         target_member = await chat.get_member(target_id)
         
         if target_member.user.is_bot:
@@ -4593,7 +4598,7 @@ async def demote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if target_member.status != 'administrator':
             return await message.reply_text(f"⚠️ <b>{name}</b> Iꜱ Nᴏᴛ Aɴ Aᴅᴍɪɴ!", parse_mode=ParseMode.HTML)
 
-        # Demote action
+        # 2. Attempt demotion
         await context.bot.promote_chat_member(
             chat.id, target_id,
             can_change_info=False, can_delete_messages=False, can_invite_users=False,
@@ -4604,22 +4609,16 @@ async def demote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     except BadRequest as e:
         err = str(e).lower()
-        
-        # Case 1: Bot lacks the "Add New Admins" permission entirely
-        if "chat_admin_required" in err or "admin_privileges" in err:
-            await message.reply_text(
-                "⚠️ I Nᴇᴇᴅ Aᴅᴅ Nᴇᴡ Aᴅᴍɪɴꜱ Pᴇʀᴍɪꜱꜱɪᴏɴ Tᴏ Dᴇᴍᴏᴛᴇ Uꜱᴇʀꜱ.", 
-                parse_mode=ParseMode.HTML
-            )
-            
-        # Case 2: Bot has permission but the target is higher in hierarchy (Promoted by someone else)
-        elif "not enough rights" in err:
+        # If the bot has the permission but still gets 'admin_required' or 'rights' error,
+        # it 100% means the target was promoted by a human/higher admin.
+        if "not enough rights" in err or "chat_admin_required" in err:
             await message.reply_text(
                 "⚠️ I Cᴀɴ'ᴛ Dᴇᴍᴏᴛᴇ Tʜɪꜱ Aᴅᴍɪɴ. Tʜᴇʏ Mɪɢʜᴛ Hᴀᴠᴇ Bᴇᴇɴ Pʀᴏᴍᴏᴛᴇᴅ Bʏ Tʜᴇ Aɴᴏᴛʜᴇʀ Aᴅᴍɪɴ.", 
                 parse_mode=ParseMode.HTML
             )
         else:
             await message.reply_text(f"❌ API Eʀʀᴏʀ: {e}")
+
 
 # --- SET TITLE ---
 async def set_admin_title(update: Update, context: ContextTypes.DEFAULT_TYPE):
