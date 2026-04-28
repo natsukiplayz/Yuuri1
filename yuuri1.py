@@ -2049,6 +2049,11 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     args = context.args
 
+    # --- 1. THE "CONTINUE TO PAY" REDIRECT ---
+    if args and args[0] == "pay":
+        # If the user clicked the button in a group, this runs instead of the Start message
+        return await pay(update, context)
+
     if args and args[0].startswith("ref_"):
         ref_code = args[0].replace("ref_", "")
         ref_data = referrals_db.find_one({"code": ref_code})
@@ -3080,18 +3085,20 @@ from telegram.ext import ContextTypes
 
 # --- PAY COMMAND ---
 async def pay(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Determine the message object (works for both commands and start redirects)
     msg = update.effective_message
     user_id = update.effective_user.id
     chat_type = update.effective_chat.type
     bot_username = context.bot.username
     
-    # 🔗 Links
+    # 🔗 Links & Assets
     website_url = "https://yuuri_premium.oneapp.dev/"
     benefits_link = "https://t.me/ig_yuukii/51" 
     banner_url = "https://i.ibb.co/GQPQGdNF/x.jpg"
 
-    # 1. 📢 GROUP REDIRECT (Keep your business in DMs)
+    # 1. 📢 GROUP REDIRECT
     if chat_type in ["group", "supergroup"]:
+        # The 'start=pay' part is what triggers the logic in start_command
         redirect_url = f"https://t.me/{bot_username}?start=pay"
         keyboard = [[InlineKeyboardButton("💳 Cᴏɴᴛɪɴᴜᴇ Tᴏ Pᴀʏ", url=redirect_url)]]
         return await msg.reply_text(
@@ -3101,7 +3108,7 @@ async def pay(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
     # 2. 💎 CHECK PREMIUM STATUS
-    # FIX: Changed 'users' to 'users_col' to match your Async MongoDB setup
+    # Fetching from users_col (Async MongoDB)
     user_data = await users_col.find_one({"id": user_id})
     
     is_premium = user_data.get("premium", False) if user_data else False
@@ -3138,7 +3145,6 @@ async def pay(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
     except Exception as e:
-        # Fallback if the banner URL is broken
         await msg.reply_text(
             text,
             parse_mode=ParseMode.HTML,
