@@ -4531,7 +4531,7 @@ async def promote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Bot Permission Check
         bot_member = await chat.get_member(context.bot.id)
         if not getattr(bot_member, 'can_promote_members', False):
-            return await message.reply_text("💠 Eʜᴇʜᴇ... Cᴀɴ Gɪᴠᴇ Mᴇ Fᴜʟʟ Pᴏᴡᴇʀ Aᴅᴍɪɴ? Sᴏ I Aʟꜱᴏ Cᴀɴ... 😁🫠")
+            return await message.reply_text("💠 I Dᴏɴᴛ Hᴀᴠᴇ Pᴇʀᴍɪꜱꜱɪᴏɴ Tᴏ Pʀᴏᴍᴏᴛᴇ Uꜱᴇʀꜱ.")
 
         level = 1
         if args:
@@ -4579,7 +4579,7 @@ async def demote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await message.reply_text("⚠️ Uꜱᴀɢᴇ: <code>/demote @username or reply</code>", parse_mode=ParseMode.HTML)
 
     if not await is_user_allowed(chat, user.id):
-        return await message.reply_text("⚠️ Oɴʟʏ Aᴅᴍɪɴꜱ Cᴀɴ Dᴇᴍᴏᴛᴇ Uꜱᴇʀꜱ!")
+        return await message.reply_text("⚠️ Oɴʟʏ Aᴅᴍɪɴꜱ Cᴀɴ Dᴇᴍᴏᴛᴇ Uꜱᴇʀꜱ!", parse_mode=ParseMode.HTML)
 
     try:
         target_member = await chat.get_member(target_id)
@@ -4603,8 +4603,21 @@ async def demote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await message.reply_text(f"🎖️ <b>{name}</b> Hᴀꜱ Bᴇᴇɴ Dᴇᴍᴏᴛᴇᴅ! 🥱", parse_mode=ParseMode.HTML)
 
     except BadRequest as e:
-        if "Not enough rights" in str(e):
-            await message.reply_text("⚠️ I Cᴀɴ'ᴛ Dᴇᴍᴏᴛᴇ Tʜɪꜱ Aᴅᴍɪɴ. Tʜᴇʏ Mɪɢʜᴛ Hᴀᴠᴇ Bᴇᴇɴ Pʀᴏᴍᴏᴛᴇᴅ Bʏ Tʜᴇ Aɴᴏᴛʜᴇʀ Aᴅᴍɪɴ.", parse_mode=ParseMode.HTML)
+        err = str(e).lower()
+        
+        # Case 1: Bot lacks the "Add New Admins" permission entirely
+        if "chat_admin_required" in err or "admin_privileges" in err:
+            await message.reply_text(
+                "⚠️ I Nᴇᴇᴅ Aᴅᴅ Nᴇᴡ Aᴅᴍɪɴꜱ Pᴇʀᴍɪꜱꜱɪᴏɴ Tᴏ Dᴇᴍᴏᴛᴇ Uꜱᴇʀꜱ.", 
+                parse_mode=ParseMode.HTML
+            )
+            
+        # Case 2: Bot has permission but the target is higher in hierarchy (Promoted by someone else)
+        elif "not enough rights" in err:
+            await message.reply_text(
+                "⚠️ I Cᴀɴ'ᴛ Dᴇᴍᴏᴛᴇ Tʜɪꜱ Aᴅᴍɪɴ. Tʜᴇʏ Mɪɢʜᴛ Hᴀᴠᴇ Bᴇᴇɴ Pʀᴏᴍᴏᴛᴇᴅ Bʏ Tʜᴇ Aɴᴏᴛʜᴇʀ Aᴅᴍɪɴ.", 
+                parse_mode=ParseMode.HTML
+            )
         else:
             await message.reply_text(f"❌ API Eʀʀᴏʀ: {e}")
 
@@ -4630,7 +4643,7 @@ async def set_admin_title(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await message.reply_text("✨ Pʟᴇᴀsᴇ ᴘʀᴏᴠɪᴅᴇ ᴀ ᴛɪᴛʟᴇ!")
 
     if not await is_user_allowed(chat, user.id):
-        return await message.reply_text("🧐 Yᴏᴜ ɴᴇᴇᴅ 'Aᴅᴅ Nᴇᴡ Aᴅᴍɪɴs' ᴘᴇʀᴍɪssɪᴏɴ!")
+        return await message.reply_text("🪢 Oɴʟʏ Aᴅᴍɪɴꜱ Cᴀɴ Cʜᴀɴɢᴇ Tɪᴛʟᴇ!")
 
     try:
         await context.bot.set_chat_administrator_custom_title(chat.id, target_id, title)
@@ -4638,7 +4651,7 @@ async def set_admin_title(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except BadRequest as e:
         error_msg = str(e)
         if "Not enough rights" in error_msg:
-            await message.reply_text("❌ I Cᴀɴᴛ Cʜᴀɴɢᴇ Tʜᴇ Uꜱᴇʀꜱ Tɪᴛʟᴇ, Tʜᴇʏ Mɪɢʜᴛ Pʀᴏᴍᴏᴛᴇᴅ Oᴛʜᴇʀ Tʜᴀɴ Mᴇ.")
+            await message.reply_text("❌ I Cᴀɴᴛ Cʜᴀɴɢᴇ Tʜᴇ Uꜱᴇʀ Tɪᴛʟᴇ, Tʜᴇʏ Mɪɢʜᴛ Pʀᴏᴍᴏᴛᴇᴅ Oᴛʜᴇʀ Tʜᴀɴ Mᴇ.")
         else:
             await message.reply_text(f"❌ Eʀʀᴏʀ: {e}")
 
