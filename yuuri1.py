@@ -4237,47 +4237,53 @@ async def user_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     chat = update.effective_chat
     user_id = None
-    label = "👤 Uꜱᴇʀ Iᴅ"
+    label = "👤 Uꜱᴇʀ ID"
 
     # 1. HANDLE REPLY
     if msg.reply_to_message:
         target_user = msg.reply_to_message.from_user
         if target_user:
             user_id = target_user.id
-            label = "👤 Rᴇᴘʟɪᴇᴅ Uꜱᴇʀ Iᴅ"
+            label = "👤 Rᴇᴘʟɪᴇᴅ Uꜱᴇʀ ID"
 
     # 2. HANDLE USERNAME ARGUMENT
     elif context.args:
         query = context.args[0].strip().replace("@", "")
         
-        # SEARCH DB (Use users_col for async)
-        user_data = await users_col.find_one({"username": {"$regex": f"^{query}$", "$options": "i"}})
+        # SEARCH DB (Check both 'id' and 'user_id' just in case)
+        user_data = await users_col.find_one({
+            "$or": [
+                {"username": {"$regex": f"^{query}$", "$options": "i"}},
+                {"name": {"$regex": f"^{query}$", "$options": "i"}}
+            ]
+        })
         
         if user_data:
-            user_id = user_data.get("user_id")
-            label = f"👤 @{query}'ꜱ Uꜱᴇʀ Iᴅ"
-        else:
+            # Using .get() to check both common ID keys
+            user_id = user_data.get("id") or user_data.get("user_id")
+            label = f"👤 @{query}'ꜱ Uꜱᴇʀ ID"
+        
+        # If not in DB, try fetching from Telegram directly
+        if not user_id:
             try:
-                target_chat = await context.bot.get_chat(query)
+                target_chat = await context.bot.get_chat(f"@{query}")
                 user_id = target_chat.id
-                label = f"👤 @{query}'ꜱ Uꜱᴇʀ Iᴅ"
+                label = f"👤 @{query}'ꜱ Uꜱᴇʀ ID"
             except (BadRequest, Exception):
-                error_text = (
-                    "⚠️ <b>Uꜱᴇʀ Nᴏᴛ Fᴏᴜɴᴅ.</b>\n"
-                    "I ᴄᴏᴜʟᴅ ɴᴏᴛ ғɪɴᴅ ᴀɴʏ ᴜꜱᴇʀ ᴡɪᴛʜ ᴛʜᴀᴛ ᴜꜱᴇʀɴᴀᴍᴇ ɪɴ ᴍʏ ᴅᴀᴛᴀʙᴀꜱᴇ."
+                return await msg.reply_text(
+                    "⚠️ <b>Uꜱᴇʀ Nᴏᴛ Fᴏᴜɴᴅ.</b>\nI ᴄᴏᴜʟᴅ ɴᴏᴛ ғɪɴᴅ ᴛʜᴀᴛ ᴜꜱᴇʀɴᴀᴍᴇ.", 
+                    parse_mode=ParseMode.HTML
                 )
-                await msg.reply_text(error_text, parse_mode=ParseMode.HTML)
-                return
 
     # 3. DEFAULT TO SENDER
     else:
         user_id = update.effective_user.id
-        label = "👤 Uꜱᴇʀ Iᴅ"
+        label = "👤 Uꜱᴇʀ ID"
 
-    # Final Response using HTML to avoid underscore (_) crashes
+    # Final Response
     text = (
-        f"{label}: <code>{user_id}</code>\n"
-        f"👥 Gʀᴏᴜᴘ Iᴅ: <code>{chat.id}</code>"
+        f"<b>{label}</b>: <code>{user_id}</code>\n"
+        f"<b>👥 Gʀᴏᴜᴘ ID</b>: <code>{chat.id}</code>"
     )
 
     await msg.reply_text(text, parse_mode=ParseMode.HTML)
@@ -4341,34 +4347,49 @@ async def ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     message = update.effective_message
 
+    # 1. Group Chat Check
+    if chat.type == "private":
+        return await message.reply_text("❌ Tʜɪꜱ Cᴏᴍᴍᴀɴᴅ Cᴀɴ Bᴇ Uꜱᴇᴅ Oɴʟʏ Iɴ Gʀᴏᴜᴘ Cʜᴀᴛꜱ.")
+
+    # 2. Usage Check
+    target_id, name = await resolve_user_all(update, context)
+    if not target_id:
+        return await message.reply_text("⚠️ Uꜱᴀɢᴇ: <code>/ban @username or reply</code>", parse_mode='HTML')
+
+    # 3. User Admin Check
     if user.id != OWNER_IDS:
         if not await is_admin(update, context, user.id):
-            await message.reply_text("🧐 ᴏᴘᴘs ʏᴏᴜ ɴᴇᴇᴅ ᴛᴏ ʙᴇ ᴀᴅᴍɪɴ ᴛᴏ ʙᴀɴ ᴏᴛʜᴇʀs")
-            return
+            return await message.reply_text("🧐 Yᴏᴜ Nᴇᴇᴅ Tᴏ Bᴇ Aᴅᴍɪɴ Tᴏ Bᴀɴ Oᴛʜᴇʀꜱ.")
 
-    target_id, name = await resolve_user_all(update, context)
-    if not target_id: return
-
+    # 4. Target Admin/Owner Check
     if target_id == OWNER_IDS:
-        await message.reply_text("👑 ɪ ᴡᴏɴ'ᴛ ʙᴀɴ ᴍʏ ᴏᴡɴᴇʀ")
-        return
+        return await message.reply_text("👑 I Wᴏɴ'ᴛ Bᴀɴ Mʏ Oᴡɴᴇʀ.")
 
     try:
         target_member = await chat.get_member(target_id)
+        
         if target_member.status == 'creator':
-            await message.reply_text("👑 ᴛʜᴀᴛ's ᴛʜᴇ ɢʀᴏᴜᴘ ᴄʀᴇᴀᴛᴏʀ ɪ ᴄᴀɴ'ᴛ ᴛᴏᴜᴄʜ ᴛʜᴇᴍ")
-            return
+            return await message.reply_text("👑 Tʜᴀᴛ'ꜱ Tʜᴇ Gʀᴏᴜᴘ Cʀᴇᴀᴛᴏʀ. I Cᴀɴ'ᴛ Tᴏᴜᴄʜ Tʜᴇᴍ.")
+            
         if target_member.status == 'administrator':
-            await message.reply_text("⚠️ ɪ ᴄᴀɴ'ᴛ ʙᴀɴ ᴀᴅᴍɪɴs ᴅᴇᴍᴏᴛᴇ ᴛʜᴇᴍ ғɪʀsᴛ")
-            return
+            return await message.reply_text("⚠️ I Cᴀɴ'ᴛ Bᴀɴ Aᴅᴍɪɴꜱ. Dᴇᴍᴏᴛᴇ Tʜᴇᴍ Fɪʀꜱᴛ!")
+            
+        if target_member.status == 'kicked':
+            return await message.reply_text(f"⚠️ <b>{name}</b> Iꜱ Aʟʀᴇᴀᴅʏ Bᴀɴɴᴇᴅ.", parse_mode='HTML')
 
+        # 5. Ban Action
         await chat.ban_member(target_id)
         await message.reply_text(
-            f"🎖️ sʏsᴛᴇᴍ ᴜᴘᴅᴀᴛᴇ\nᴜsᴇʀ: <b>{name}</b>\nsᴛᴀᴛᴜs: ʙᴀɴɴᴇᴅ\nAccess: ɴᴏɴᴇ",
+            f"🎖️ Uᴘᴅᴀᴛᴇᴅ Sᴛᴀᴛᴜꜱ: <b>{name}</b> ɪꜱ ɴᴏᴡ ʙᴀɴɴᴇᴅ!",
             parse_mode='HTML'
         )
+
     except BadRequest as e:
-        await message.reply_text(f"❌ API ᴇʀʀᴏʀ: {str(e).lower()}")
+        err = str(e).lower()
+        if "not enough rights" in err or "admin_privileges" in err:
+            await message.reply_text("❌ I Dᴏɴ'ᴛ Hᴀᴠᴇ Pᴇʀᴍɪꜱꜱɪᴏɴ Tᴏ Bᴀɴ Uꜱᴇʀꜱ.")
+        else:
+            await message.reply_text(f"❌ API Eʀʀᴏʀ: {err}")
 
 # --- KICK COMMAND ---
 async def kick_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -4376,32 +4397,48 @@ async def kick_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     message = update.effective_message
 
+    # 1. Group Chat Check
+    if chat.type == "private":
+        return await message.reply_text("❌ Tʜɪꜱ Cᴏᴍᴍᴀɴᴅ Cᴀɴ Bᴇ Uꜱᴇᴅ Oɴʟʏ Iɴ Gʀᴏᴜᴘ Cʜᴀᴛꜱ.")
+
+    # 2. Usage Check
+    target_id, name = await resolve_user_all(update, context)
+    if not target_id:
+        return await message.reply_text("⚠️ Uꜱᴀɢᴇ: <code>/kick @username or reply</code>", parse_mode='HTML')
+
+    # 3. User Admin Check
     if user.id != OWNER_IDS:
         if not await is_admin(update, context, user.id):
-            await message.reply_text("🧐 ᴏᴘᴘs ʏᴏᴜ ɴᴇᴇᴅ ᴛᴏ ʙᴇ ᴀᴅᴍɪɴ ᴛᴏ ᴋɪᴄᴋ ᴏᴛʜᴇʀs")
-            return
+            return await message.reply_text("🧐 Yᴏᴜ Nᴇᴇᴅ Tᴏ Bᴇ Aᴅᴍɪɴ Tᴏ Kɪᴄᴋ Oᴛʜᴇʀꜱ.")
 
-    target_id, name = await resolve_user_all(update, context)
-    if not target_id: return
-
+    # 4. Target Admin/Owner Check
     if target_id == OWNER_IDS:
-        await message.reply_text("👑Oᴏᴘꜱ I Cᴀɴ'ᴛ Kɪᴄᴋ Tʜᴇ Bᴏꜱꜱ ☠")
-        return
+        return await message.reply_text("👑 Oᴏᴘꜱ I Cᴀɴ'ᴛ Kɪᴄᴋ Tʜᴇ Bᴏꜱꜱ ☠️")
 
     try:
         target_member = await chat.get_member(target_id)
+        
         if target_member.status in ['creator', 'administrator']:
-            await message.reply_text("⚠️ ɪ ᴄᴀɴ'ᴛ ᴋɪᴄᴋ ᴀᴅᴍɪɴs ᴏʀ ᴛʜᴇ ᴏᴡɴᴇʀ")
-            return
+            return await message.reply_text("⚠️ I Cᴀɴ'ᴛ Kɪᴄᴋ Aᴅᴍɪɴꜱ Oʀ Tʜᴇ Oᴡɴᴇʀ.")
+            
+        if target_member.status in ['left', 'kicked']:
+            return await message.reply_text(f"⚠️ <b>{name}</b> Iꜱ Nᴏᴛ Iɴ Tʜᴇ Cʜᴀᴛ.", parse_mode='HTML')
 
+        # 5. Kick Action (Ban then Unban)
         await chat.ban_member(target_id)
         await chat.unban_member(target_id)
+        
         await message.reply_text(
-            f"🎖️ sʏsᴛᴇᴍ ᴜᴘᴅᴀᴛᴇ\nᴜsᴇʀ: <b>{name}</b>\nsᴛᴀᴛᴜs: ᴋɪᴄᴋᴇᴅ\nAccess: ʀᴇᴍᴏᴠᴇᴅ",
+            f"🎖️ Uᴘᴅᴀᴛᴇᴅ Sᴛᴀᴛᴜꜱ: <b>{name}</b> ɪꜱ ɴᴏᴡ ᴋɪᴄᴋᴇᴅ!",
             parse_mode='HTML'
         )
+
     except BadRequest as e:
-        await message.reply_text(f"❌ API ᴇʀʀᴏʀ: {str(e).lower()}")
+        err = str(e).lower()
+        if "not enough rights" in err or "admin_privileges" in err:
+            await message.reply_text("❌ I Dᴏɴ'ᴛ Hᴀᴠᴇ Pᴇʀᴍɪꜱꜱɪᴏɴ Tᴏ Kɪᴄᴋ Uꜱᴇʀꜱ.")
+        else:
+            await message.reply_text(f"❌ API Eʀʀᴏʀ: {err}")
 
 # --- UNBAN COMMAND ---
 async def unban(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -4409,22 +4446,44 @@ async def unban(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     message = update.effective_message
 
+    # 1. Group Chat Check
+    if chat.type == "private":
+        return await message.reply_text("❌ Tʜɪꜱ Cᴏᴍᴍᴀɴᴅ Cᴀɴ Bᴇ Uꜱᴇᴅ Oɴʟʏ Iɴ Gʀᴏᴜᴘ Cʜᴀᴛꜱ.")
+
+    # 2. Usage Check
+    target_id, name = await resolve_user_all(update, context)
+    if not target_id:
+        return await message.reply_text("⚠️ Uꜱᴀɢᴇ: <code>/unban @username or reply</code>", parse_mode='HTML')
+
+    # 3. User Admin Check
     if user.id != OWNER_IDS:
         if not await is_admin(update, context, user.id):
-            await message.reply_text("🧐 ᴏᴘᴘs ʏᴏᴜ ɴᴇᴇᴅ ᴛᴏ ʙᴇ ᴀᴅᴍɪɴ ᴛᴏ ᴜɴʙᴀɴ ᴏᴛʜᴇʀs")
-            return
-
-    target_id, name = await resolve_user_all(update, context)
-    if not target_id: return
+            return await message.reply_text("🧐 Yᴏᴜ Nᴇᴇᴅ Tᴏ Bᴇ Aᴅᴍɪɴ Tᴏ Uɴʙᴀɴ Oᴛʜᴇʀꜱ.")
 
     try:
+        # 4. Check if already unbanned/member
+        target_member = await chat.get_member(target_id)
+        if target_member.status in ['member', 'administrator', 'creator', 'restricted']:
+            return await message.reply_text(f"⚠️ <b>{name}</b> Iꜱ Nᴏᴛ Bᴀɴɴᴇᴅ.", parse_mode='HTML')
+
+        # 5. Unban Action
         await chat.unban_member(target_id, only_if_banned=True)
         await message.reply_text(
-            f"🎖️ sʏsᴛᴇᴍ ᴜᴘᴅᴀᴛᴇ\nᴜsᴇʀ: <b>{name}</b>\nsᴛᴀᴛᴜs: ᴜɴʙᴀɴɴᴇᴅ\nAccess: ʀᴇsᴛᴏʀᴇᴅ",
+            f"🎖️ Uᴘᴅᴀᴛᴇᴅ Sᴛᴀᴛᴜꜱ: <b>{name}</b> ɪꜱ ɴᴏᴡ ᴜɴʙᴀɴɴᴇᴅ!",
             parse_mode='HTML'
         )
+
     except BadRequest as e:
-        await message.reply_text(f"❌ API ᴇʀʀᴏʀ: {str(e).lower()}")
+        err = str(e).lower()
+        if "not enough rights" in err or "admin_privileges" in err:
+            await message.reply_text("❌ I Dᴏɴ'ᴛ Hᴀᴠᴇ Pᴇʀᴍɪꜱꜱɪᴏɴ Tᴏ Uɴʙᴀɴ Uꜱᴇʀꜱ.")
+        elif "user_id_invalid" in err:
+            await message.reply_text("❌ Iɴᴠᴀʟɪᴅ Uꜱᴇʀ ID.")
+        else:
+            await message.reply_text(f"❌ API Eʀʀᴏʀ: {err}")
+
+from telegram import ChatPermissions
+from telegram.error import BadRequest
 
 # --- MUTE COMMAND ---
 async def mute(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -4432,31 +4491,45 @@ async def mute(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     message = update.effective_message
 
+    # 1. Group Chat Check
+    if chat.type == "private":
+        return await message.reply_text("❌ Tʜɪꜱ Cᴏᴍᴍᴀɴᴅ Cᴀɴ Bᴇ Uꜱᴇᴅ Oɴʟʏ Iɴ Gʀᴏᴜᴘ Cʜᴀᴛꜱ.")
+
+    # 2. Usage Check
+    target_id, name = await resolve_user_all(update, context)
+    if not target_id:
+        return await message.reply_text("⚠️ Uꜱᴀɢᴇ: <code>/mute @username or reply</code>", parse_mode='HTML')
+
+    # 3. User Admin Check
     if user.id != OWNER_IDS:
         if not await is_admin(update, context, user.id):
-            await message.reply_text("🧐 ᴏᴘᴘs ʏᴏᴜ ɴᴇᴇᴅ ᴛᴏ ʙᴇ ᴀᴅᴍɪɴ ᴛᴏ ᴍᴜᴛᴇ ᴏᴛʜᴇʀs")
-            return
+            return await message.reply_text("🧐 Yᴏᴜ Nᴇᴇᴅ Tᴏ Bᴇ Aᴅᴍɪɴ Tᴏ Mᴜᴛᴇ Oᴛʜᴇʀꜱ.")
 
-    target_id, name = await resolve_user_all(update, context)
-    if not target_id: return
-
+    # 4. Target Admin/Owner Check
     if target_id == OWNER_IDS:
-        await message.reply_text("👑 ᴍʏ ᴏᴡɴᴇʀ ɪs ᴛᴏᴏ ʟᴏᴜᴅ ᴛᴏ ʙᴇ ᴍᴜᴛᴇᴅ")
-        return
+        return await message.reply_text("👑 I Cᴀɴ'ᴛ Mᴜᴛᴇ Mʏ Oᴡɴᴇʀ.")
 
     try:
         target_member = await chat.get_member(target_id)
         if target_member.status in ['creator', 'administrator']:
-            await message.reply_text("Yᴏᴜ Cᴀɴ'ᴛ Dᴏ Aɴʏᴛʜɪɴɢ Tᴏ Tʜᴏꜱᴇ Cʜɪᴘᴋᴜ Aᴅᴍɪɴ Lᴏɢᴢ 🪵😁")
-            return
+            return await message.reply_text("🪵 I Cᴀɴ'ᴛ Mᴜᴛᴇ Aᴅᴍɪɴꜱ.")
+        
+        if target_member.status == 'restricted' and not target_member.can_send_messages:
+            return await message.reply_text(f"⚠️ <b>{name}</b> Iꜱ Aʟʀᴇᴀᴅʏ Mᴜᴛᴇᴅ.", parse_mode='HTML')
 
+        # 5. Mute Action
         await chat.restrict_member(target_id, permissions=ChatPermissions(can_send_messages=False))
         await message.reply_text(
-            f"🎖️ Sʏꜱᴛᴇᴍ Uᴘᴅᴀᴛᴇ\nUꜱᴇʀ: <b>{name}</b>\nSᴛᴀᴛᴜꜱ: ᴍᴜᴛᴇᴅ\nAccess: Rᴇsᴛʀɪᴄᴛᴇᴅ",
+            f"🎖️ Uᴘᴅᴀᴛᴇᴅ Sᴛᴀᴛᴜꜱ: <b>{name}</b> ɪꜱ ɴᴏᴡ ᴍᴜᴛᴇᴅ!",
             parse_mode='HTML'
         )
+
     except BadRequest as e:
-        await message.reply_text(f"❌ API ᴇʀʀᴏʀ: {str(e).lower()}")
+        err = str(e).lower()
+        if "not enough rights" in err or "admin_privileges" in err:
+            await message.reply_text("❌ I Dᴏɴ'ᴛ Hᴀᴠᴇ Pᴇʀᴍɪꜱꜱɪᴏɴ Tᴏ Mᴜᴛᴇ Uꜱᴇʀꜱ.")
+        else:
+            await message.reply_text(f"❌ API Eʀʀᴏʀ: {err}")
 
 # --- UNMUTE COMMAND ---
 async def unmute(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -4464,15 +4537,23 @@ async def unmute(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     message = update.effective_message
 
-    if user.id != OWNER_IDS:
-        if not await is_admin(update, context, user.id):
-            await message.reply_text("🧐 ᴏᴘᴘs ʏᴏᴜ ɴᴇᴇᴅ ᴛᴏ ʙᴇ ᴀᴅᴍɪɴ ᴛᴏ ᴜɴᴍᴜᴛᴇ ᴏᴛʜᴇʀs")
-            return
+    if chat.type == "private":
+        return await message.reply_text("❌ Tʜɪꜱ Cᴏᴍᴍᴀɴᴅ Cᴀɴ Bᴇ Uꜱᴇᴅ Oɴʟʏ Iɴ Gʀᴏᴜᴘ Cʜᴀᴛꜱ.")
 
     target_id, name = await resolve_user_all(update, context)
-    if not target_id: return
+    if not target_id:
+        return await message.reply_text("⚠️ Uꜱᴀɢᴇ: <code>/unmute @username or reply</code>", parse_mode='HTML')
+
+    if user.id != OWNER_IDS:
+        if not await is_admin(update, context, user.id):
+            return await message.reply_text("🧐 Yᴏᴜ Nᴇᴇᴅ Tᴏ Bᴇ Aᴅᴍɪɴ Tᴏ Uɴᴍᴜᴛᴇ Oᴛʜᴇʀꜱ.")
 
     try:
+        target_member = await chat.get_member(target_id)
+        if target_member.status in ['member', 'administrator', 'creator'] and (getattr(target_member, 'can_send_messages', True)):
+             return await message.reply_text(f"⚠️ <b>{name}</b> Iꜱ Nᴏᴛ Mᴜᴛᴇᴅ.", parse_mode='HTML')
+
+        # Unmute Action (Full Permissions)
         await chat.restrict_member(
             target_id, 
             permissions=ChatPermissions(
@@ -4483,11 +4564,15 @@ async def unmute(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         )
         await message.reply_text(
-            f"🎖️ sʏsᴛᴇᴍ ᴜᴘᴅᴀᴛᴇ\nᴜsᴇʀ: <b>{name}</b>\nsᴛᴀᴛᴜs: ᴜɴᴍᴜᴛᴇᴅ\nAccess: ғᴜʟʟ",
+            f"🎖️ Uᴘᴅᴀᴛᴇᴅ Sᴛᴀᴛᴜꜱ: <b>{name}</b> ɪꜱ ɴᴏᴡ ᴜɴᴍᴜᴛᴇᴅ!",
             parse_mode='HTML'
         )
     except BadRequest as e:
-        await message.reply_text(f"❌ API ᴇʀʀᴏʀ: {str(e).lower()}")
+        err = str(e).lower()
+        if "not enough rights" in err or "admin_privileges" in err:
+            await message.reply_text("❌ I Dᴏɴ'ᴛ Hᴀᴠᴇ Pᴇʀᴍɪꜱꜱɪᴏɴ Tᴏ Uɴᴍᴜᴛᴇ Uꜱᴇʀꜱ.")
+        else:
+            await message.reply_text(f"❌ API Eʀʀᴏʀ: {err}")
 
 # ================= PROMOTION SYSTEM =================
 from telegram.error import BadRequest
@@ -4739,23 +4824,25 @@ async def unwarn(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"<b>✅ ᴡᴀʀɴs ғᴏʀ {name} ʜᴀs ʙᴇᴇɴ ʀᴇsᴇᴛ.</b>", parse_mode='HTML')
 
 # --- PIN COMMAND ---
+# --- PIN COMMAND ---
 async def pin_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat = update.effective_chat
     message = update.effective_message
 
-    if user.id != OWNER_ID:
-        if not await is_admin(update, context, user.id):
-            await message.reply_text("🧐 ᴏᴘᴘs ʏᴏᴜ ɴᴇᴇᴅ ᴛᴏ ʙᴇ ᴀᴅᴍɪɴ ᴛᴏ ᴘɪɴ ᴍᴇssᴀɢᴇs")
-            return
+    # 1. Logic for Admin Check (Skip in DMs)
+    if chat.type != "private":
+        if user.id != OWNER_ID:
+            if not await is_admin(update, context, user.id):
+                return await message.reply_text("🧐 Yᴏᴜ Nᴇᴇᴅ Tᴏ Bᴇ Aᴅᴍɪɴ Tᴏ Pɪɴ Mᴇꜱꜱᴀɢᴇꜱ.")
 
+    # 2. Usage Check
     if not message.reply_to_message:
-        await message.reply_text("<code>⚠️ ᴜsᴀɢᴇ: ʀᴇᴘʟʏ ᴛᴏ ᴀ ᴍᴇssᴀɢᴇ ᴛᴏ ᴘɪɴ ɪᴛ</code>", parse_mode='HTML')
-        return
+        return await message.reply_text("⚠️ Uꜱᴀɢᴇ: <code>ʀᴇᴘʟʏ ᴛᴏ ᴀ ᴍᴇꜱꜱᴀɢᴇ ᴛᴏ ᴘɪɴ ɪᴛ</code>", parse_mode='HTML')
 
     try:
         target_user = message.reply_to_message.from_user
-        name = target_user.first_name if target_user else "sʏsᴛᴇᴍ"
+        name = target_user.first_name if target_user else "Sʏꜱᴛᴇᴍ"
 
         await context.bot.pin_chat_message(
             chat_id=chat.id,
@@ -4763,15 +4850,18 @@ async def pin_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             disable_notification=False
         )
 
-        # CLEAN CALLBACK
-        response = (
-            f"ᴜsᴇʀ: <b>{name}</b>\n"
-            "sᴛᴀᴛᴜs: ᴘɪɴɴᴇᴅ"
+        # 3. Success Response (Single Line)
+        await message.reply_text(
+            f"🎖️ Uᴘᴅᴀᴛᴇᴅ Sᴛᴀᴛᴜꜱ: <b>{name}'ꜱ</b> ᴍᴇꜱꜱᴀɢᴇ ɪꜱ ɴᴏᴡ ᴘɪɴɴᴇᴅ!",
+            parse_mode='HTML'
         )
-        await message.reply_text(response, parse_mode='HTML')
 
     except BadRequest as e:
-        await message.reply_text(f"❌ API ᴇʀʀᴏʀ: {str(e).lower()}")
+        err = str(e).lower()
+        if "not enough rights" in err or "admin_privileges" in err:
+            await message.reply_text("❌ I Dᴏɴ'ᴛ Hᴀᴠᴇ Pᴇʀᴍɪꜱꜱɪᴏɴ Tᴏ Pɪɴ Mᴇꜱꜱᴀɢᴇꜱ.")
+        else:
+            await message.reply_text(f"❌ API Eʀʀᴏʀ: {err}")
 
 # --- UNPIN COMMAND ---
 async def unpin_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -4779,32 +4869,38 @@ async def unpin_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     message = update.effective_message
 
-    if user.id != OWNER_ID:
-        if not await is_admin(update, context, user.id):
-            await message.reply_text("🧐 ᴏᴘᴘs ʏᴏᴜ ɴᴇᴇᴅ ᴛᴏ ʙᴇ ᴀᴅᴍɪɴ ᴛᴏ ᴜɴᴘɪɴ ᴍᴇssᴀɢᴇs")
-            return
+    # 1. Logic for Admin Check (Skip in DMs)
+    if chat.type != "private":
+        if user.id != OWNER_ID:
+            if not await is_admin(update, context, user.id):
+                return await message.reply_text("🧐 Yᴏᴜ Nᴇᴇᴅ Tᴏ Bᴇ Aᴅᴍɪɴ Tᴏ UɴPɪɴ Mᴇꜱꜱᴀɢᴇꜱ.")
 
     try:
         if message.reply_to_message:
             target_user = message.reply_to_message.from_user
-            name = target_user.first_name if target_user else "sʏsᴛᴇᴍ"
+            name = target_user.first_name if target_user else "Sʏꜱᴛᴇᴍ"
             await context.bot.unpin_chat_message(
                 chat_id=chat.id,
                 message_id=message.reply_to_message.message_id
             )
         else:
-            name = "ʟᴀᴛᴇsᴛ ᴘɪɴ"
+            name = "Lᴀᴛᴇꜱᴛ Pɪɴ"
             await context.bot.unpin_chat_message(chat_id=chat.id)
 
-        # CLEAN CALLBACK
-        response = (
-            f"ᴜsᴇʀ: <b>{name}</b>\n"
-            "sᴛᴀᴛᴜs: ᴜɴᴘɪɴɴᴇᴅ"
+        # 2. Success Response (Single Line)
+        await message.reply_text(
+            f"🎖️ Uᴘᴅᴀᴛᴇᴅ Sᴛᴀᴛᴜꜱ: <b>{name}</b> ɪꜱ ɴᴏᴡ ᴜɴᴘɪɴɴᴇᴅ!",
+            parse_mode='HTML'
         )
-        await message.reply_text(response, parse_mode='HTML')
 
     except BadRequest as e:
-        await message.reply_text(f"❌ API ᴇʀʀᴏʀ: {str(e).lower()}")
+        err = str(e).lower()
+        if "not enough rights" in err or "admin_privileges" in err:
+            await message.reply_text("❌ I Dᴏɴ'ᴛ Hᴀᴠᴇ Pᴇʀᴍɪꜱꜱɪᴏɴ Tᴏ UɴPɪɴ Mᴇꜱꜱᴀɢᴇꜱ.")
+        elif "no message to unpin" in err:
+             await message.reply_text("⚠️ Tʜᴇʀᴇ Aʀᴇ Nᴏ Pɪɴɴᴇᴅ Mᴇꜱꜱᴀɢᴇꜱ Tᴏ Rᴇᴍᴏᴠᴇ.")
+        else:
+            await message.reply_text(f"❌ API Eʀʀᴏʀ: {err}")
 
 #===========purge=========
 async def purge(update: Update, context: ContextTypes.DEFAULT_TYPE):
