@@ -4549,8 +4549,8 @@ async def promote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await context.bot.promote_chat_member(chat.id, target_id, **perms[level])
         
-        access_map = {3: "Full Power", 2: "Moderator", 1: "Standard", 0: "Pin Only"}
-        await message.reply_text(f"🎖️ <b>{name}</b> ᴘʀᴏᴍᴏᴛᴇᴅ to <b>{access_map[level]}</b>!", parse_mode=ParseMode.HTML)
+        access_map = {3: "Fᴜʟʟ Pᴏᴡᴇʀ", 2: "Sᴛᴀɴᴅᴀʀᴅ", 1: "Jᴜɴɪᴏʀ", 0: "Pin Only"}
+        await message.reply_text(f"🎖️ <b>{name}</b> Pʀᴏᴍᴏᴛᴇ Tᴏ <b>{access_map[level]}</b>!", parse_mode=ParseMode.HTML)
 
     except BadRequest as e:
         await message.reply_text(f"❌ Eʀʀᴏʀ: {e}")
@@ -4579,7 +4579,7 @@ async def demote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await message.reply_text("⚠️ Uꜱᴀɢᴇ: <code>/demote @username or reply</code>", parse_mode=ParseMode.HTML)
 
     if not await is_user_allowed(chat, user.id):
-        return await message.reply_text("🧐 Yᴏᴜ Nᴇᴇᴅ 'Aᴅᴅ Nᴇᴡ Aᴅᴍɪɴꜱ' Pᴇʀᴍɪꜱꜱɪᴏɴ!")
+        return await message.reply_text("⚠️ Oɴʟʏ Aᴅᴍɪɴꜱ Cᴀɴ Dᴇᴍᴏᴛᴇ Uꜱᴇʀꜱ!")
 
     try:
         target_member = await chat.get_member(target_id)
