@@ -4569,6 +4569,7 @@ async def is_user_allowed(chat, user_id):
         return False
 
 # --- DEMOTE USER ---
+# --- DEMOTE USER ---
 async def demote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     user = update.effective_user
@@ -4576,13 +4577,14 @@ async def demote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     target_id, name = await resolve_user_all(update, context) 
     if not target_id:
-        return await message.reply_text("⚠️ Uꜱᴀɢᴇ:<code> /demote @username or reply</code>", parse_mode=ParseMode.HTML)
+        return await message.reply_text("⚠️ Uꜱᴀɢᴇ: <code>/demote @username or reply</code>", parse_mode=ParseMode.HTML)
 
     if not await is_user_allowed(chat, user.id):
-        return await message.reply_text("🧐 Yᴏᴜ ɴᴇᴇᴅ 'Aᴅᴅ Nᴇᴡ Aᴅᴍɪɴs' ᴘᴇʀᴍɪssɪᴏɴ!")
+        return await message.reply_text("🧐 Yᴏᴜ Nᴇᴇᴅ 'Aᴅᴅ Nᴇᴡ Aᴅᴍɪɴꜱ' Pᴇʀᴍɪꜱꜱɪᴏɴ!")
 
     try:
         target_member = await chat.get_member(target_id)
+        
         if target_member.user.is_bot:
             return await message.reply_text("👀 I Cᴀɴɴᴏᴛ Dᴇᴍᴏᴛᴇ Bᴏᴛꜱ. 👾")
 
@@ -4590,9 +4592,9 @@ async def demote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return await message.reply_text("👑 Gʀᴏᴜᴘ Oᴡɴᴇʀ Cᴀɴ'ᴛ Bᴇ Dᴇᴍᴏᴛᴇᴅ.")
 
         if target_member.status != 'administrator':
-            return await message.reply_text(f"⚠️ <b>{name}</b> Iꜱ Nᴏᴛ Aɴᴅ Aᴅᴍɪɴ!", parse_mode=ParseMode.HTML)
+            return await message.reply_text(f"⚠️ <b>{name}</b> Iꜱ Nᴏᴛ Aɴ Aᴅᴍɪɴ!", parse_mode=ParseMode.HTML)
 
-        # Demote by stripping all admin rights
+        # Demote action
         await context.bot.promote_chat_member(
             chat.id, target_id,
             can_change_info=False, can_delete_messages=False, can_invite_users=False,
@@ -4602,9 +4604,8 @@ async def demote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await message.reply_text(f"🎖️ <b>{name}</b> Hᴀꜱ Bᴇᴇɴ Dᴇᴍᴏᴛᴇᴅ! 🥱", parse_mode=ParseMode.HTML)
 
     except BadRequest as e:
-        error_msg = str(e)
-        if "Not enough rights" in error_msg:
-            await message.reply_text(f"❌ I Cᴀɴᴛ Dᴇᴍᴏᴛᴇ <b>{name}</b> Tʜᴇʏ Mɪɢʜᴛ Pʀᴏᴍᴏᴛᴇᴅ Bʏ Oᴛʜᴇʀ Aᴅᴍɪɴ!", parse_mode=ParseMode.HTML)
+        if "Not enough rights" in str(e):
+            await message.reply_text(f"❌ <b>{name}</b> Wᴀꜱ Pʀᴏᴍᴏᴛᴇᴅ Bʏ Oᴛʜᴇʀ Tʜᴀɴ Mᴇ! I Cᴀɴ'ᴛ Dᴇᴍᴏᴛᴇ Tʜᴇᴍ. 🙄", parse_mode=ParseMode.HTML)
         else:
             await message.reply_text(f"❌ API Eʀʀᴏʀ: {e}")
 
