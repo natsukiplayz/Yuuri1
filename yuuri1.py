@@ -4522,11 +4522,11 @@ async def promote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # Check if they are already admin
         if target_member.status == 'administrator':
-            return await message.reply_text("👀 Yᴏᴜ'ʀᴇ Aʟʀᴇᴀᴅʏ Aɴ Aᴅᴍɪɴ 😮‍💨")
+            return await message.reply_text("🎗️ Uꜱᴇʀ Iꜱ Aʟʀᴇᴀᴅʏ Aɴ Aᴅᴍɪɴ.")
 
         # Auth Check for the person sending the command
         if not await is_user_allowed(chat, user.id):
-            return await message.reply_text("🧐 Oᴏᴘs! Yᴏᴜ Nᴇᴇᴅ Tᴏ Bᴇ Aᴅᴍɪɴ Tᴏ Pʀᴏᴍᴏᴛᴇ Oᴛʜᴇʀs... 🧩")
+            return await message.reply_text("⚠️ Oɴʟʏ Aᴅᴍɪɴꜱ Cᴀɴ Pʀᴏᴍᴏᴛᴇ Uꜱᴇʀꜱ. 🧩")
 
         # Bot Permission Check
         bot_member = await chat.get_member(context.bot.id)
@@ -4569,7 +4569,6 @@ async def is_user_allowed(chat, user_id):
         return False
 
 # --- DEMOTE USER ---
-# --- DEMOTE USER ---
 async def demote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     user = update.effective_user
@@ -4605,7 +4604,7 @@ async def demote_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     except BadRequest as e:
         if "Not enough rights" in str(e):
-            await message.reply_text(f"❌ <b>{name}</b> Wᴀꜱ Pʀᴏᴍᴏᴛᴇᴅ Bʏ Oᴛʜᴇʀ Tʜᴀɴ Mᴇ! I Cᴀɴ'ᴛ Dᴇᴍᴏᴛᴇ Tʜᴇᴍ. 🙄", parse_mode=ParseMode.HTML)
+            await message.reply_text("⚠️ I Cᴀɴ'ᴛ Dᴇᴍᴏᴛᴇ Tʜɪꜱ Aᴅᴍɪɴ. Tʜᴇʏ Mɪɢʜᴛ Hᴀᴠᴇ Bᴇᴇɴ Pʀᴏᴍᴏᴛᴇᴅ Bʏ Tʜᴇ Aɴᴏᴛʜᴇʀ Aᴅᴍɪɴ.", parse_mode=ParseMode.HTML)
         else:
             await message.reply_text(f"❌ API Eʀʀᴏʀ: {e}")
 
