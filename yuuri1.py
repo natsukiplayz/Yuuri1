@@ -8,6 +8,7 @@ import random
 import pytz
 import base64
 import io
+import html
 from io import BytesIO
 
 import cloudinary
@@ -2322,6 +2323,8 @@ async def daily(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 #====economy commands=======
 #--
+import html
+
 # ============ PROFILE ============
 async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
@@ -2332,7 +2335,6 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if chat.type != "private" and await is_economy_disabled(chat.id):
         return await msg.reply_text("🛑 Tʜᴇ Eᴄᴏɴᴏᴍʏ Sʏsᴛᴇᴍ Iꜱ Cᴜʀʀᴇɴᴛʟʏ Cʟᴏsᴇᴅ Iɴ Tʜɪs Gʀᴏᴜᴘ.")
 
-    # Fixed: Correctly targets the replied user or the sender
     target_user = msg.reply_to_message.from_user if msg.reply_to_message else user
     data = get_user(target_user) 
     icon = get_user_icon(data, context) 
@@ -2367,8 +2369,11 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     status = "💀 Dᴇᴀᴅ" if data.get("dead") else "❤️ Aʟɪᴠᴇ"
     guild = data.get("guild", "Nᴏɴᴇ")
 
+    # Fixed: Escaping the name to prevent HTML crashes
+    safe_name = html.escape(data.get('name', target_user.first_name))
+
     text = (
-        f"{icon} <b>Nᴀᴍᴇ:</b> {data.get('name', target_user.first_name)}\n"
+        f"{icon} <b>Nᴀᴍᴇ:</b> {safe_name}\n"
         f"🛡️ <b>Tɪᴛʟᴇ:</b> {current_rank_data['name']}\n"
         f"🏅 <b>Lᴇᴠᴇʟ:</b> {lvl}\n"
         f"⚔️ <b>Kɪʟʟs:</b> {kills:,}\n"
@@ -2393,7 +2398,6 @@ async def bal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if chat.type != "private" and await is_economy_disabled(chat.id):
         return await msg.reply_text("🛑 Tʜᴇ Eᴄᴏɴᴏᴍʏ Sʏsᴛᴇᴍ Iꜱ Cᴜʀʀᴇɴᴛʟʏ Cʟᴏsᴇᴅ Iɴ Tʜɪs Gʀᴏᴜᴘ.")
 
-    # Fixed: Logic ensures anyone can check their own or a replied user's balance
     target_user = msg.reply_to_message.from_user if msg.reply_to_message else update.effective_user
     data = get_user(target_user) 
     icon = get_user_icon(data, context) 
@@ -2405,8 +2409,11 @@ async def bal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     bot_id = context.bot.id
     wealth_rank = 1 + users.count_documents({"id": {"$ne": bot_id}, "coins": {"$gt": coins}})
 
+    # Fixed: Escaping the name to prevent HTML crashes
+    safe_name = html.escape(target_user.first_name)
+
     text = (
-        f"{icon} <b>Nᴀᴍᴇ:</b> {target_user.first_name}\n"
+        f"{icon} <b>Nᴀᴍᴇ:</b> {safe_name}\n"
         f"💰 <b>Cᴏɪɴꜱ:</b> {coins:,}\n"
         f"💸 <b>Wᴇᴀʟᴛʜ Rᴀɴᴋ:</b> {wealth_rank}\n"
         f"🎯 <b>Sᴛᴀᴛᴜꜱ:</b> {status}\n"
