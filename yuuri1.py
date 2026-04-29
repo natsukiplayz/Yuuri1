@@ -515,29 +515,14 @@ SNAKE_GAME_URL = "https://snake_event.oneapp.dev/"
 # ────────────────────────────────────────────────────────────────────
 
 # ════════════════════════════════════════════════════════════════════
-#  TELEGRAM COMMAND: /snake (Group & DM Support)
+#  TELEGRAM COMMAND:  /snake
 # ════════════════════════════════════════════════════════════════════
+
 async def cmd_snake(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Sends the Snake game button to the user."""
     user = update.effective_user
-    chat = update.effective_chat
-    bot_username = context.bot.username
-
-    # REDIRECT GROUPS TO DM
-    if chat.type != "private":
-        keyboard = InlineKeyboardMarkup([[
-            InlineKeyboardButton(
-                "🎴 Cᴏɴᴛɪɴᴜᴇ Pʟᴀʏɪɴɢ", 
-                url=f"https://t.me/{bot_username}?start=play_snake"
-            )
-        ]])
-        await update.message.reply_text(
-            "<b>Usᴇ ᴛʜɪs ᴄᴏᴍᴍᴀɴᴅ ɪɴ ᴍʏ DM ᴛᴏ ᴘʟᴀʏ!</b>",
-            reply_markup=keyboard,
-            parse_mode="HTML"
-        )
-        return
-
-    # DM LOGIC
+    
+    # RESTORED await
     user_doc = await users_async.find_one({"id": user.id})
     coins = user_doc.get("coins", 0) if user_doc else 0
 
@@ -550,104 +535,157 @@ async def cmd_snake(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     game_url = f"{SNAKE_GAME_URL}?user_id={user.id}&name={user.first_name[:8]}"
+
     keyboard = InlineKeyboardMarkup([[
-        InlineKeyboardButton("🎮 Pʟᴀʏ Sɴᴀᴋᴇ", web_app=WebAppInfo(url=game_url))
+        InlineKeyboardButton(
+            "🎮 Pʟᴀʏ Sɴᴀᴋᴇ",
+            web_app=WebAppInfo(url=game_url)
+        )
     ]])
 
     await update.message.reply_text(text, reply_markup=keyboard, parse_mode="HTML")
 
+
 # ════════════════════════════════════════════════════════════════════
-#  API ROUTE: START GAME (Deducts Coins & Creates Session)
+#  API ROUTE 1: GET COINS
 # ════════════════════════════════════════════════════════════════════
+
+@app.post("/snake/get_coins")
+async def snake_get_coins(request: Request):
+    try:
+        body    = await request.json()
+        user_id = int(body.get("user_id", 0))
+        if not user_id:
+            return {"ok": False, "error": "NO USER ID"}
+
+        # RESTORED await
+        user_doc = await users_async.find_one({"id": user_id})
+        if not user_doc:
+            return {"ok": False, "error": "USER NOT FOUND"}
+
+        return {"ok": True, "coins": user_doc.get("coins", 0)}
+
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+# ════════════════════════════════════════════════════════════════════
+#  API ROUTE 2: START GAME
+# ════════════════════════════════════════════════════════════════════
+
 @app.post("/snake/start_game")
 async def snake_start_game(request: Request):
     try:
-        body = await request.json()
-        user_id = int(body.get("user_id", 0))
-        
+        body       = await request.json()
+        user_id    = int(body.get("user_id", 0))
+        entry_fee  = int(body.get("entry_fee", ENTRY_FEE))
+
+        if not user_id:
+            return {"ok": False, "error": "NO USER ID"}
+
+        # RESTORED await
         user_doc = await users_async.find_one({"id": user_id})
-        if not user_doc or user_doc.get("coins", 0) < ENTRY_FEE:
-            return {"ok": False, "error": "Insufficient coins"}
+        if not user_doc:
+            return {"ok": False, "error": "USER NOT FOUND"}
 
-        session_id = str(uuid.uuid4())
-        coins_after = user_doc.get("coins", 0) - ENTRY_FEE
+        coins = user_doc.get("coins", 0)
+        if coins < entry_fee:
+            return {"ok": False, "error": f"NOT ENOUGH COINS ({coins}/{entry_fee})"}
 
+        session_id  = str(uuid.uuid4())
+        coins_after = coins - entry_fee
+
+        # RESTORED await
         await users_async.update_one(
             {"id": user_id},
             {
-                "$set": {"coins": coins_after},
+                "$set":  {"coins": coins_after},
                 "$push": {
                     "snake_sessions": {
                         "session_id": session_id,
                         "started_at": datetime.now(timezone.utc).isoformat(),
-                        "settled": False,
-                        "entry_fee": ENTRY_FEE,
+                        "paid":       True,
+                        "settled":    False,
+                        "entry_fee":  entry_fee,
                     }
                 }
             }
         )
-        return {"ok": True, "session_id": session_id, "coins_after": coins_after}
+
+        return {
+            "ok":          True,
+            "session_id":  session_id,
+            "coins_after": coins_after
+        }
     except Exception as e:
-        return {"ok": False, "error": "Server error"}
+        return {"ok": False, "error": str(e)}
+
 
 # ════════════════════════════════════════════════════════════════════
-#  API ROUTE: END GAME (Validates Session & Awards Coins)
+#  API ROUTE 3: END GAME
 # ════════════════════════════════════════════════════════════════════
+
 @app.post("/snake/end_game")
 async def snake_end_game(request: Request):
     try:
-        body = await request.json()
-        user_id = int(body.get("user_id", 0))
-        session_id = body.get("session_id", "")
-        score = int(body.get("score", 0))
-        coins_earned = min(int(body.get("coins_earned", 0)), MAX_PAYOUT)
-        name = str(body.get("name", "PLAYER"))[:8].upper()
+        body         = await request.json()
+        user_id      = int(body.get("user_id", 0))
+        session_id   = body.get("session_id", "")
+        score        = int(body.get("score", 0))
+        coins_earned = int(body.get("coins_earned", 0))
+        name         = str(body.get("name", "PLAYER"))[:8].upper()
 
+        # RESTORED await
         user_doc = await users_async.find_one({"id": user_id})
-        if not user_doc: return {"ok": False, "error": "User not found"}
+        if not user_doc:
+            return {"ok": False, "error": "USER NOT FOUND"}
 
-        # Check if session exists and is NOT already settled
-        sessions = user_doc.get("snake_sessions", [])
+        sessions    = user_doc.get("snake_sessions", [])
         session_obj = next((s for s in sessions if s.get("session_id") == session_id), None)
 
         if not session_obj or session_obj.get("settled"):
-            return {"ok": False, "error": "Claim expired or already processed"}
+            return {"ok": False, "error": "INVALID OR SETTLED SESSION"}
 
-        coins_after = user_doc.get("coins", 0) + coins_earned
+        coins_earned = min(max(coins_earned, 0), MAX_PAYOUT)
+        current_coins = user_doc.get("coins", 0)
+        coins_after   = current_coins + coins_earned
 
-        # Atomic Update: Ensure session is settled so it can't be used again
+        # RESTORED await
         await users_async.update_one(
             {"id": user_id, "snake_sessions.session_id": session_id},
             {
                 "$set": {
                     "coins": coins_after,
-                    "snake_sessions.$.settled": True,
-                    "snake_sessions.$.score": score,
+                    "snake_sessions.$.settled":     True,
+                    "snake_sessions.$.score":        score,
                     "snake_sessions.$.coins_earned": coins_earned,
-                    "snake_sessions.$.ended_at": datetime.now(timezone.utc).isoformat(),
+                    "snake_sessions.$.ended_at":     datetime.now(timezone.utc).isoformat(),
                 }
             }
         )
 
-        # Update Leaderboard
+        # RESTORED await
         await async_db["snake_leaderboard"].update_one(
             {"user_id": user_id},
             {
                 "$set": {
-                    "user_id": user_id,
-                    "name": name,
-                    "best_score": max(score, user_doc.get("snake_best", 0)),
+                    "user_id":     user_id,
+                    "name":        name,
+                    "best_score":  max(score, user_doc.get("snake_best", 0)),
+                    "last_score":  score,
                     "coins_earned": coins_earned,
-                    "date": datetime.now(timezone.utc).strftime("%b %d"),
+                    "date":        datetime.now(timezone.utc).strftime("%b %d"),
                 }
             },
             upsert=True
         )
 
-        return {"ok": True, "coins_after": coins_after}
-    except Exception as e:
-        return {"ok": False, "error": "Processing error"}
+        if score > user_doc.get("snake_best", 0):
+            await users_async.update_one({"id": user_id}, {"$set": {"snake_best": score}})
 
+        return {"ok": True, "coins_after": coins_after, "coins_earned": coins_earned}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
 
 
 # ════════════════════════════════════════════════════════════════════
@@ -657,7 +695,7 @@ async def snake_end_game(request: Request):
 @app.get("/snake/leaderboard")
 async def snake_leaderboard():
     try:
-        # FIXED: Use async_db and to_list()
+        # RESTORED await and to_list for async motor driver
         cursor = async_db["snake_leaderboard"].find({}, {"_id": 0}).sort("best_score", -1).limit(10)
         entries = await cursor.to_list(length=10)
         
@@ -672,6 +710,7 @@ async def snake_leaderboard():
         ]
     except Exception as e:
         return []
+
 
 
 import html
