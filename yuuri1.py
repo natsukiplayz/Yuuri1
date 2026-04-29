@@ -522,7 +522,7 @@ async def cmd_snake(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Sends the Snake game button to the user."""
     user = update.effective_user
     
-    # RESTORED await
+    # RESTORED await for async driver
     user_doc = await users_async.find_one({"id": user.id})
     coins = user_doc.get("coins", 0) if user_doc else 0
 
@@ -531,7 +531,7 @@ async def cmd_snake(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"💰 Yᴏᴜʀ Cᴏɪɴs: <b>{coins}</b>\n"
         f"🎟 Eɴᴛʀʏ Fᴇᴇ: <b>{ENTRY_FEE} coins</b>\n\n"
         f"Eᴀʀɴ ᴄᴏɪɴs ʙᴀsᴇᴅ ᴏɴ ʏᴏᴜʀ sᴄᴏʀᴇ!\n"
-        f"Hɪɢʜᴇʀ sᴄᴏʀᴇ = ᴍᴏʀᴇ ᴄᴏɪɴs ✨\n"
+        f"Hɪɢʜᴇʀ sᴄᴏʀᴇ = ᴍᴏʀᴇ ᴄᴏɪɴs ✨\n\n"
         f"• Iᴍᴘᴏʀᴛᴀɴᴛ:-\n"
         f"Wʜᴇɴᴇᴠᴇʀ Yᴏᴜ Sᴀᴡ Tʜᴇ 'Sᴀᴠɪɴɢ...' Tᴀᴋɪɴɢ Tᴏᴏ Lᴏɴɢ Sᴏ Jᴜꜱᴛ Pʀᴇꜱꜱ Eɴᴛᴇʀ Fʀᴏᴍ Yᴏᴜ Kᴇʏʙᴏᴀʀᴅ Iᴛ Wɪʟʟ Gɪᴠᴇ Yᴏᴜ Eᴀʀɴᴇᴅ Mᴏɴᴇʏ Aɴᴅ Sᴀᴠᴇ Cʜᴀɴɢᴇꜱ 👀❤️"
     )
@@ -546,6 +546,7 @@ async def cmd_snake(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]])
 
     await update.message.reply_text(text, reply_markup=keyboard, parse_mode="HTML")
+
 
 
 # ════════════════════════════════════════════════════════════════════
