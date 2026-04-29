@@ -491,6 +491,259 @@ def get_user_icon(user_data, context):
 
 #============ Side_Features ========
 #--
+
+"""
+╔══════════════════════════════════════════════════════════════════╗
+║         SNAKE GAME — COIN SYSTEM API ROUTES                      ║
+║         Add these routes to your existing FastAPI bot            ║
+║                                                                  ║
+║  HOW TO USE:                                                      ║
+║  1. Copy this entire block into your main bot .py file           ║
+║  2. Make sure 'app', 'users', 'sync_db', 'async_db' are defined  ║
+║  3. Replace GAME_URL with your deployed HTML game URL            ║
+║  4. Add /snake command handler to your bot                       ║
+╚══════════════════════════════════════════════════════════════════╝
+"""
+
+import uuid
+from datetime import datetime, timezone
+from fastapi import Request
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
+
+# ── CONFIG ──────────────────────────────────────────────────────────
+ENTRY_FEE      = 2000           # coins to enter the game
+MAX_PAYOUT     = 10000          # cap so no runaway rewards
+SNAKE_GAME_URL = "https://snake_event.oneapp.dev/"  # ← update this!
+# e.g. host your HTML on GitHub Pages, Vercel, or any static host
+# ────────────────────────────────────────────────────────────────────
+
+
+# ════════════════════════════════════════════════════════════════════
+#  TELEGRAM COMMAND:  /snake
+# ════════════════════════════════════════════════════════════════════
+
+async def cmd_snake(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Sends the Snake game button to the user."""
+    user   = update.effective_user
+    data   = get_user(user)
+    coins  = data.get("coins", 0)
+
+    text = (
+        f"🐍 <b>Sɴᴀᴋᴇ Aʀᴄᴀᴅᴇ</b>\n\n"
+        f"💰 Yᴏᴜʀ Cᴏɪɴs: <b>{coins}</b>\n"
+        f"🎟 Eɴᴛʀʏ Fᴇᴇ: <b>{ENTRY_FEE} coins</b>\n\n"
+        f"Eᴀʀɴ ᴄᴏɪɴs ʙᴀsᴇᴅ ᴏɴ ʏᴏᴜʀ sᴄᴏʀᴇ!\n"
+        f"Hɪɢʜᴇʀ sᴄᴏʀᴇ = ᴍᴏʀᴇ ᴄᴏɪɴs ✨"
+    )
+
+    # Build game URL with user info embedded
+    game_url = f"{SNAKE_GAME_URL}?user_id={user.id}&name={user.first_name[:8]}"
+
+    keyboard = InlineKeyboardMarkup([[
+        InlineKeyboardButton(
+            "🎮 Pʟᴀʏ Sɴᴀᴋᴇ",
+            web_app=WebAppInfo(url=game_url)
+        )
+    ]])
+
+    await update.message.reply_text(text, reply_markup=keyboard, parse_mode="HTML")
+
+
+# ════════════════════════════════════════════════════════════════════
+#  API ROUTE 1: GET COINS
+#  Called by game on load to show user's balance
+# ════════════════════════════════════════════════════════════════════
+
+@app.post("/snake/get_coins")
+async def snake_get_coins(request: Request):
+    try:
+        body    = await request.json()
+        user_id = int(body.get("user_id", 0))
+        if not user_id:
+            return {"ok": False, "error": "NO USER ID"}
+
+        user_doc = users.find_one({"id": user_id})
+        if not user_doc:
+            return {"ok": False, "error": "USER NOT FOUND"}
+
+        return {"ok": True, "coins": user_doc.get("coins", 0)}
+
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+# ════════════════════════════════════════════════════════════════════
+#  API ROUTE 2: START GAME — Deduct entry fee
+# ════════════════════════════════════════════════════════════════════
+
+@app.post("/snake/start_game")
+async def snake_start_game(request: Request):
+    try:
+        body       = await request.json()
+        user_id    = int(body.get("user_id", 0))
+        entry_fee  = int(body.get("entry_fee", ENTRY_FEE))
+
+        if not user_id:
+            return {"ok": False, "error": "NO USER ID"}
+
+        user_doc = users.find_one({"id": user_id})
+        if not user_doc:
+            return {"ok": False, "error": "USER NOT FOUND"}
+
+        coins = user_doc.get("coins", 0)
+        if coins < entry_fee:
+            return {
+                "ok": False,
+                "error": f"NOT ENOUGH COINS ({coins}/{entry_fee})"
+            }
+
+        # Generate a unique session ID to prevent duplicate payouts
+        session_id  = str(uuid.uuid4())
+        coins_after = coins - entry_fee
+
+        # Deduct coins and store the session
+        users.update_one(
+            {"id": user_id},
+            {
+                "$set":  {"coins": coins_after},
+                "$push": {
+                    "snake_sessions": {
+                        "session_id": session_id,
+                        "started_at": datetime.now(timezone.utc).isoformat(),
+                        "paid":       True,
+                        "settled":    False,
+                        "entry_fee":  entry_fee,
+                    }
+                }
+            }
+        )
+
+        return {
+            "ok":          True,
+            "session_id":  session_id,
+            "coins_after": coins_after
+        }
+
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+# ════════════════════════════════════════════════════════════════════
+#  API ROUTE 3: END GAME — Award coins based on score
+# ════════════════════════════════════════════════════════════════════
+
+@app.post("/snake/end_game")
+async def snake_end_game(request: Request):
+    try:
+        body         = await request.json()
+        user_id      = int(body.get("user_id", 0))
+        session_id   = body.get("session_id", "")
+        score        = int(body.get("score", 0))
+        coins_earned = int(body.get("coins_earned", 0))
+        name         = str(body.get("name", "PLAYER"))[:8].upper()
+
+        if not user_id:
+            return {"ok": False, "error": "NO USER ID"}
+
+        user_doc = users.find_one({"id": user_id})
+        if not user_doc:
+            return {"ok": False, "error": "USER NOT FOUND"}
+
+        # ── ANTI-CHEAT: validate session exists & isn't already settled ──
+        sessions    = user_doc.get("snake_sessions", [])
+        session_obj = next((s for s in sessions if s.get("session_id") == session_id), None)
+
+        if not session_obj:
+            return {"ok": False, "error": "INVALID SESSION"}
+
+        if session_obj.get("settled"):
+            return {"ok": False, "error": "SESSION ALREADY SETTLED"}
+
+        # ── ANTI-CHEAT: cap max payout ──
+        coins_earned = min(max(coins_earned, 0), MAX_PAYOUT)
+
+        current_coins = user_doc.get("coins", 0)
+        coins_after   = current_coins + coins_earned
+
+        # ── UPDATE user coins & mark session settled ──
+        users.update_one(
+            {"id": user_id, "snake_sessions.session_id": session_id},
+            {
+                "$set": {
+                    "coins": coins_after,
+                    "snake_sessions.$.settled":     True,
+                    "snake_sessions.$.score":        score,
+                    "snake_sessions.$.coins_earned": coins_earned,
+                    "snake_sessions.$.ended_at":     datetime.now(timezone.utc).isoformat(),
+                }
+            }
+        )
+
+        # ── SAVE to leaderboard collection ──
+        sync_db["snake_leaderboard"].update_one(
+            {"user_id": user_id},
+            {
+                "$set": {
+                    "user_id":     user_id,
+                    "name":        name,
+                    "best_score":  max(score, user_doc.get("snake_best", 0)),
+                    "last_score":  score,
+                    "coins_earned": coins_earned,
+                    "date":        datetime.now(timezone.utc).strftime("%b %d"),
+                }
+            },
+            upsert=True
+        )
+
+        # Update personal best
+        if score > user_doc.get("snake_best", 0):
+            users.update_one({"id": user_id}, {"$set": {"snake_best": score}})
+
+        return {
+            "ok":          True,
+            "coins_after": coins_after,
+            "coins_earned": coins_earned,
+        }
+
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+# ════════════════════════════════════════════════════════════════════
+#  API ROUTE 4: LEADERBOARD — Top 10 by best score
+# ════════════════════════════════════════════════════════════════════
+
+@app.get("/snake/leaderboard")
+async def snake_leaderboard():
+    try:
+        cursor = sync_db["snake_leaderboard"] \
+            .find({}, {"_id": 0}) \
+            .sort("best_score", -1) \
+            .limit(10)
+        entries = list(cursor)
+        # rename for frontend
+        return [
+            {
+                "name":        e.get("name", "???"),
+                "score":       e.get("best_score", 0),
+                "coins_earned": e.get("coins_earned", 0),
+                "date":        e.get("date", ""),
+            }
+            for e in entries
+        ]
+    except Exception as e:
+        return []
+
+
+# ════════════════════════════════════════════════════════════════════
+#  REGISTER THE COMMAND in your ApplicationBuilder block:
+#
+#  app_bot.add_handler(CommandHandler("snake", cmd_snake))
+#
+#  In your /start or help text, add:
+#  /snake — 🐍 Play Snake (Entry: 2000 coins)
+# ════════════════════════════════════════════════════════════════════
+
 import html
 import logging
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
@@ -5417,6 +5670,7 @@ application.add_handler(CommandHandler("connect", connect_log_group))
 application.add_handler(CommandHandler("seticon", set_icon))
 application.add_handler(CommandHandler("denyicon", deny_icon))
 application.add_handler(CommandHandler("title", set_admin_title))
+application.add_handler(CommandHandler("snake", cmd_snake))
 
 # Message Handlers
 application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
