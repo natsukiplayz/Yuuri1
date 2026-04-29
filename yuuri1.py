@@ -502,7 +502,7 @@ def get_user_icon(user_data, context):
 
 #============ Side_Features ========
 #--
-import uuid  # Fixed: lowercase 'import'
+import uuid
 from datetime import datetime, timezone
 from fastapi import Request
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo, Update
@@ -522,8 +522,8 @@ async def cmd_snake(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Sends the Snake game button to the user."""
     user = update.effective_user
     
-    # REMOVED await: users.find_one returns a dict immediately
-    user_doc = users.find_one({"id": user.id})
+    # FIXED: Use users_async to allow the use of await
+    user_doc = await users_async.find_one({"id": user.id})
     coins = user_doc.get("coins", 0) if user_doc else 0
 
     text = (
@@ -558,8 +558,8 @@ async def snake_get_coins(request: Request):
         if not user_id:
             return {"ok": False, "error": "NO USER ID"}
 
-        # REMOVED await
-        user_doc = users.find_one({"id": user_id})
+        # FIXED: Use users_async
+        user_doc = await users_async.find_one({"id": user_id})
         if not user_doc:
             return {"ok": False, "error": "USER NOT FOUND"}
 
@@ -583,8 +583,8 @@ async def snake_start_game(request: Request):
         if not user_id:
             return {"ok": False, "error": "NO USER ID"}
 
-        # REMOVED await
-        user_doc = users.find_one({"id": user_id})
+        # FIXED: Use users_async
+        user_doc = await users_async.find_one({"id": user_id})
         if not user_doc:
             return {"ok": False, "error": "USER NOT FOUND"}
 
@@ -595,8 +595,8 @@ async def snake_start_game(request: Request):
         session_id  = str(uuid.uuid4())
         coins_after = coins - entry_fee
 
-        # REMOVED await
-        users.update_one(
+        # FIXED: Use users_async
+        await users_async.update_one(
             {"id": user_id},
             {
                 "$set":  {"coins": coins_after},
@@ -635,8 +635,8 @@ async def snake_end_game(request: Request):
         coins_earned = int(body.get("coins_earned", 0))
         name         = str(body.get("name", "PLAYER"))[:8].upper()
 
-        # REMOVED await
-        user_doc = users.find_one({"id": user_id})
+        # FIXED: Use users_async
+        user_doc = await users_async.find_one({"id": user_id})
         if not user_doc:
             return {"ok": False, "error": "USER NOT FOUND"}
 
@@ -650,8 +650,8 @@ async def snake_end_game(request: Request):
         current_coins = user_doc.get("coins", 0)
         coins_after   = current_coins + coins_earned
 
-        # REMOVED await
-        users.update_one(
+        # FIXED: Use users_async
+        await users_async.update_one(
             {"id": user_id, "snake_sessions.session_id": session_id},
             {
                 "$set": {
@@ -664,8 +664,8 @@ async def snake_end_game(request: Request):
             }
         )
 
-        # REMOVED await
-        db["snake_leaderboard"].update_one(
+        # FIXED: Use async_db
+        await async_db["snake_leaderboard"].update_one(
             {"user_id": user_id},
             {
                 "$set": {
@@ -681,7 +681,7 @@ async def snake_end_game(request: Request):
         )
 
         if score > user_doc.get("snake_best", 0):
-            users.update_one({"id": user_id}, {"$set": {"snake_best": score}})
+            await users_async.update_one({"id": user_id}, {"$set": {"snake_best": score}})
 
         return {"ok": True, "coins_after": coins_after, "coins_earned": coins_earned}
     except Exception as e:
@@ -695,9 +695,9 @@ async def snake_end_game(request: Request):
 @app.get("/snake/leaderboard")
 async def snake_leaderboard():
     try:
-        # REMOVED await and to_list: Use standard list conversion for sync driver
-        cursor = db["snake_leaderboard"].find({}, {"_id": 0}).sort("best_score", -1).limit(10)
-        entries = list(cursor)
+        # FIXED: Use async_db and to_list()
+        cursor = async_db["snake_leaderboard"].find({}, {"_id": 0}).sort("best_score", -1).limit(10)
+        entries = await cursor.to_list(length=10)
         
         return [
             {
@@ -710,6 +710,7 @@ async def snake_leaderboard():
         ]
     except Exception as e:
         return []
+
 
 import html
 import logging
