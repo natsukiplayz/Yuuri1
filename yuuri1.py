@@ -519,10 +519,27 @@ SNAKE_GAME_URL = "https://snake_event.oneapp.dev/"
 # ════════════════════════════════════════════════════════════════════
 
 async def cmd_snake(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Sends the Snake game button to the user."""
+    """Sends the Snake game button to the user or redirects to DM if in Group."""
     user = update.effective_user
-    
-    # FIXED: Use users_async to allow the use of await
+    chat = update.effective_chat
+    bot_username = context.bot.username
+
+    # Check if the command was used in a Group or Channel
+    if chat.type != "private":
+        keyboard = InlineKeyboardMarkup([[
+            InlineKeyboardButton(
+                "🎴 Cᴏɴᴛɪɴᴜᴇ Pʟᴀʏɪɴɢ", 
+                url=f"https://t.me/{bot_username}?start=play_snake"
+            )
+        ]])
+        await update.message.reply_text(
+            "<b>Usᴇ ᴛʜɪs ᴄᴏᴍᴍᴀɴᴅ ɪɴ ᴍʏ DM ᴛᴏ ᴘʟᴀʏ!</b>",
+            reply_markup=keyboard,
+            parse_mode="HTML"
+        )
+        return
+
+    # --- DM LOGIC ---
     user_doc = await users_async.find_one({"id": user.id})
     coins = user_doc.get("coins", 0) if user_doc else 0
 
@@ -544,6 +561,7 @@ async def cmd_snake(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]])
 
     await update.message.reply_text(text, reply_markup=keyboard, parse_mode="HTML")
+
 
 
 # ════════════════════════════════════════════════════════════════════
@@ -1934,7 +1952,7 @@ async def send_personal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         target_id = context.args[0]
     except IndexError:
-        await update.message.reply_text("⚠️ Boss, I need a UserID first!")
+        await update.message.reply_text("⚠️ I need a UserID first!")
         return
 
     try:
@@ -2269,6 +2287,10 @@ async def referral(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     args = context.args
+
+    if context.args and context.args[0] == "play_snake":
+        await cmd_snake(update, context)
+        return
 
     # --- 1. THE "CONTINUE TO PAY" REDIRECT ---
     if args and args[0] == "pay":
