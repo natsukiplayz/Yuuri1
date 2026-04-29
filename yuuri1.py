@@ -502,30 +502,17 @@ def get_user_icon(user_data, context):
 
 #============ Side_Features ========
 #--
-"""
-╔══════════════════════════════════════════════════════════════════╗
-║         SNAKE GAME — COIN SYSTEM API ROUTES (FIXED)              ║
-║         Paste this block into your main bot .py file             ║
-║                                                                  ║
-║  REQUIRES (already in your bot):                                 ║
-║    app, users, sync_db, Update, ContextTypes,                    ║
-║    InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo        ║
-╚══════════════════════════════════════════════════════════════════╝
-"""
-
 import uuid
 from datetime import datetime, timezone
 from fastapi import Request
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo, Update
+from telegram.ext import ContextTypes
 
-# ── CONFIG ───────────────────────────────────────────────────────────
-# NOTE: Remove the ENTRY_FEE = 2000 line at the top of your snake block
-# if you already have it defined elsewhere, to avoid duplicate definitions.
-ENTRY_FEE      = 2000
-MAX_PAYOUT     = 10000
-SNAKE_GAME_URL = "https://snake_event.oneapp.dev/"  # ← your HTML game URL
-# ─────────────────────────────────────────────────────────────────────
-
+# ── CONFIG ──────────────────────────────────────────────────────────
+ENTRY_FEE      = 2000           
+MAX_PAYOUT     = 10000          
+SNAKE_GAME_URL = "https://YOUR_GAME_HTML_URL_HERE"  # ← Make sure this is your actual hosted HTML link!
+# ────────────────────────────────────────────────────────────────────
 
 # ════════════════════════════════════════════════════════════════════
 #  TELEGRAM COMMAND:  /snake
@@ -533,9 +520,10 @@ SNAKE_GAME_URL = "https://snake_event.oneapp.dev/"  # ← your HTML game URL
 
 async def cmd_snake(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Sends the Snake game button to the user."""
-    user  = update.effective_user
-    data  = get_user(user)          # uses the FIRST get_user (with defaults)
-    coins = data.get("coins", 0)
+    user   = update.effective_user
+    # Assuming 'users' is your MongoDB collection
+    user_doc = await users.find_one({"id": user.id})
+    coins = user_doc.get("coins", 0) if user_doc else 0
 
     text = (
         f"🐍 <b>Sɴᴀᴋᴇ Aʀᴄᴀᴅᴇ</b>\n\n"
@@ -545,6 +533,7 @@ async def cmd_snake(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"Hɪɢʜᴇʀ sᴄᴏʀᴇ = ᴍᴏʀᴇ ᴄᴏɪɴs ✨"
     )
 
+    # Build game URL with user info embedded
     game_url = f"{SNAKE_GAME_URL}?user_id={user.id}&name={user.first_name[:8]}"
 
     keyboard = InlineKeyboardMarkup([[
@@ -569,7 +558,8 @@ async def snake_get_coins(request: Request):
         if not user_id:
             return {"ok": False, "error": "NO USER ID"}
 
-        user_doc = users.find_one({"id": user_id})
+        # FIXED: Added await
+        user_doc = await users.find_one({"id": user_id})
         if not user_doc:
             return {"ok": False, "error": "USER NOT FOUND"}
 
@@ -586,25 +576,30 @@ async def snake_get_coins(request: Request):
 @app.post("/snake/start_game")
 async def snake_start_game(request: Request):
     try:
-        body      = await request.json()
-        user_id   = int(body.get("user_id", 0))
-        entry_fee = int(body.get("entry_fee", ENTRY_FEE))
+        body       = await request.json()
+        user_id    = int(body.get("user_id", 0))
+        entry_fee  = int(body.get("entry_fee", ENTRY_FEE))
 
         if not user_id:
             return {"ok": False, "error": "NO USER ID"}
 
-        user_doc = users.find_one({"id": user_id})
+        # FIXED: Added await
+        user_doc = await users.find_one({"id": user_id})
         if not user_doc:
             return {"ok": False, "error": "USER NOT FOUND"}
 
         coins = user_doc.get("coins", 0)
         if coins < entry_fee:
-            return {"ok": False, "error": f"NOT ENOUGH COINS ({coins}/{entry_fee})"}
+            return {
+                "ok": False,
+                "error": f"NOT ENOUGH COINS ({coins}/{entry_fee})"
+            }
 
         session_id  = str(uuid.uuid4())
         coins_after = coins - entry_fee
 
-        users.update_one(
+        # FIXED: Added await
+        await users.update_one(
             {"id": user_id},
             {
                 "$set":  {"coins": coins_after},
@@ -624,7 +619,7 @@ async def snake_start_game(request: Request):
             "ok":          True,
             "session_id":  session_id,
             "coins_after": coins_after
-        }  # ← THIS WAS MISSING — caused a syntax crash on startup
+        }
 
     except Exception as e:
         return {"ok": False, "error": str(e)}
@@ -647,61 +642,60 @@ async def snake_end_game(request: Request):
         if not user_id:
             return {"ok": False, "error": "NO USER ID"}
 
-        user_doc = users.find_one({"id": user_id})
+        # FIXED: Added await
+        user_doc = await users.find_one({"id": user_id})
         if not user_doc:
             return {"ok": False, "error": "USER NOT FOUND"}
 
-        # ── ANTI-CHEAT: validate session ──
-        sessions   = user_doc.get("snake_sessions", [])
-        session_obj = next(
-            (s for s in sessions if s.get("session_id") == session_id), None
-        )
+        sessions    = user_doc.get("snake_sessions", [])
+        session_obj = next((s for s in sessions if s.get("session_id") == session_id), None)
 
         if not session_obj:
             return {"ok": False, "error": "INVALID SESSION"}
+
         if session_obj.get("settled"):
             return {"ok": False, "error": "SESSION ALREADY SETTLED"}
 
-        # ── ANTI-CHEAT: cap payout ──
         coins_earned = min(max(coins_earned, 0), MAX_PAYOUT)
+        current_coins = user_doc.get("coins", 0)
+        coins_after   = current_coins + coins_earned
 
-        coins_after = user_doc.get("coins", 0) + coins_earned
-
-        users.update_one(
+        # FIXED: Added await
+        await users.update_one(
             {"id": user_id, "snake_sessions.session_id": session_id},
             {
                 "$set": {
                     "coins": coins_after,
-                    "snake_sessions.$.settled":      True,
-                    "snake_sessions.$.score":         score,
-                    "snake_sessions.$.coins_earned":  coins_earned,
-                    "snake_sessions.$.ended_at":      datetime.now(timezone.utc).isoformat(),
+                    "snake_sessions.$.settled":     True,
+                    "snake_sessions.$.score":        score,
+                    "snake_sessions.$.coins_earned": coins_earned,
+                    "snake_sessions.$.ended_at":     datetime.now(timezone.utc).isoformat(),
                 }
             }
         )
 
-        # ── Save to leaderboard ──
-        sync_db["snake_leaderboard"].update_one(
+        # FIXED: Added await and made sure we use the async db object
+        await db["snake_leaderboard"].update_one(
             {"user_id": user_id},
             {
                 "$set": {
-                    "user_id":      user_id,
-                    "name":         name,
-                    "best_score":   max(score, user_doc.get("snake_best", 0)),
-                    "last_score":   score,
+                    "user_id":     user_id,
+                    "name":        name,
+                    "best_score":  max(score, user_doc.get("snake_best", 0)),
+                    "last_score":  score,
                     "coins_earned": coins_earned,
-                    "date":         datetime.now(timezone.utc).strftime("%b %d"),
+                    "date":        datetime.now(timezone.utc).strftime("%b %d"),
                 }
             },
             upsert=True
         )
 
         if score > user_doc.get("snake_best", 0):
-            users.update_one({"id": user_id}, {"$set": {"snake_best": score}})
+            await users.update_one({"id": user_id}, {"$set": {"snake_best": score}})
 
         return {
-            "ok":           True,
-            "coins_after":  coins_after,
+            "ok":          True,
+            "coins_after": coins_after,
             "coins_earned": coins_earned,
         }
 
@@ -710,35 +704,29 @@ async def snake_end_game(request: Request):
 
 
 # ════════════════════════════════════════════════════════════════════
-#  API ROUTE 4: LEADERBOARD
+#  API ROUTE 4: LEADERBOARD — Top 10 by best score
 # ════════════════════════════════════════════════════════════════════
 
 @app.get("/snake/leaderboard")
 async def snake_leaderboard():
     try:
-        cursor = sync_db["snake_leaderboard"] \
-            .find({}, {"_id": 0}) \
-            .sort("best_score", -1) \
-            .limit(10)
-        entries = list(cursor)
+        # FIXED: Correct Async MongoDB fetching using to_list()
+        cursor = db["snake_leaderboard"].find({}, {"_id": 0}).sort("best_score", -1)
+        entries = await cursor.to_list(length=10)
+        
         return [
             {
-                "name":         e.get("name", "???"),
-                "score":        e.get("best_score", 0),
+                "name":        e.get("name", "???"),
+                "score":       e.get("best_score", 0),
                 "coins_earned": e.get("coins_earned", 0),
-                "date":         e.get("date", ""),
+                "date":        e.get("date", ""),
             }
             for e in entries
         ]
     except Exception as e:
+        print(f"Leaderboard Error: {e}")
         return []
 
-
-# ════════════════════════════════════════════════════════════════════
-#  REGISTER THE COMMAND — add this in your ApplicationBuilder block:
-#
-#  app_bot.add_handler(CommandHandler("snake", cmd_snake))
-# ════════════════════════════════════════════════════════════════════
 
 import html
 import logging
