@@ -531,8 +531,9 @@ async def cmd_snake(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"💰 Yᴏᴜʀ Cᴏɪɴs: <b>{coins}</b>\n"
         f"🎟 Eɴᴛʀʏ Fᴇᴇ: <b>{ENTRY_FEE} coins</b>\n\n"
         f"Eᴀʀɴ ᴄᴏɪɴs ʙᴀsᴇᴅ ᴏɴ ʏᴏᴜʀ sᴄᴏʀᴇ!\n"
-        f"Hɪɢʜᴇʀ sᴄᴏʀᴇ = ᴍᴏʀᴇ ᴄᴏɪɴs ✨"\n
-        f"• Iᴍᴘᴏʀᴛᴀɴᴛ:-\nWʜᴇɴᴇᴠᴇʀ Yᴏᴜ Sᴀᴡ Tʜᴇ 'Sᴀᴠɪɴɢ...' Tᴀᴋɪɴɢ Tᴏᴏ Lᴏɴɢ Sᴏ Jᴜꜱᴛ Pʀᴇꜱꜱ Eɴᴛᴇʀ Fʀᴏᴍ Yᴏᴜ Kᴇʏʙᴏᴀʀᴅ Iᴛ Wɪʟʟ Gɪᴠᴇ Yᴏᴜ Eᴀʀɴᴇᴅ Mᴏɴᴇʏ Aɴᴅ Sᴀᴠᴇ Cʜᴀɴɢᴇꜱ 👀❤️"
+        f"Hɪɢʜᴇʀ sᴄᴏʀᴇ = ᴍᴏʀᴇ ᴄᴏɪɴs ✨\n"
+        f"• Iᴍᴘᴏʀᴛᴀɴᴛ:-\n"
+        f"Wʜᴇɴᴇᴠᴇʀ Yᴏᴜ Sᴀᴡ Tʜᴇ 'Sᴀᴠɪɴɢ...' Tᴀᴋɪɴɢ Tᴏᴏ Lᴏɴɢ Sᴏ Jᴜꜱᴛ Pʀᴇꜱꜱ Eɴᴛᴇʀ Fʀᴏᴍ Yᴏᴜ Kᴇʏʙᴏᴀʀᴅ Iᴛ Wɪʟʟ Gɪᴠᴇ Yᴏᴜ Eᴀʀɴᴇᴅ Mᴏɴᴇʏ Aɴᴅ Sᴀᴠᴇ Cʜᴀɴɢᴇꜱ 👀❤️"
     )
 
     game_url = f"{SNAKE_GAME_URL}?user_id={user.id}&name={user.first_name[:8]}"
