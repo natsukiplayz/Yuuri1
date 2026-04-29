@@ -61,8 +61,8 @@ dns.resolver.default_resolver.nameservers = ['8.8.8.8', '1.1.1.1']
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 BOT_NAME = "yuuri"
 MONGO_URI = os.getenv("MONGO_URI")
-OWNER_ID = 8622072470
-OWNER_IDS = 8622072470
+OWNER_ID = 5773908061
+OWNER_IDS = 5773908061
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
 
 RAW_GROQ_KEYS = os.getenv("GROQ_KEYS")
