@@ -296,6 +296,17 @@ async def is_economy_disabled(chat_id: int) -> bool:
         return True
     return False
 
+import asyncio, httpx
+
+async def keep_alive():
+    while True:
+        await asyncio.sleep(600)  # ping every 10 minutes
+        try:
+            async with httpx.AsyncClient() as c:
+                await c.get("https://yuuri1.onrender.com/")
+        except:
+            pass
+
 #======== load groups ====
 SAVED_GROUPS = {}
 
@@ -5772,6 +5783,7 @@ async def premium_auto_activate(request: Request):
 
 from fastapi import FastAPI, Request
 import uvicorn
+import asyncio
 
 @app.post("/webhook")
 async def webhook(request: Request):
@@ -5796,6 +5808,8 @@ async def on_startup():
 
     application.job_queue.run_repeating(auto_coin_gift, interval=86400, first=60)
     
+    asyncio.create_task(keep_alive())
+
     print(f"🚀 Webhook set to {webhook_url}")
 
 
