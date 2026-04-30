@@ -515,14 +515,31 @@ SNAKE_GAME_URL = "https://snake_event.oneapp.dev/"
 # ────────────────────────────────────────────────────────────────────
 
 # ════════════════════════════════════════════════════════════════════
-#  TELEGRAM COMMAND:  /snake
+#  TELEGRAM COMMAND:  /snake (Group & DM Support)
 # ════════════════════════════════════════════════════════════════════
 
 async def cmd_snake(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Sends the Snake game button to the user."""
+    """Sends the Snake game button. Redirects to DM if used in a group."""
     user = update.effective_user
-    
-    # RESTORED await for async driver
+    chat = update.effective_chat
+    bot_username = context.bot.username
+
+    # 1. REDIRECT LOGIC FOR GROUPS
+    if chat.type != "private":
+        keyboard = InlineKeyboardMarkup([[
+            InlineKeyboardButton(
+                "🎮 Pʟᴀʏ Sɴᴀᴋᴇ", 
+                url=f"https://t.me/{bot_username}?start=play_snake"
+            )
+        ]])
+        await update.message.reply_text(
+            "<b>Cʟɪᴄᴋ ᴛʜᴇ ʙᴜᴛᴛᴏɴ ʙᴇʟᴏᴡ ᴛᴏ ᴘʟᴀʏ Sɴᴀᴋᴇ ɪɴ ᴍʏ DM!</b>",
+            reply_markup=keyboard,
+            parse_mode="HTML"
+        )
+        return
+
+    # 2. DM LOGIC (Starts the actual game)
     user_doc = await users_async.find_one({"id": user.id})
     coins = user_doc.get("coins", 0) if user_doc else 0
 
@@ -540,13 +557,12 @@ async def cmd_snake(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     keyboard = InlineKeyboardMarkup([[
         InlineKeyboardButton(
-            "🎮 Pʟᴀʏ Sɴᴀᴋᴇ",
+            "🎮 Sᴛᴀʀᴛ Gᴀᴍᴇ",
             web_app=WebAppInfo(url=game_url)
         )
     ]])
 
     await update.message.reply_text(text, reply_markup=keyboard, parse_mode="HTML")
-
 
 
 # ════════════════════════════════════════════════════════════════════
