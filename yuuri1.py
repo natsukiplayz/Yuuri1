@@ -509,7 +509,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo, Upd
 from telegram.ext import ContextTypes
 
 # ── CONFIG ──────────────────────────────────────────────────────────
-ENTRY_FEE      = 2000           
+ENTRY_FEE      = 1000           
 MAX_PAYOUT     = 10000          
 SNAKE_GAME_URL = "https://snake_event.oneapp.dev/" 
 # ────────────────────────────────────────────────────────────────────
