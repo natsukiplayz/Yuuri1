@@ -817,17 +817,6 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CommandHandler
 from telegram.constants import ChatAction
 
-# ── Import your existing helpers ────────────────────────────
-# Adjust these imports to match your actual file structure
-from your_main_file import (
-    users,           # sync mongo collection
-    users_async,     # async mongo collection
-    get_user,
-    save_user,
-    is_premium,
-    add_xp,
-)
-
 # ============================================================
 #  CONSTANTS
 # ============================================================
