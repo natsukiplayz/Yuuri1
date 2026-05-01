@@ -803,6 +803,221 @@ async def cmd_reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="HTML"
         )
 
+#!/usr/bin/env python3
+import asyncio
+import random
+import html
+from datetime import datetime, timezone
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ContextTypes, CommandHandler
+
+# ── Import existing helpers ────────────────────────────────
+from your_main_file import (
+    users,
+    get_user,
+    save_user,
+    add_xp,
+    get_user_icon, # Ensure this is imported for the winner announcement
+)
+
+# ============================================================
+# CONSTANTS & UTILS
+# ============================================================
+MIN_BET = 500
+JOIN_WINDOW = 120
+REMIND_EVERY = 15
+FLIP_TIMEOUT = 30
+MAX_ROUNDS = 4
+TAX_NORMAL = 0.10
+TAX_PREMIUM = 0.05
+XP_PER_WIN = 180
+POINTS_PER_WIN = 26
+
+SC = {'a':'ᴀ','b':'ʙ','c':'ᴄ','d':'ᴅ','e':'ᴇ','f':'ꜰ','g':'ɢ','h':'ʜ','i':'ɪ','j':'ᴊ','k':'ᴋ','l':'ʟ','m':'ᴍ','n':'ɴ','o':'ᴏ','p':'ᴘ','q':'ǫ','r':'ʀ','s':'ꜱ','t':'ᴛ','u':'ᴜ','v':'ᴠ','w':'ᴡ','x':'x','y':'ʏ','z':'ᴢ'}
+
+def sc(text: str) -> str:
+    return ''.join(SC.get(c.lower(), c) for c in text)
+
+active_games: dict = {}
+CARD_SLOTS = ['a', 'b', 'c', 'd']
+
+def deal_cards() -> dict:
+    return {slot: random.randint(1, 10) for slot in CARD_SLOTS}
+
+# Simple premium check helper
+def is_premium_user(data: dict) -> bool:
+    return data.get("premium", False)
+
+# ============================================================
+# COMMANDS: /card and /bet
+# ============================================================
+async def cmd_card(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat = update.effective_chat
+    user = update.effective_user
+    msg = update.message
+
+    if chat.type == "private":
+        return await msg.reply_text(sc("use this command in a group."))
+
+    if not context.args:
+        return await msg.reply_text(f"<b>Usage:</b> /card <code>&lt;amount&gt;</code>", parse_mode="HTML")
+
+    try:
+        bet = int(context.args[0])
+    except ValueError:
+        return await msg.reply_text(sc("invalid amount."))
+
+    if bet <= MIN_BET:
+        return await msg.reply_text(f"⚠️ {sc('Amount Must Be Greater Than')} {MIN_BET}.")
+
+    if chat.id in active_games and active_games[chat.id]["phase"] != "done":
+        return await msg.reply_text(f"🚫 {sc('Game Already Running.')}")
+
+    host_data = get_user(user)
+    if not host_data or host_data.get("coins", 0) < bet:
+        return await msg.reply_text(sc("insufficient coins to host."))
+
+    host_data["coins"] -= bet
+    save_user(host_data)
+
+    active_games[chat.id] = {
+        "host_id": user.id,
+        "bet": bet,
+        "players": {
+            user.id: {
+                "name": html.escape(user.first_name),
+                "cards": deal_cards(),
+                "points": 0,
+                "premium": is_premium_user(host_data),
+            }
+        },
+        "round": 1,
+        "turn_order": [],
+        "current_turn": 0,
+        "round_plays": {},
+        "phase": "joining",
+    }
+
+    text = (
+        f"♠️ {sc('Card Game Started.')}\n\n"
+        f"💰 {sc('Entry Fee')}: <b>{bet}</b>\n"
+        f"👉 {sc('Use')} /bet {bet} {sc('to join.')}\n"
+        f"⏳ {sc('Game Starts In 2 Minutes.')}"
+    )
+    await msg.reply_text(text, parse_mode="HTML")
+    asyncio.create_task(_join_countdown(context, chat.id))
+
+async def _join_countdown(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
+    await asyncio.sleep(JOIN_WINDOW)
+    game = active_games.get(chat_id)
+    if not game or game["phase"] != "joining": return
+
+    players = game["players"]
+    if len(players) < 2:
+        for uid in players:
+            u = users.find_one({"id": uid})
+            if u:
+                u["coins"] = u.get("coins", 0) + game["bet"]
+                save_user(u)
+        await context.bot.send_message(chat_id=chat_id, text=f"👥 {sc('Not enough players. Refunded.')}")
+        active_games.pop(chat_id, None)
+        return
+
+    game["phase"] = "playing"
+    game["turn_order"] = list(players.keys())
+    random.shuffle(game["turn_order"])
+    
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text=f"🃏 {sc('Game Started!')}\n📩 {sc('Check cards in DM.')}",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Check Cards 📩", url=f"https://t.me/{context.bot.username}?start=cards")]])
+    )
+    for uid, pdata in players.items():
+        await _update_cards_dm(context, uid, pdata)
+    await _start_round(context, chat_id)
+
+async def cmd_bet(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat = update.effective_chat
+    user = update.effective_user
+    msg = update.message
+    game = active_games.get(chat.id)
+
+    if not game or game["phase"] != "joining":
+        return await msg.reply_text(sc("no active lobby."))
+
+    if user.id in game["players"]:
+        return await msg.reply_text(sc("already joined."))
+
+    user_data = get_user(user)
+    if not user_data or user_data.get("coins", 0) < game["bet"]:
+        return await msg.reply_text(sc("insufficient coins."))
+
+    user_data["coins"] -= game["bet"]
+    save_user(user_data)
+
+    game["players"][user.id] = {
+        "name": html.escape(user.first_name),
+        "cards": deal_cards(),
+        "points": 0,
+        "premium": is_premium_user(user_data),
+    }
+    await msg.reply_text(f"🧚‍♀️ {user.first_name} {sc('Joined.')}")
+
+# ============================================================
+# LOGIC & FINISH (With Tax Fix)
+# ============================================================
+async def _update_cards_dm(context: ContextTypes.DEFAULT_TYPE, user_id: int, pdata: dict):
+    remaining = {s: v for s, v in pdata["cards"].items() if v is not None}
+    lines = "\n".join(f" [{s.upper()}] ➜ {v}" for s, v in remaining.items())
+    text = f"🃏 <b>{sc('Your Cards')}:</b>\n\n<code>{lines}</code>\n\n{sc('Points')}: {pdata['points']}"
+    try: await context.bot.send_message(chat_id=user_id, text=text, parse_mode="HTML")
+    except: pass
+
+async def _finish_game(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
+    game = active_games.get(chat_id)
+    if not game: return
+    game["phase"] = "done"
+
+    players = game["players"]
+    bet = game["bet"]
+    total_pot = bet * len(players)
+
+    max_points = max(p["points"] for p in players.values())
+    top_players = [uid for uid, p in players.items() if p["points"] == max_points]
+
+    # Tie-breaker logic using the "premium" boolean we stored
+    if len(top_players) > 1:
+        premium_tops = [uid for uid in top_players if players[uid]["premium"]]
+        winner_id = premium_tops[0] if premium_tops else random.choice(top_players)
+    else:
+        winner_id = top_players[0]
+
+    winner_data = players[winner_id]
+    
+    # Calculate winnings based on premium status
+    tax_rate = TAX_PREMIUM if winner_data["premium"] else TAX_NORMAL
+    winnings = int(total_pot * (1 - tax_rate))
+
+    # Update Database
+    w_user = users.find_one({"id": winner_id})
+    if w_user:
+        w_user["coins"] = w_user.get("coins", 0) + winnings
+        add_xp(w_user, XP_PER_WIN)
+        save_user(w_user)
+
+    # Winner Icon Trigger
+    w_db_data = get_user(winner_id) # Get fresh data for icon
+    winner_icon = get_user_icon(w_db_data, context)
+
+    text = (
+        f"👑 {sc('Final Winner')} 👑\n\n"
+        f"{winner_icon} <b>{winner_data['name']}</b>\n"
+        f"💰 {sc('Won')}: <b>{winnings:,}</b>\n"
+        f"🎯 {sc('Tax Applied')}: {int(tax_rate*100)}%"
+    )
+    await context.bot.send_message(chat_id=chat_id, text=text, parse_mode="HTML")
+    active_games.pop(chat_id, None)
+
 #===============
 
 import uuid
@@ -6206,6 +6421,10 @@ application.add_handler(CommandHandler("title", set_admin_title))
 application.add_handler(CommandHandler("snake", cmd_snake))
 application.add_handler(CommandHandler("reset", cmd_reset))
 application.add_handler(CommandHandler("resetlist", cmd_resetlist))
+application.add_handler(CommandHandler("card", cmd_card))
+application.add_handler(CommandHandler("bet", cmd_bet))
+application.add_handler(CommandHandler("flip", cmd_flip))
+
 
 # Message Handlers
 application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
