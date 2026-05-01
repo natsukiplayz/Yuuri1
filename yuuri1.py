@@ -502,6 +502,312 @@ def get_user_icon(user_data, context):
 
 #============ Side_Features ========
 #--
+
+# ================= /reset & /resetlist COMMANDS =================
+# Add these handlers at the bottom of your main file (or import from here)
+# Register with:
+#   app.add_handler(CommandHandler("reset", cmd_reset))
+#   app.add_handler(CommandHandler("resetlist", cmd_resetlist))
+
+from telegram import Update
+from telegram.ext import ContextTypes
+
+# ── All resettable targets ────────────────────────────────────────
+RESET_TARGETS = {
+
+    # ── Per-field resets (touches only one field across all users) ──
+    "coins": {
+        "label": "💰 Coins",
+        "desc": "Resets every user's coins back to 100 (starter balance).",
+        "scope": "users",
+    },
+    "kills": {
+        "label": "⚔️ Kills",
+        "desc": "Wipes all kill counts (sets to 0).",
+        "scope": "users",
+    },
+    "xp": {
+        "label": "✨ XP",
+        "desc": "Resets XP to 0 for every user.",
+        "scope": "users",
+    },
+    "level": {
+        "label": "🎖 Level",
+        "desc": "Resets level to 1 for every user.",
+        "scope": "users",
+    },
+    "inventory": {
+        "label": "🎒 Inventory",
+        "desc": "Clears every user's item inventory.",
+        "scope": "users",
+    },
+    "warned": {
+        "label": "⚠️ Warns",
+        "desc": "Clears all warn counts from the users collection.",
+        "scope": "users",
+    },
+    "premium": {
+        "label": "💎 Premium",
+        "desc": "Revokes premium status and expiry from all users.",
+        "scope": "users",
+    },
+    "claimed_groups": {
+        "label": "🏠 Claimed Groups",
+        "desc": "Clears the list of groups each user has claimed.",
+        "scope": "users",
+    },
+    "old_names": {
+        "label": "📛 Name History",
+        "desc": "Wipes stored old-name history for every user.",
+        "scope": "users",
+    },
+    "blocked": {
+        "label": "🚫 Blocked Flags",
+        "desc": "Un-blocks every user (sets blocked=False).",
+        "scope": "users",
+    },
+
+    # ── Snake-specific ──
+    "snake_scores": {
+        "label": "🐍 Snake Scores",
+        "desc": "Deletes all snake_sessions arrays from every user.",
+        "scope": "users",
+    },
+
+    # ── Whole-collection wipes ──
+    "referral_data": {
+        "label": "🔗 Referral Data",
+        "desc": "Drops the entire referral_codes collection.",
+        "scope": "collection",
+        "collection": "referral_codes",
+    },
+    "redeem_codes": {
+        "label": "🎫 Redeem Codes",
+        "desc": "Drops the entire redeem_codes collection.",
+        "scope": "collection",
+        "collection": "redeem_codes",
+    },
+    "feedbacks": {
+        "label": "📝 Feedbacks",
+        "desc": "Drops the entire feedbacks collection.",
+        "scope": "collection",
+        "collection": "feedbacks",
+    },
+    "torture_registry": {
+        "label": "🔒 Torture Registry",
+        "desc": "Drops the torture_registry collection.",
+        "scope": "collection",
+        "collection": "torture_registry",
+    },
+    "heists": {
+        "label": "🏦 Heists",
+        "desc": "Drops the heists collection.",
+        "scope": "collection",
+        "collection": "heists",
+    },
+    "designs": {
+        "label": "🎨 Designs",
+        "desc": "Drops all uploaded designs from the designs collection.",
+        "scope": "collection",
+        "collection": "designs",
+    },
+
+    # ── Nuclear option ──
+    "users_data": {
+        "label": "👤 Users Data",
+        "desc": "Drops the ENTIRE users collection. All profiles gone.",
+        "scope": "nuke_collection",
+        "collection": "users",
+    },
+    "wipe_all": {
+        "label": "💣 WIPE ALL",
+        "desc": (
+            "⚠️ DANGER: Drops users, referral_codes, redeem_codes, "
+            "feedbacks, torture_registry, heists, designs AND clears "
+            "snake_sessions/kills/coins/xp/level on every document. "
+            "This is irreversible."
+        ),
+        "scope": "wipe_all",
+    },
+}
+
+
+# ── Helper: run one reset target ─────────────────────────────────
+async def _do_reset(target: str) -> str:
+    """
+    Executes the reset for the given target key.
+    Returns a human-readable result string.
+    """
+    cfg = RESET_TARGETS[target]
+    scope = cfg["scope"]
+
+    # ── Single-field update across users collection ──
+    if scope == "users":
+        field_defaults = {
+            "coins":          {"coins": 100},
+            "kills":          {"kills": 0},
+            "xp":             {"xp": 0},
+            "level":          {"level": 1},
+            "inventory":      {"inventory": []},
+            "warned":         {"warns": 0},
+            "premium":        {"premium": False, "premium_until": None, "membership_type": None},
+            "claimed_groups": {"claimed_groups": []},
+            "old_names":      {"old_names": []},
+            "blocked":        {"blocked": False},
+            "snake_scores":   {},   # handled via $unset below
+        }
+
+        if target == "snake_scores":
+            res = await users_async.update_many({}, {"$unset": {"snake_sessions": ""}})
+        else:
+            res = await users_async.update_many({}, {"$set": field_defaults[target]})
+
+        return f"✅ <b>{cfg['label']}</b> reset — {res.modified_count} users affected."
+
+    # ── Drop a whole collection ──
+    elif scope == "collection":
+        col = async_db[cfg["collection"]]
+        await col.drop()
+        return f"✅ <b>{cfg['label']}</b> collection dropped."
+
+    # ── Nuke the users collection (special label) ──
+    elif scope == "nuke_collection":
+        col = async_db[cfg["collection"]]
+        await col.drop()
+        return f"✅ <b>{cfg['label']}</b> — entire users collection dropped."
+
+    # ── Wipe everything ──
+    elif scope == "wipe_all":
+        nuked = []
+        for col_name in [
+            "users", "referral_codes", "redeem_codes",
+            "feedbacks", "torture_registry", "heists", "designs"
+        ]:
+            await async_db[col_name].drop()
+            nuked.append(col_name)
+        return (
+            "💣 <b>WIPE ALL complete.</b>\n"
+            f"Dropped collections: <code>{', '.join(nuked)}</code>"
+        )
+
+    return "❓ Unknown scope — nothing was changed."
+
+
+#═══════════════════════════════════════════════════════════════════
+
+async def cmd_resetlist(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != OWNER_ID:
+        await update.message.reply_text("❌ Owner only.")
+        return
+
+    lines = ["📋 <b>Resettable Targets</b>\n", "Use: <code>/reset &lt;target&gt;</code>\n"]
+
+    # Group by scope type for readability
+    sections = {
+        "👤 User Fields (partial reset)": [],
+        "🗄 Full Collection Wipes": [],
+        "☢️ Nuclear Options": [],
+    }
+
+    for key, cfg in RESET_TARGETS.items():
+        scope = cfg["scope"]
+        entry = f"• <code>/reset {key}</code> — {cfg['label']}\n  ↳ {cfg['desc']}"
+
+        if scope == "users":
+            sections["👤 User Fields (partial reset)"].append(entry)
+        elif scope in ("collection",):
+            sections["🗄 Full Collection Wipes"].append(entry)
+        else:
+            sections["☢️ Nuclear Options"].append(entry)
+
+    for section_title, entries in sections.items():
+        if entries:
+            lines.append(f"\n<b>{section_title}</b>")
+            lines.extend(entries)
+
+    await update.message.reply_text("\n".join(lines), parse_mode="HTML")
+
+#==================
+
+USAGE_TEXT = (
+    "⚙️ <b>/reset — Usage Guide</b>\n\n"
+    "<b>Syntax:</b> <code>/reset &lt;target&gt;</code>\n\n"
+    "<b>Quick Examples:</b>\n"
+    "• <code>/reset coins</code> — Reset all coins to 100\n"
+    "• <code>/reset kills</code> — Wipe kill counts\n"
+    "• <code>/reset snake_scores</code> — Clear snake sessions\n"
+    "• <code>/reset xp</code> — Reset XP to 0\n"
+    "• <code>/reset level</code> — Reset levels to 1\n"
+    "• <code>/reset inventory</code> — Clear inventories\n"
+    "• <code>/reset warned</code> — Clear all warns\n"
+    "• <code>/reset premium</code> — Revoke all premium\n"
+    "• <code>/reset blocked</code> — Unblock all users\n"
+    "• <code>/reset referral_data</code> — Wipe referrals\n"
+    "• <code>/reset redeem_codes</code> — Wipe redeem codes\n"
+    "• <code>/reset feedbacks</code> — Wipe feedbacks\n"
+    "• <code>/reset heists</code> — Wipe heist data\n"
+    "• <code>/reset designs</code> — Wipe uploaded designs\n"
+    "• <code>/reset users_data</code> — ⚠️ Drop entire users DB\n"
+    "• <code>/reset wipe_all</code> — 💣 Nuke EVERYTHING\n\n"
+    "📋 See full list: <code>/resetlist</code>"
+)
+
+async def cmd_reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+
+    # Owner-only guard
+    if user.id != OWNER_ID:
+        await update.message.reply_text("❌ This command is for the bot owner only.")
+        return
+
+    args = context.args  # List of words after /reset
+
+    # ── No argument → show usage (never auto-reset) ──
+    if not args:
+        await update.message.reply_text(USAGE_TEXT, parse_mode="HTML")
+        return
+
+    target = args[0].lower().strip()
+
+    # ── Unknown target ──
+    if target not in RESET_TARGETS:
+        await update.message.reply_text(
+            f"❓ <b>Unknown target:</b> <code>{target}</code>\n\n"
+            f"Run <code>/resetlist</code> to see all valid targets.",
+            parse_mode="HTML"
+        )
+        return
+
+    # ── Dangerous targets → require confirmation flag ──
+    DANGEROUS = {"users_data", "wipe_all"}
+    if target in DANGEROUS:
+        confirm = args[1].lower() if len(args) > 1 else ""
+        if confirm != "confirm":
+            cfg = RESET_TARGETS[target]
+            await update.message.reply_text(
+                f"⚠️ <b>Dangerous Operation: {cfg['label']}</b>\n\n"
+                f"{cfg['desc']}\n\n"
+                f"This <b>cannot be undone</b>.\n"
+                f"To proceed, type:\n"
+                f"<code>/reset {target} confirm</code>",
+                parse_mode="HTML"
+            )
+            return
+
+    # ── Execute ──
+    await update.message.reply_text("⏳ Working...", parse_mode="HTML")
+
+    try:
+        result_msg = await _do_reset(target)
+        await update.message.reply_text(result_msg, parse_mode="HTML")
+    except Exception as e:
+        await update.message.reply_text(
+            f"❌ <b>Reset failed:</b> <code>{e}</code>",
+            parse_mode="HTML"
+        )
+
+#===============
+
 import uuid
 from datetime import datetime, timezone
 from fastapi import Request
@@ -5901,6 +6207,8 @@ application.add_handler(CommandHandler("seticon", set_icon))
 application.add_handler(CommandHandler("denyicon", deny_icon))
 application.add_handler(CommandHandler("title", set_admin_title))
 application.add_handler(CommandHandler("snake", cmd_snake))
+application.add_handler(CommandHandler("reset", cmd_reset))
+application.add_handler(CommandHandler("resetlist", cmd_resetlist))
 
 # Message Handlers
 application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
