@@ -1133,7 +1133,7 @@ async def _prompt_next_player(context, chat_id: int):
     await context.bot.send_message(
         chat_id=chat_id,
         text=(
-            f"👉 <b>{name}</b> {sc(\"It's Your Turn.\")}\n"
+            f"👉 <b>{name}</b> {sc('Its Your Turn.')}\n"
             f"⏰ {sc('You Have 60 Seconds.')}\n\n"
             f"🎴 {sc('Use')} /flip <code>{slots}</code>"
         ),
