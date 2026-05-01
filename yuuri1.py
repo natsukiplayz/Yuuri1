@@ -166,7 +166,6 @@ logging.basicConfig(level=logging.INFO)
 
 # ================= USER SYSTEM (STRICT SYNC) =================
 def get_user(user):
-    """Fetches user data synchronously with Auto-Name Update and History tracking."""
     data = users.find_one({"id": user.id})
 
     default_data = {
@@ -182,7 +181,7 @@ def get_user(user):
         "claimed_groups": [],
         "blocked": False,
         "premium": False,
-        "old_names": []  
+        "old_names": []
     }
 
     if not data:
@@ -194,12 +193,10 @@ def get_user(user):
     if data.get("name") != user.first_name:
         current_db_name = data.get("name")
         old_names_list = data.get("old_names", [])
-
         if current_db_name and current_db_name not in old_names_list:
             old_names_list.append(current_db_name)
             updated_fields["old_names"] = old_names_list
             data["old_names"] = old_names_list
-
         updated_fields["name"] = user.first_name
         data["name"] = user.first_name
 
@@ -211,7 +208,7 @@ def get_user(user):
     if updated_fields:
         users.update_one({"id": user.id}, {"$set": updated_fields})
 
-    return data
+    return data  # ← only ONE return, at the very end
 
 def save_user(data):
     """Saves user data synchronously."""
