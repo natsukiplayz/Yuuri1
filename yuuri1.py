@@ -13,7 +13,6 @@ from io import BytesIO
 
 import cloudinary
 import cloudinary.uploader
-from card_game import cmd_card, cmd_bet, cmd_flip
 from fastapi import UploadFile, File, Form, HTTPException
 
 import requests
