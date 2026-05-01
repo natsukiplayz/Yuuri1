@@ -2918,7 +2918,7 @@ MAX_ROB_PER_ATTEMPT = 10000
 # ==========================================
 # 🕵️ ROB SYSTEM (UPDATED WITH CUSTOM ICONS)
 # ==========================================
-@spam_guard("robe")
+@spam_guard("rob")
 async def robe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message:
         return
