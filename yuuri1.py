@@ -1196,7 +1196,7 @@ async def _prompt_next_player(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
         chat_id=chat_id,
         text=(
             f"🏆 {sc(f'Round {rnd}')}\n\n"
-            f"👉 {name} {sc(\"It's Your Turn.\")}\n"
+            f"👉 {name} {sc('Its Your Turn.')}\n"
             f"⏰ {sc('You Have 30 Seconds.')}\n\n"
             f"📩 {sc('Check Your Cards In My DM, Then Use')} /flip <code>a</code> / <code>b</code> / <code>c</code> / <code>d</code> {sc('here.')}"
         ),
