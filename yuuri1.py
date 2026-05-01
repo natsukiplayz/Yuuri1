@@ -820,18 +820,20 @@ from telegram.constants import ChatAction
 # ============================================================
 #  CONSTANTS
 # ============================================================
-MIN_BET        = 500          # /card amount must be > 500
-JOIN_WINDOW    = 120          # seconds to join (2 min)
-REMIND_EVERY   = 15           # reminder interval in seconds
-FLIP_TIMEOUT   = 30           # seconds per player turn
-MAX_ROUNDS     = 4            # maximum rounds
-TAX_NORMAL     = 0.10         # 10% fee for normal users
-TAX_PREMIUM    = 0.05         # 5% fee for premium users
-XP_PER_WIN     = 180          # XP awarded to winner
-POINTS_PER_WIN = 26           # points per round win shown
+MIN_BET        = 500
+JOIN_WINDOW    = 120
+REMIND_EVERY   = 15
+FLIP_TIMEOUT   = 30
+MAX_ROUNDS     = 4
+TAX_NORMAL     = 0.10
+TAX_PREMIUM    = 0.05
+XP_PER_WIN     = 180
+POINTS_PER_WIN = 26
 
 # ── Small-caps helper ────────────────────────────────────────
-SC = {
+# Style: Uppercase stays UPPERCASE, lowercase → small-caps
+# e.g. "Hello World" → "Hᴇʟʟᴏ Wᴏʀʟᴅ"
+SC_MAP = {
     'a':'ᴀ','b':'ʙ','c':'ᴄ','d':'ᴅ','e':'ᴇ','f':'ꜰ','g':'ɢ','h':'ʜ',
     'i':'ɪ','j':'ᴊ','k':'ᴋ','l':'ʟ','m':'ᴍ','n':'ɴ','o':'ᴏ','p':'ᴘ',
     'q':'ǫ','r':'ʀ','s':'ꜱ','t':'ᴛ','u':'ᴜ','v':'ᴠ','w':'ᴡ','x':'x',
@@ -839,35 +841,46 @@ SC = {
 }
 
 def sc(text: str) -> str:
-    """Convert a string to small-caps."""
-    return ''.join(SC.get(c.lower(), c) for c in text)
+    """Uppercase stays, lowercase → small-caps unicode."""
+    return ''.join(SC_MAP[c] if c in SC_MAP else c for c in text)
 
 # ============================================================
-#  ACTIVE GAME STATE  (one game per chat)
+#  ACTIVE GAME STATE
 # ============================================================
-# Structure:
 # active_games[chat_id] = {
-#   "host_id":       int,
-#   "bet":           int,
-#   "players":       {user_id: {"name": str, "cards": {slot: int}, "points": int, "premium": bool}},
-#   "round":         int,            # current round (1–4)
-#   "turn_order":    [user_id, ...], # order for this round
-#   "current_turn":  int,            # index in turn_order
-#   "round_plays":   {user_id: int}, # card value played this round
-#   "phase":         "joining" | "playing" | "done",
-#   "join_task":     asyncio.Task,
-#   "remind_task":   asyncio.Task,
+#   "host_id", "bet", "round", "turn_order", "current_turn",
+#   "round_plays", "phase", "join_task", "remind_task",
+#   "players": {
+#       user_id: {
+#           "name", "cards", "points", "premium",
+#           "dm_msg_id": int | None   ← message ID of the cards DM
+#       }
+#   }
 # }
 active_games: dict = {}
-
-# ============================================================
-#  CARD DEALING
-# ============================================================
 CARD_SLOTS = ['a', 'b', 'c', 'd']
 
 def deal_cards() -> dict:
-    """Deal 4 random card values (1–10) for one player."""
     return {slot: random.randint(1, 10) for slot in CARD_SLOTS}
+
+# ============================================================
+#  CARD TEXT BUILDER  (reused everywhere)
+# ============================================================
+def _build_cards_text(pdata: dict, played_slot: str | None = None, played_val: int | None = None) -> str:
+    remaining = {s: v for s, v in pdata["cards"].items() if v is not None}
+    lines = "\n".join(f"  {s.upper()} ➜ {v}" for s, v in pdata["cards"].items())
+
+    header = ""
+    if played_slot and played_val is not None:
+        header = f"✅ {sc('Played')} {played_slot.upper()} ➜ <b>{played_val}</b>\n\n"
+
+    slots_left = ", ".join(s.upper() for s, v in pdata["cards"].items() if v is not None) or sc("None")
+    footer = (
+        f"\n\n🧮 {sc('Points')}: <b>{pdata['points']}</b>\n"
+        f"🎴 {sc('Left')}: {slots_left}\n"
+        f"📌 /flip {' / '.join(s for s, v in pdata['cards'].items() if v is not None) or '—'}"
+    )
+    return f"{header}🃏 {sc('Your Cards')}:\n{lines}{footer}"
 
 # ============================================================
 #  /card <amount>
@@ -877,59 +890,48 @@ async def cmd_card(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     msg  = update.message
 
-    # ── Private chat guard ───────────────────────────────────
     if chat.type == "private":
-        await msg.reply_text(sc("use this command in a group."))
+        await msg.reply_text(sc("Group only."))
         return
 
     chat_id = chat.id
 
-    # ── Usage guard ──────────────────────────────────────────
     if not context.args:
-        await msg.reply_text(
-            f"<b>Usage:</b> /card <code>&lt;amount&gt;</code>",
-            parse_mode="HTML"
-        )
+        await msg.reply_text(f"<b>{sc('Usage')}:</b> /card &lt;{sc('amount')}&gt;", parse_mode="HTML")
         return
 
-    # ── Amount validation ─────────────────────────────────────
     try:
         bet = int(context.args[0])
     except ValueError:
-        await msg.reply_text(sc("invalid amount. use a number."))
+        await msg.reply_text(sc("Invalid amount."))
         return
 
     if bet <= MIN_BET:
-        await msg.reply_text(
-            f"⚠️ {sc('Amount Must Be Greater Than')} {MIN_BET}."
-        )
+        await msg.reply_text(f"⚠️ {sc('Min bet is')} {MIN_BET}.")
         return
 
-    # ── Already running guard ────────────────────────────────
     if chat_id in active_games and active_games[chat_id]["phase"] != "done":
-        await msg.reply_text(f"🚫 {sc('Game Already Running.')}")
+        await msg.reply_text(f"🚫 {sc('Game already running.')}")
         return
 
-    # ── Host balance check ───────────────────────────────────
     host_data = get_user(user)
     if not host_data or host_data.get("coins", 0) < bet:
-        await msg.reply_text(sc("insufficient coins to host."))
+        await msg.reply_text(sc("Insufficient coins."))
         return
 
-    # ── Deduct host's bet immediately ────────────────────────
     host_data["coins"] -= bet
     save_user(host_data)
 
-    # ── Initialise game state ────────────────────────────────
     active_games[chat_id] = {
         "host_id":      user.id,
         "bet":          bet,
         "players": {
             user.id: {
-                "name":    user.first_name,
-                "cards":   deal_cards(),
-                "points":  0,
-                "premium": is_premium(host_data, context),
+                "name":       user.first_name,
+                "cards":      deal_cards(),
+                "points":     0,
+                "premium":    is_premium(host_data, context),
+                "dm_msg_id":  None,
             }
         },
         "round":        1,
@@ -941,104 +943,81 @@ async def cmd_card(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "remind_task":  None,
     }
 
-    # ── Announcement message ─────────────────────────────────
-    text = (
+    await msg.reply_text(
         f"♠️ {sc('Card Game Started.')}\n\n"
-        f"💰 {sc('Entry Fee')}: <b>{bet}</b>\n"
-        f"👉 {sc('Use')} /bet {bet} {sc('to join.')}\n"
-        f"⏳ {sc('Game Starts In 2 Minutes.')}"
+        f"💰 {sc('Entry')}: <b>{bet}</b>\n"
+        f"👉 /bet {bet}\n"
+        f"⏳ {sc('Starts in 2 minutes.')}",
+        parse_mode="HTML"
     )
-    await msg.reply_text(text, parse_mode="HTML")
 
-    # ── Schedule reminder + countdown ───────────────────────
     game = active_games[chat_id]
-    game["remind_task"] = asyncio.create_task(
-        _remind_loop(context, chat_id, bet)
-    )
-    game["join_task"] = asyncio.create_task(
-        _join_countdown(context, chat_id)
-    )
+    game["remind_task"] = asyncio.create_task(_remind_loop(context, chat_id, bet))
+    game["join_task"]   = asyncio.create_task(_join_countdown(context, chat_id))
 
-# ── Reminder loop ────────────────────────────────────────────
-async def _remind_loop(context: ContextTypes.DEFAULT_TYPE, chat_id: int, bet: int):
+# ── Reminder loop ─────────────────────────────────────────────
+async def _remind_loop(context, chat_id: int, bet: int):
     elapsed = 0
     while elapsed < JOIN_WINDOW:
         await asyncio.sleep(REMIND_EVERY)
         elapsed += REMIND_EVERY
-
         game = active_games.get(chat_id)
         if not game or game["phase"] != "joining":
             return
-
         remaining = JOIN_WINDOW - elapsed
         count     = len(game["players"])
         await context.bot.send_message(
             chat_id=chat_id,
             text=(
-                f"⚡ {sc('Fast!! Use')}: /bet {bet} {sc('to join')} "
-                f"({remaining}s {sc('left')})\n"
-                f"👥 {sc('Members Joined')}: {count}"
-            ),
-            parse_mode="HTML"
+                f"⚡ /bet {bet}  •  {remaining}s {sc('left')}\n"
+                f"👥 {sc('Joined')}: {count}"
+            )
         )
 
-# ── Join countdown ───────────────────────────────────────────
-async def _join_countdown(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
+# ── Join countdown ────────────────────────────────────────────
+async def _join_countdown(context, chat_id: int):
     await asyncio.sleep(JOIN_WINDOW)
-
     game = active_games.get(chat_id)
     if not game or game["phase"] != "joining":
         return
 
-    # Cancel reminder loop
     if game.get("remind_task"):
         game["remind_task"].cancel()
 
     players = game["players"]
 
-    # ── Not enough players ───────────────────────────────────
     if len(players) < 2:
-        # Refund the one player
-        for uid, pdata in players.items():
+        for uid in players:
             u = users.find_one({"id": uid})
             if u:
                 u["coins"] += game["bet"]
                 save_user(u)
-
         await context.bot.send_message(
             chat_id=chat_id,
-            text=(
-                f"👥 {sc('At Least 2 Players Required')}\n"
-                f"💸 {sc('Amount Refunded.')}"
-            )
+            text=f"👥 {sc('Need at least 2 players.')}\n💸 {sc('Refunded.')}"
         )
         active_games.pop(chat_id, None)
         return
 
-    # ── Enough players — start the game ─────────────────────
     game["phase"]      = "playing"
     game["turn_order"] = list(players.keys())
     random.shuffle(game["turn_order"])
 
-    count = len(players)
     await context.bot.send_message(
         chat_id=chat_id,
         text=(
-            f"🃏 {sc('Game Started!')}\n\n"
-            f"👥 {sc('Total Players')}: <b>{count}</b>\n\n"
-            f"📩 {sc('Check Your Cards In My DM.')}"
+            f"🃏 {sc('Game Started!')}  👥 <b>{len(players)}</b> {sc('players')}\n"
+            f"📩 {sc('Cards sent to your DM.')}"
         ),
         parse_mode="HTML",
         reply_markup=InlineKeyboardMarkup([[
-            InlineKeyboardButton("Check Cards In DM 📩", url=f"https://t.me/im_yuuribot?start=cards_{chat_id}")
+            InlineKeyboardButton("📩 " + sc("View Cards"), url="https://t.me/im_yuuribot?start=cards_" + str(chat_id))
         ]])
     )
 
-    # ── DM each player their cards ───────────────────────────
     for uid, pdata in players.items():
-        await _send_cards_dm(context, uid, pdata["cards"])
+        await _send_cards_dm(context, uid, pdata)
 
-    # ── Begin Round 1 ────────────────────────────────────────
     await _start_round(context, chat_id)
 
 # ============================================================
@@ -1050,111 +1029,87 @@ async def cmd_bet(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg  = update.message
 
     if chat.type == "private":
-        await msg.reply_text(sc("use this command in a group."))
+        await msg.reply_text(sc("Group only."))
         return
 
     chat_id = chat.id
     game    = active_games.get(chat_id)
 
-    # ── No game running ──────────────────────────────────────
     if not game or game["phase"] == "done":
-        await msg.reply_text(
-            f"{sc('no game running...')}\n{sc('use')}: /card <{sc('amount')}>"
-        )
+        await msg.reply_text(f"{sc('No game running.')}  /card &lt;{sc('amount')}&gt;")
         return
 
-    # ── Game already started (no longer joining) ─────────────
     if game["phase"] != "joining":
-        await msg.reply_text(sc("game already started. wait for the next one."))
+        await msg.reply_text(sc("Game already started."))
         return
 
     bet = game["bet"]
 
-    # ── Usage guard ──────────────────────────────────────────
     if not context.args:
-        await msg.reply_text(
-            f"<b>{sc('Usage')}:</b> /bet <code>{bet}</code>",
-            parse_mode="HTML"
-        )
+        await msg.reply_text(f"<b>{sc('Usage')}:</b> /bet {bet}", parse_mode="HTML")
         return
 
-    # ── Wrong amount guard ───────────────────────────────────
     try:
         user_bet = int(context.args[0])
     except ValueError:
-        await msg.reply_text(sc("invalid amount."))
+        await msg.reply_text(sc("Invalid amount."))
         return
 
     if user_bet != bet:
-        await msg.reply_text(
-            f"<b>{sc('Usage')}:</b> /bet <code>{bet}</code>",
-            parse_mode="HTML"
-        )
+        await msg.reply_text(f"<b>{sc('Usage')}:</b> /bet {bet}", parse_mode="HTML")
         return
 
-    # ── Already joined guard ─────────────────────────────────
     if user.id in game["players"]:
-        count = len(game["players"])
-        remaining = JOIN_WINDOW  # approximate; fine for display
-        await msg.reply_text(
-            f"🙅‍♂️ {sc('You Already Joined.')}\n"
-            f"👉 {sc('Members Joined')}: {count}\n\n"
-            f"⚡ {sc('Fast!! Use')}: /bet {bet} {sc('to join')} ({remaining}s {sc('left')})"
-        )
+        await msg.reply_text(f"🙅 {sc('Already joined.')}  👥 {len(game['players'])}")
         return
 
-    # ── Balance check ────────────────────────────────────────
     user_data = get_user(user)
     if not user_data or user_data.get("coins", 0) < bet:
-        await msg.reply_text(sc("insufficient coins."))
+        await msg.reply_text(sc("Insufficient coins."))
         return
 
-    # ── Deduct & register ────────────────────────────────────
     user_data["coins"] -= bet
     save_user(user_data)
 
     game["players"][user.id] = {
-        "name":    user.first_name,
-        "cards":   deal_cards(),
-        "points":  0,
-        "premium": is_premium(user_data, context),
+        "name":      user.first_name,
+        "cards":     deal_cards(),
+        "points":    0,
+        "premium":   is_premium(user_data, context),
+        "dm_msg_id": None,
     }
 
-    await msg.reply_text(f"🧚‍♀️ {user.first_name} {sc('Joined.')}")
+    await msg.reply_text(f"🧚 {user.first_name} {sc('joined.')}")
 
 # ============================================================
-#  DM CARDS
+#  DM: SEND or EDIT cards message
 # ============================================================
-async def _send_cards_dm(context: ContextTypes.DEFAULT_TYPE, user_id: int, cards: dict):
-    lines = "\n".join(
-        f"  card {slot} ➜ {val}" for slot, val in cards.items()
-    )
-    text = (
-        f"🃏 {sc('Your Cards')}:\n\n"
-        f"{lines}\n\n"
-        f"📌 {sc('Use')} /flip <code>a</code> / <code>b</code> / <code>c</code> / <code>d</code> "
-        f"{sc('in the group to play a card.')}"
-    )
+async def _send_cards_dm(context, uid: int, pdata: dict, played_slot=None, played_val=None):
+    text = _build_cards_text(pdata, played_slot, played_val)
     try:
-        await context.bot.send_message(chat_id=user_id, text=text, parse_mode="HTML")
+        mid = pdata.get("dm_msg_id")
+        if mid:
+            await context.bot.edit_message_text(
+                chat_id=uid, message_id=mid, text=text, parse_mode="HTML"
+            )
+        else:
+            sent = await context.bot.send_message(chat_id=uid, text=text, parse_mode="HTML")
+            pdata["dm_msg_id"] = sent.message_id
     except Exception:
-        pass  # User has not started the bot in DM yet
+        pass
 
 # ============================================================
 #  ROUND MANAGEMENT
 # ============================================================
-async def _start_round(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
+async def _start_round(context, chat_id: int):
     game = active_games.get(chat_id)
     if not game:
         return
-
-    rnd = game["round"]
     game["round_plays"]  = {}
     game["current_turn"] = 0
-
     await _prompt_next_player(context, chat_id)
 
-async def _prompt_next_player(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
+async def _prompt_next_player(context, chat_id: int):
     game = active_games.get(chat_id)
     if not game:
         return
@@ -1163,7 +1118,6 @@ async def _prompt_next_player(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
     order      = game["turn_order"]
     turn_index = game["current_turn"]
 
-    # All players have played this round
     if turn_index >= len(order):
         await _finish_round(context, chat_id)
         return
@@ -1172,58 +1126,51 @@ async def _prompt_next_player(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
     pdata = game["players"][uid]
     name  = pdata["name"]
 
-    # Check remaining cards
     remaining = {s: v for s, v in pdata["cards"].items() if v is not None}
     if not remaining:
-        # No cards left — auto-skip
         game["current_turn"] += 1
         await _prompt_next_player(context, chat_id)
         return
 
+    slots = " / ".join(s for s in remaining)
     await context.bot.send_message(
         chat_id=chat_id,
         text=(
             f"🏆 {sc(f'Round {rnd}')}\n\n"
-            f"👉 {name} {sc('Its Your Turn.')}\n"
-            f"⏰ {sc('You Have 30 Seconds.')}\n\n"
-            f"📩 {sc('Check Your Cards In My DM, Then Use')} /flip <code>a</code> / <code>b</code> / <code>c</code> / <code>d</code> {sc('here.')}"
+            f"👉 <b>{name}</b> — {sc('your turn.')}  ⏰ 30s\n"
+            f"📌 /flip {slots}"
         ),
         parse_mode="HTML"
     )
 
-    # Schedule auto-play after FLIP_TIMEOUT
     asyncio.create_task(_auto_flip(context, chat_id, uid, rnd))
 
-async def _auto_flip(context: ContextTypes.DEFAULT_TYPE, chat_id: int, uid: int, rnd: int):
+async def _auto_flip(context, chat_id: int, uid: int, rnd: int):
     await asyncio.sleep(FLIP_TIMEOUT)
-
     game = active_games.get(chat_id)
-    if not game or game["phase"] != "playing":
-        return
-    if game["round"] != rnd:
+    if not game or game["phase"] != "playing" or game["round"] != rnd:
         return
     if uid in game["round_plays"]:
-        return  # already played
+        return
 
-    pdata    = game["players"][uid]
+    pdata     = game["players"][uid]
     remaining = {s: v for s, v in pdata["cards"].items() if v is not None}
     if not remaining:
         return
 
-    # Pick a random remaining card
     slot, val = random.choice(list(remaining.items()))
-    pdata["cards"][slot] = None  # mark as used
+    pdata["cards"][slot] = None
     game["round_plays"][uid] = val
+
+    # Update DM (edit existing message)
+    await _send_cards_dm(context, uid, pdata, played_slot=slot, played_val=val)
 
     await context.bot.send_message(
         chat_id=chat_id,
-        text=(
-            f"⏰ {sc('Time Up.')} {pdata['name']} {sc('Auto-Played Card')} ➜ <b>{val}</b>"
-        ),
+        text=f"⏰ {pdata['name']} {sc('auto-played')} {slot.upper()} ➜ <b>{val}</b>",
         parse_mode="HTML"
     )
 
-    # Advance turn
     game["current_turn"] += 1
     await _prompt_next_player(context, chat_id)
 
@@ -1235,17 +1182,11 @@ async def cmd_flip(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat = update.effective_chat
 
-    # ── Group-only guard ──────────────────────────────────────
     if chat.type == "private":
-        await msg.reply_text(
-            f"🚫 {sc('flip must be used in the group.')}\n"
-            f"📩 {sc('Your card slots are in my DM.')}"
-        )
+        await msg.reply_text(f"🚫 {sc('Use in group.')}  /flip a / b / c / d")
         return
 
     uid = user.id
-
-    # Find the game this user belongs to
     target_chat_id = None
     for cid, game in active_games.items():
         if uid in game["players"] and game["phase"] == "playing":
@@ -1253,90 +1194,58 @@ async def cmd_flip(update: Update, context: ContextTypes.DEFAULT_TYPE):
             break
 
     if target_chat_id is None:
-        await msg.reply_text(sc("no active game found for you."))
+        await msg.reply_text(sc("No active game."))
         return
 
     game  = active_games[target_chat_id]
     rnd   = game["round"]
     order = game["turn_order"]
 
-    # Is it this user's turn?
     if game["current_turn"] >= len(order) or order[game["current_turn"]] != uid:
-        await msg.reply_text(sc("it's not your turn yet."))
+        await msg.reply_text(sc("Not your turn."))
         return
 
-    # Already played this round?
     if uid in game["round_plays"]:
-        await msg.reply_text(sc("you already played this round."))
+        await msg.reply_text(sc("Already played this round."))
         return
 
-    # Parse slot
     if not context.args:
-        await msg.reply_text(
-            f"📌 {sc('usage')}: /flip <code>a</code> / <code>b</code> / <code>c</code> / <code>d</code>",
-            parse_mode="HTML"
-        )
+        await msg.reply_text(f"<b>{sc('Usage')}:</b> /flip a / b / c / d", parse_mode="HTML")
         return
 
     raw_slot = context.args[0].lower().strip()
     if raw_slot not in CARD_SLOTS:
-        await msg.reply_text(
-            f"❌ {sc('invalid slot.')}\n"
-            f"📌 {sc('choose')}: <code>a</code>, <code>b</code>, <code>c</code> {sc('or')} <code>d</code>",
-            parse_mode="HTML"
-        )
+        await msg.reply_text(f"❌ {sc('Invalid slot.')}  a / b / c / d")
         return
 
     pdata = game["players"][uid]
     if pdata["cards"].get(raw_slot) is None:
-        await msg.reply_text(sc("that card has already been used."))
+        await msg.reply_text(sc("Card already used."))
         return
 
-    # ── Play the card ─────────────────────────────────────────
     val = pdata["cards"][raw_slot]
-    pdata["cards"][raw_slot] = None   # mark used
+    pdata["cards"][raw_slot] = None
     game["round_plays"][uid] = val
 
-    # Update DM with remaining cards
-    remaining = {s: v for s, v in pdata["cards"].items() if v is not None}
-    if remaining:
-        lines = "\n".join(f"  card {s} ➜ {v}" for s, v in remaining.items())
-        dm_text = (
-            f"✅ {sc('Card')} <b>{raw_slot.upper()}</b> {sc('Played')} ➜ <b>{val}</b>\n\n"
-            f"🧮 {sc('Your Points')}: <b>{pdata['points']}</b>\n\n"
-            f"🎴 {sc('Remaining Cards')}:\n{lines}\n\n"
-            f"📌 {sc('Use')} /flip <code>a</code> / <code>b</code> / <code>c</code> / <code>d</code> "
-            f"{sc('in the group when it is your turn.')}"
-        )
-    else:
-        dm_text = (
-            f"✅ {sc('Card')} <b>{raw_slot.upper()}</b> {sc('Played')} ➜ <b>{val}</b>\n\n"
-            f"🧮 {sc('Your Points')}: <b>{pdata['points']}</b>\n\n"
-            f"🎴 {sc('No Cards Remaining.')}"
-        )
-    try:
-        await context.bot.send_message(chat_id=uid, text=dm_text, parse_mode="HTML")
-    except Exception:
-        pass  # DM unavailable
+    # Edit DM with updated card state
+    await _send_cards_dm(context, uid, pdata, played_slot=raw_slot, played_val=val)
 
-    # ── Post in group ─────────────────────────────────────────
     await context.bot.send_message(
         chat_id=target_chat_id,
         text=(
             f"🏆 {sc(f'Round {rnd}')}\n\n"
-            f"• {pdata['name']} ➜ {val}"
+            f"• {pdata['name']} ➜ <b>{val}</b>"
         ),
         parse_mode="HTML"
     )
 
-    # ── Advance turn ──────────────────────────────────────────
     game["current_turn"] += 1
     await _prompt_next_player(context, target_chat_id)
 
 # ============================================================
 #  FINISH ROUND
 # ============================================================
-async def _finish_round(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
+async def _finish_round(context, chat_id: int):
     game = active_games.get(chat_id)
     if not game:
         return
@@ -1345,53 +1254,41 @@ async def _finish_round(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
     plays   = game["round_plays"]
     players = game["players"]
 
-    # ── Build round summary ───────────────────────────────────
     sorted_plays = sorted(plays.items(), key=lambda x: x[1])
-    lines = "\n".join(
-        f"• {players[uid]['name']} ➜ {val}"
-        for uid, val in sorted_plays
-    )
+    lines = "\n".join(f"• {players[uid]['name']} ➜ {val}" for uid, val in sorted_plays)
 
-    # Find highest card
     if plays:
         max_val = max(plays.values())
         winners = [uid for uid, val in plays.items() if val == max_val]
-
-        # Award points to round winner(s)
         for uid in winners:
             players[uid]["points"] += POINTS_PER_WIN
-
-        winner_names = ", ".join(players[uid]["name"] for uid in winners)
+        winner_names = " & ".join(players[uid]["name"] for uid in winners)
 
         await context.bot.send_message(
             chat_id=chat_id,
             text=(
-                f"🏆 {sc(f'Round {rnd}')}\n\n"
+                f"🏆 {sc(f'Round {rnd} Result')}\n\n"
                 f"{lines}\n\n"
-                f"🏆 {sc(f'Round {rnd} Winner(s)')}: <b>{winner_names}</b>\n"
-                f"🎴 {sc('Highest Card')}: {max_val}\n"
-                f"💰 {sc('Points Gained (Each)')}: {POINTS_PER_WIN}"
+                f"🥇 {winner_names}  ➜  {max_val}\n"
+                f"💎 +{POINTS_PER_WIN} {sc('pts')}"
             ),
             parse_mode="HTML"
         )
 
-    # ── Check if game is over ─────────────────────────────────
     if rnd >= MAX_ROUNDS:
         await _finish_game(context, chat_id)
         return
 
-    # ── Next round ────────────────────────────────────────────
     game["round"] += 1
     game["round_plays"]  = {}
     game["current_turn"] = 0
-    random.shuffle(game["turn_order"])  # shuffle order each round
-
+    random.shuffle(game["turn_order"])
     await _start_round(context, chat_id)
 
 # ============================================================
-#  FINISH GAME
+#  FINISH GAME  (with winner profile photo)
 # ============================================================
-async def _finish_game(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
+async def _finish_game(context, chat_id: int):
     game = active_games.get(chat_id)
     if not game:
         return
@@ -1401,75 +1298,61 @@ async def _finish_game(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
     bet           = game["bet"]
     total_pot     = bet * len(players)
 
-    # ── Determine overall winner ──────────────────────────────
+    # ── Determine winner ──────────────────────────────────────
     max_points = max(p["points"] for p in players.values())
-    top_players = [uid for uid, p in players.items() if p["points"] == max_points]
+    winners    = [uid for uid, p in players.items() if p["points"] == max_points]
 
-    is_tie = len(top_players) > 1
-    winner_id = None
-
-    if is_tie:
-        # Premium priority in a tie
-        premium_tops = [uid for uid in top_players if players[uid]["premium"]]
-        if premium_tops:
-            winner_id = premium_tops[0]
-        else:
-            winner_id = random.choice(top_players)
-    else:
-        winner_id = top_players[0]
-
-    winner_data  = players[winner_id]
-    winner_name  = winner_data["name"]
-    is_prem_win  = winner_data["premium"]
-    tax_rate     = TAX_PREMIUM if is_prem_win else TAX_NORMAL
-    tax_symbol   = "💓" if is_prem_win else "💸"
-    tax_pct      = int(tax_rate * 100)
-    winnings     = int(total_pot * (1 - tax_rate))
-
-    # ── Award winnings ────────────────────────────────────────
-    w_user = users.find_one({"id": winner_id})
-    if w_user:
-        w_user["coins"] = w_user.get("coins", 0) + winnings
-        leveled_up = add_xp(w_user, XP_PER_WIN)
-        save_user(w_user)
-
-    # ── Streak (simple: stored per user in db) ────────────────
-    streak = 1
-    w_db   = users.find_one({"id": winner_id}) or {}
-    prev_streak = w_db.get("card_streak", 0)
-    streak      = prev_streak + 1
-    users.update_one({"id": winner_id}, {"$set": {"card_streak": streak}}, upsert=True)
-
-    # Reset streak for losers
-    for uid in players:
-        if uid != winner_id:
-            users.update_one({"id": uid}, {"$set": {"card_streak": 0}}, upsert=True)
-
-    # ── Build winner announcement ─────────────────────────────
-    tie_line = f"🪢 {sc('Tie detected!! Premium priority.')}\n" if is_tie else ""
-
-    mention = f'<a href="tg://user?id={winner_id}">{winner_name}</a>'
-
-    text = (
-        f"{tie_line}"
-        f"👑 {sc('Final Winner')} 👑\n\n"
-        f"🐐 {mention}\n"
-        f"🎯 {sc('Total Points')}: <b>{max_points}</b>\n"
-        f"💰 {sc('Won')}: <b>{winnings}</b> "
-        f"({tax_symbol} {tax_pct}% {sc('Fee')})\n"
-        f"⚡ {sc('Streak')}: {streak}\n"
-        f"⚡ {sc('Xp Gained')}: +{XP_PER_WIN}\n\n"
-        f"👉 {sc('Play Again Using')}: /card {sc('Amount')}"
+    # ── Build leaderboard ─────────────────────────────────────
+    sorted_players = sorted(players.items(), key=lambda x: x[1]["points"], reverse=True)
+    board = "\n".join(
+        f"{'🥇' if i == 0 else '▪️'} {pdata['name']}  —  {pdata['points']} {sc('pts')}"
+        for i, (uid, pdata) in enumerate(sorted_players)
     )
 
-    await context.bot.send_message(
-        chat_id=chat_id,
-        text=text,
-        parse_mode="HTML"
+    # ── Tax & payout ──────────────────────────────────────────
+    share = total_pot // len(winners)
+    for uid in winners:
+        tax  = TAX_PREMIUM if players[uid]["premium"] else TAX_NORMAL
+        net  = int(share * (1 - tax))
+        u    = users.find_one({"id": uid})
+        if u:
+            u["coins"]   = u.get("coins", 0) + net
+            u["xp"]      = u.get("xp", 0) + XP_PER_WIN
+            save_user(u)
+
+    winner_names = " & ".join(players[uid]["name"] for uid in winners)
+    net_each     = int(share * (1 - (TAX_PREMIUM if players[winners[0]]["premium"] else TAX_NORMAL)))
+
+    caption = (
+        f"🎉 {sc('Game Over!')}\n\n"
+        f"{board}\n\n"
+        f"🏆 {sc('Winner')}: <b>{winner_names}</b>\n"
+        f"💰 {sc('Won')}: <b>{net_each}</b> {sc('coins')}\n"
+        f"⭐ +{XP_PER_WIN} XP"
     )
 
-    # ── Clean up ──────────────────────────────────────────────
+    # ── Try to send winner's profile photo ───────────────────
+    winner_uid = winners[0]
+    sent_photo = False
+    try:
+        photos = await context.bot.get_user_profile_photos(winner_uid, limit=1)
+        if photos.total_count > 0:
+            file_id = photos.photos[0][-1].file_id
+            await context.bot.send_photo(
+                chat_id=chat_id,
+                photo=file_id,
+                caption=caption,
+                parse_mode="HTML"
+            )
+            sent_photo = True
+    except Exception:
+        pass
+
+    if not sent_photo:
+        await context.bot.send_message(chat_id=chat_id, text=caption, parse_mode="HTML")
+
     active_games.pop(chat_id, None)
+
 
 
 #===============
