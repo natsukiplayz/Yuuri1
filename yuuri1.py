@@ -2290,6 +2290,11 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     args = context.args
 
+    if args and args[0].startswith("captcha_"):
+        return await handle_captcha_verify(update, context)
+    if args and args[0] == "daily":
+        return await daily(update, context)
+
     if context.args and context.args[0] == "play_snake":
         await cmd_snake(update, context)
         return
@@ -2518,57 +2523,288 @@ async def handle_help_callbacks(update: Update, context: ContextTypes.DEFAULT_TY
     except Exception as e:
         print(f"Help Callback Error: {e}")
 
-# =======Daily=======
-from datetime import datetime
+import time
 import random
+import secrets
+from datetime import datetime
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.constants import ParseMode
+from telegram.ext import ContextTypes
+
+# ─────────────────────────────────────────────
+# CONFIG
+# ─────────────────────────────────────────────
+
+CAPTCHA_HOST     = "https://yuuri_captcha.oneapp.dev/"
+SPAM_THRESHOLD   = 4      # uses within window before captcha triggers
+SPAM_WINDOW      = 10     # seconds
+CAPTCHA_TIMEOUT  = 300    # 5 min to complete captcha
+CAPTCHA_COOLDOWN = 600    # 10 min before asking again after pass
+
+# ─────────────────────────────────────────────
+# IN-MEMORY STORES
+# (swap values into MongoDB if you want persistence)
+# ─────────────────────────────────────────────
+
+spam_tracker:    dict[int, list[float]] = {}   # user_id → [timestamps]
+pending_captcha: dict[int, dict]        = {}   # user_id → session data
+captcha_cleared: dict[int, float]       = {}   # user_id → cleared timestamp
+
+
+# ─────────────────────────────────────────────
+# INTERNAL HELPERS
+# ─────────────────────────────────────────────
+
+def _token() -> str:
+    return secrets.token_hex(8)
+
+
+def _captcha_url(token: str) -> str:
+    return f"{CAPTCHA_HOST}?token={token}"
+
+
+def _is_premium(user_data: dict, context) -> bool:
+    return is_premium(user_data, context)   # your existing function
+
+
+def _already_verified(user_id: int) -> bool:
+    ts = captcha_cleared.get(user_id)
+    return bool(ts and time.time() - ts < CAPTCHA_COOLDOWN)
+
+
+def _record_cmd(user_id: int) -> int:
+    now  = time.time()
+    hits = [t for t in spam_tracker.get(user_id, []) if now - t < SPAM_WINDOW]
+    hits.append(now)
+    spam_tracker[user_id] = hits
+    return len(hits)
+
+
+async def _dm_captcha(bot, user_id: int, chat_id: int, cmd: str):
+    """Send captcha DM. Falls back to group ping if DMs are closed."""
+    tok = _token()
+    pending_captcha[user_id] = {
+        "token":       tok,
+        "expires":     time.time() + CAPTCHA_TIMEOUT,
+        "pending_cmd": cmd,
+        "pending_chat": chat_id,
+    }
+    url = _captcha_url(tok)
+    kb  = InlineKeyboardMarkup([[
+        InlineKeyboardButton("🔒 ᴠᴇʀɪꜰʏ ɪ'ᴍ ʜᴜᴍᴀɴ", url=url)
+    ]])
+    try:
+        await bot.send_message(
+            chat_id=user_id,
+            text=(
+                "⚠️ <b>ʜᴜᴍᴀɴ ᴠᴇʀɪꜰɪᴄᴀᴛɪᴏɴ ʀᴇqᴜɪʀᴇᴅ</b>\n\n"
+                "ʏᴏᴜ'ᴠᴇ ʙᴇᴇɴ ꜰʟᴀɢɢᴇᴅ ꜰᴏʀ ꜰᴀsᴛ ᴄᴏᴍᴍᴀɴᴅ ᴜsᴀɢᴇ.\n"
+                "ᴄᴏᴍᴘʟᴇᴛᴇ ᴛʜᴇ ᴄᴀᴘᴛᴄʜᴀ ᴛᴏ ᴄᴏɴᴛɪɴᴜᴇ ᴘʟᴀʏɪɴɢ.\n\n"
+                "<i>ᴇxᴘɪʀᴇs ɪɴ 5 ᴍɪɴᴜᴛᴇs.</i>"
+            ),
+            parse_mode=ParseMode.HTML,
+            reply_markup=kb
+        )
+    except Exception:
+        await bot.send_message(
+            chat_id=chat_id,
+            text=(
+                f"🔒 <a href='tg://user?id={user_id}'>ʜᴇʏ!</a> "
+                "ᴘʟᴇᴀsᴇ ᴏᴘᴇɴ ᴍʏ DM ꜰɪʀsᴛ ᴛᴏ ᴄᴏᴍᴘʟᴇᴛᴇ ᴠᴇʀɪꜰɪᴄᴀᴛɪᴏɴ."
+            ),
+            parse_mode=ParseMode.HTML
+        )
+
+
+# ─────────────────────────────────────────────
+# CAPTCHA CALLBACK  (called from start_command)
+# ─────────────────────────────────────────────
+
+async def handle_captcha_verify(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Triggered when user taps confirm on captcha page.
+    HTML onConfirm() must redirect to:
+      https://t.me/YourBot?start=captcha_TOKEN
+    """
+    user = update.effective_user
+    args = context.args
+    if not args or not args[0].startswith("captcha_"):
+        return
+
+    tok  = args[0][len("captcha_"):]
+    data = pending_captcha.get(user.id)
+
+    if not data:
+        return await update.message.reply_text("❌ ɴᴏ ᴘᴇɴᴅɪɴɢ ᴠᴇʀɪꜰɪᴄᴀᴛɪᴏɴ ꜰᴏᴜɴᴅ.")
+
+    if time.time() > data["expires"]:
+        pending_captcha.pop(user.id, None)
+        return await update.message.reply_text("⏰ ᴠᴇʀɪꜰɪᴄᴀᴛɪᴏɴ ᴇxᴘɪʀᴇᴅ. ᴛʀʏ ʏᴏᴜʀ ᴄᴏᴍᴍᴀɴᴅ ᴀɢᴀɪɴ.")
+
+    if data["token"] != tok:
+        return await update.message.reply_text("❌ ɪɴᴠᴀʟɪᴅ ᴛᴏᴋᴇɴ.")
+
+    # ✅ Success
+    pending_captcha.pop(user.id, None)
+    captcha_cleared[user.id] = time.time()
+    spam_tracker.pop(user.id, None)
+
+    await update.message.reply_text(
+        "✅ <b>ᴠᴇʀɪꜰɪᴇᴅ!</b> ʏᴏᴜ'ʀᴇ ɢᴏᴏᴅ ᴛᴏ ɢᴏ.\n"
+        "ʜᴇᴀᴅ ʙᴀᴄᴋ ᴛᴏ ᴛʜᴇ ɢʀᴏᴜᴘ ᴀɴᴅ ᴜsᴇ ʏᴏᴜʀ ᴄᴏᴍᴍᴀɴᴅ ᴀɢᴀɪɴ. 🎮",
+        parse_mode=ParseMode.HTML
+    )
+
+
+# ─────────────────────────────────────────────
+# SPAM GUARD DECORATOR
+# ─────────────────────────────────────────────
+
+def spam_guard(cmd_name: str):
+    """
+    Usage:
+        @spam_guard("kill")
+        async def kill(update, context): ...
+    """
+    def decorator(func):
+        async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            user      = update.effective_user
+            chat      = update.effective_chat
+            user_data = get_user(user)
+
+            # ✨ Premium → no captcha ever
+            if _is_premium(user_data, context):
+                return await func(update, context)
+
+            # Captcha already pending → block
+            if user.id in pending_captcha:
+                info = pending_captcha[user.id]
+                if time.time() < info["expires"]:
+                    kb = InlineKeyboardMarkup([[
+                        InlineKeyboardButton("🔒 ᴠᴇʀɪꜰʏ ɴᴏᴡ", url=_captcha_url(info["token"]))
+                    ]])
+                    return await update.message.reply_text(
+                        "🛑 ᴄᴏᴍᴘʟᴇᴛᴇ ʏᴏᴜʀ ᴠᴇʀɪꜰɪᴄᴀᴛɪᴏɴ ꜰɪʀsᴛ!",
+                        reply_markup=kb
+                    )
+                else:
+                    pending_captcha.pop(user.id, None)
+
+            # Recently verified → allow
+            if _already_verified(user.id):
+                return await func(update, context)
+
+            # Spam check
+            uses = _record_cmd(user.id)
+            if uses >= SPAM_THRESHOLD:
+                await update.message.reply_text(
+                    "⚡ <b>sᴘᴀᴍ ᴅᴇᴛᴇᴄᴛᴇᴅ!</b>\n"
+                    "ᴄʜᴇᴄᴋ ʏᴏᴜʀ DM ᴛᴏ ᴠᴇʀɪꜰʏ ʏᴏᴜ'ʀᴇ ʜᴜᴍᴀɴ. 👀",
+                    parse_mode=ParseMode.HTML
+                )
+                await _dm_captcha(context.bot, user.id, chat.id, cmd_name)
+                return
+
+            return await func(update, context)
+
+        wrapper.__name__ = func.__name__
+        return wrapper
+    return decorator
+
+
+# ─────────────────────────────────────────────
+# DAILY COMMAND — FULL CODE
+# ─────────────────────────────────────────────
 
 async def daily(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message:
         return
 
-    msg = update.message
+    msg  = update.message
     chat = update.effective_chat
     user = update.effective_user
 
-    # 🛑 --- ECONOMY CHECK --- 🛑
-    # We only check if the economy is disabled if they are in a group.
-    # Daily can still be claimed in the bot's private DMs if you allow it!
+    # ── Called from group ──
     if chat.type != "private":
+
         if await is_economy_disabled(chat.id):
-            return await msg.reply_text("🛑 Tʜᴇ Eᴄᴏɴᴏᴍʏ Sʏsᴛᴇᴍ Iꜱ Cᴜʀʀᴇɴᴛʟʏ Cʟᴏsᴇᴅ Iɴ Tʜɪs Gʀᴏᴜᴘ.")
-    # ---------------------------
+            return await msg.reply_text(
+                "🛑 ᴛʜᴇ ᴇᴄᴏɴᴏᴍʏ sʏsᴛᴇᴍ ɪs ᴄᴜʀʀᴇɴᴛʟʏ ᴄʟᴏsᴇᴅ ɪɴ ᴛʜɪs ɢʀᴏᴜᴘ."
+            )
 
-    # Fetch user using your custom function (handles creation & name updates automatically)
-    u = get_user(user)
+        u = get_user(user)
 
+        # ──── PREMIUM USER: Skip captcha, straight DM button ────
+        if _is_premium(u, context):
+            deep = f"https://t.me/{context.bot.username}?start=daily"
+            kb   = InlineKeyboardMarkup([[
+                InlineKeyboardButton("💗 ᴄʟᴀɪᴍ ᴅᴀɪʟʏ ʀᴇᴡᴀʀᴅ", url=deep)
+            ]])
+            return await msg.reply_text(
+                f"💗 <b>{user.first_name}</b>, ʏᴏᴜʀ ᴘʀᴇᴍɪᴜᴍ ᴅᴀɪʟʏ ʀᴇᴡᴀʀᴅ ɪs ʀᴇᴀᴅʏ!\n"
+                "ᴛᴀᴘ ʙᴇʟᴏᴡ ᴛᴏ ᴄʟᴀɪᴍ ɪɴ DM — ɴᴏ ᴠᴇʀɪꜰɪᴄᴀᴛɪᴏɴ ɴᴇᴇᴅᴇᴅ.",
+                parse_mode=ParseMode.HTML,
+                reply_markup=kb
+            )
+
+        # ──── NORMAL USER: Captcha button (only if spamming) ────
+        # For daily, we always send captcha first before DM redirect
+        tok = _token()
+        pending_captcha[user.id] = {
+            "token":        tok,
+            "expires":      time.time() + CAPTCHA_TIMEOUT,
+            "pending_cmd":  "daily",
+            "pending_chat": chat.id,
+        }
+        url = _captcha_url(tok)
+        kb  = InlineKeyboardMarkup([[
+            InlineKeyboardButton("🔒 ᴠᴇʀɪꜰʏ & ᴄʟᴀɪᴍ ᴅᴀɪʟʏ", url=url)
+        ]])
+        return await msg.reply_text(
+            f"🎁 <b>{user.first_name}</b>, ᴛᴀᴘ ʙᴇʟᴏᴡ ᴛᴏ ᴠᴇʀɪꜰʏ ᴀɴᴅ ᴄʟᴀɪᴍ ʏᴏᴜʀ ᴅᴀɪʟʏ ʀᴇᴡᴀʀᴅ.\n"
+            "<i>ʟɪɴᴋ ᴇxᴘɪʀᴇs ɪɴ 5 ᴍɪɴᴜᴛᴇs.</i>",
+            parse_mode=ParseMode.HTML,
+            reply_markup=kb
+        )
+
+    # ── Called in DM (after redirect or direct) ──
+    # Check if this came from a captcha verify → daily flow
+    args = context.args
+    if args and args[0] == "daily":
+        pass  # fall through to reward logic below
+
+    u     = get_user(user)
     today = datetime.now().date()
 
+    # Already claimed today?
     if "last_daily" in u:
         last_claim = datetime.strptime(u["last_daily"], "%Y-%m-%d").date()
         if last_claim == today:
             return await msg.reply_text(
-                "⛔ Yᴏᴜ ᴀʟʀᴇᴀᴅʏ Cʟᴀɪᴍᴇᴅ Yᴏᴜʀ Dᴀɪʟʏ Rᴇᴡᴀʀᴅ Tᴏᴅᴀʏ."
+                "⛔ ʏᴏᴜ ᴀʟʀᴇᴀᴅʏ ᴄʟᴀɪᴍᴇᴅ ʏᴏᴜʀ ᴅᴀɪʟʏ ʀᴇᴡᴀʀᴅ ᴛᴏᴅᴀʏ.\n"
+                "ᴄᴏᴍᴇ ʙᴀᴄᴋ ᴛᴏᴍᴏʀʀᴏᴡ! 💗"
             )
 
-    # Check premium status
-    premium_active = is_premium(u, context) 
-    
+    premium_active = _is_premium(u, context)
+
     if premium_active:
-        reward = 2000
-        msg_prefix = "🌟 Pʀᴇᴍɪᴜᴍ Dᴀɪʟʏ Rᴇᴡᴀʀᴅ"
+        reward     = 2000
+        label      = "🌟 ᴘʀᴇᴍɪᴜᴍ ᴅᴀɪʟʏ ʀᴇᴡᴀʀᴅ"
+        extra_note = "\n<i>+2000 ᴄᴏɪɴs — ᴘʀᴇᴍɪᴜᴍ ʙᴏɴᴜs ᴀᴘᴘʟɪᴇᴅ 💗</i>"
     else:
-        reward = random.randint(50, 120)
-        msg_prefix = "🎁 Dᴀɪʟʏ Rᴇᴡᴀʀᴅ"
+        reward     = random.randint(50, 120)
+        label      = "🎁 ᴅᴀɪʟʏ ʀᴇᴡᴀʀᴅ"
+        extra_note = ""
 
-    # Add coins and update date
-    u["coins"] += reward
-    u["last_daily"] = today.strftime("%Y-%m-%d")
-
-    # Save user using your custom save function
+    u["coins"]      += reward
+    u["last_daily"]  = today.strftime("%Y-%m-%d")
     save_user(u)
 
     await msg.reply_text(
-        f"{msg_prefix}: +{reward:,} Cᴏɪɴs"
+        f"{label}\n\n"
+        f"💰 <b>+{reward:,} ᴄᴏɪɴs</b> ʜᴀᴠᴇ ʙᴇᴇɴ ᴀᴅᴅᴇᴅ ᴛᴏ ʏᴏᴜʀ ʙᴀʟᴀɴᴄᴇ!"
+        f"{extra_note}",
+        parse_mode=ParseMode.HTML
     )
 
 #====economy commands=======
@@ -2682,6 +2918,7 @@ MAX_ROB_PER_ATTEMPT = 10000
 # ==========================================
 # 🕵️ ROB SYSTEM (UPDATED WITH CUSTOM ICONS)
 # ==========================================
+@spam_guard("robe")
 async def robe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message:
         return
@@ -2893,6 +3130,7 @@ BOT_ID = None
 # ==========================================
 # 🩸 KILL SYSTEM (CUSTOM EMOJI INTEGRATED)
 # ==========================================
+@spam_guard("kill")
 async def kill(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global BOT_ID
     if BOT_ID is None:
