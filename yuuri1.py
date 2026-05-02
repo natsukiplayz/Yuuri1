@@ -849,6 +849,13 @@ def sc(text: str) -> str:
 active_games: dict = {}
 CARD_SLOTS = ['a', 'b', 'c', 'd']
 
+# ── Card game lock per-chat  {chat_id: True/False} ───────────
+card_game_locked: dict = {}
+
+
+def is_card_locked(chat_id: int) -> bool:
+    return card_game_locked.get(chat_id, False)
+
 # ── Equal-sum card dealing (with unique-total guarantee) ─────
 def deal_equal_sum_cards(num_players: int) -> list:
     """
@@ -1002,6 +1009,14 @@ async def cmd_card(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     chat_id = chat.id
+
+    # 🔒 Card game lock check
+    if is_card_locked(chat_id):
+        await msg.reply_text(
+            "🔒 <b>Cᴀʀᴅ Gᴀᴍᴇ Iꜱ Cᴜʀʀᴇɴᴛʟʏ Lᴏᴄᴋᴇᴅ Iɴ Tʜɪꜱ Gʀᴏᴜᴘ.</b>",
+            parse_mode="HTML"
+        )
+        return
 
     if not context.args:
         await msg.reply_text(
@@ -1161,6 +1176,15 @@ async def cmd_bet(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     chat_id = chat.id
+
+    # 🔒 Card game lock check
+    if is_card_locked(chat_id):
+        await msg.reply_text(
+            "🔒 <b>Cᴀʀᴅ Gᴀᴍᴇ Iꜱ Cᴜʀʀᴇɴᴛʟʏ Lᴏᴄᴋᴇᴅ Iɴ Tʜɪꜱ Gʀᴏᴜᴘ.</b>",
+            parse_mode="HTML"
+        )
+        return
+
     game    = active_games.get(chat_id)
 
     if not game or game["phase"] == "done":
@@ -1620,29 +1644,171 @@ async def _finish_game(context, chat_id: int):
 
     # ── Send announcement (photo if available, else text) ──────
     if winner_photo_file:
-        await context.bot.send_photo(
+        winner_msg = await context.bot.send_photo(
             chat_id=chat_id,
             photo=winner_photo_file,
             caption=announcement,
             parse_mode="HTML"
         )
     else:
-        await context.bot.send_message(
+        winner_msg = await context.bot.send_message(
             chat_id=chat_id,
             text=announcement,
             parse_mode="HTML"
         )
 
+    # 📌 Pin the winner announcement
+    try:
+        await context.bot.pin_chat_message(
+            chat_id=chat_id,
+            message_id=winner_msg.message_id,
+            disable_notification=False
+        )
+    except Exception:
+        pass
+
     active_games.pop(chat_id, None)
+
+# ============================================================
+#  /close — LOCK / UNLOCK CARD GAME  (+ Economy if no args)
+# ============================================================
+async def cmd_close(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    /close          → toggles card game lock for this group
+    /close all      → closes BOTH card game AND economy for this group
+    Admin / Owner only.
+    """
+    msg  = update.message
+    chat = update.effective_chat
+    user = update.effective_user
+
+    if chat.type == "private":
+        return await msg.reply_text("❌ Gʀᴏᴜᴘ Oɴʟʏ.")
+
+    # ── Permission check (admin or bot owner) ─────────────────
+    chat_member = await chat.get_member(user.id)
+    is_admin = chat_member.status in ("administrator", "creator")
+    if not is_admin and user.id != OWNER_ID:
+        return await msg.reply_text("❌ Aᴅᴍɪɴs Oɴʟʏ.")
+
+    chat_id = chat.id
+    arg     = (context.args[0].lower() if context.args else "")
+
+    # ── /close all  →  lock card game + disable economy ───────
+    if arg == "all":
+        card_game_locked[chat_id] = True
+
+        # Disable economy using whatever your project's helper is.
+        # Adjust the call below to match your actual economy-disable function.
+        try:
+            await disable_economy(chat_id)        # ← your existing helper
+        except Exception:
+            pass
+
+        return await msg.reply_text(
+            "🔒 <b>Aʟʟ Sʏsᴛᴇᴍs Cʟᴏsᴇᴅ!</b>\n\n"
+            "♠️ Cᴀʀᴅ Gᴀᴍᴇ  ➜  <b>Lᴏᴄᴋᴇᴅ</b>\n"
+            "💰 Eᴄᴏɴᴏᴍʏ     ➜  <b>Dɪsᴀʙʟᴇᴅ</b>",
+            parse_mode="HTML"
+        )
+
+    # ── /close  →  toggle card game lock only ─────────────────
+    current = card_game_locked.get(chat_id, False)
+    card_game_locked[chat_id] = not current
+
+    if card_game_locked[chat_id]:
+        status_text = (
+            "🔒 <b>Cᴀʀᴅ Gᴀᴍᴇ Lᴏᴄᴋᴇᴅ!</b>\n\n"
+            "♠️ Nᴏ ɴᴇᴡ ɢᴀᴍᴇs ᴄᴀɴ ʙᴇ sᴛᴀʀᴛᴇᴅ.\n"
+            "💡 Usᴇ /close ᴀɢᴀɪɴ ᴛᴏ ᴜɴʟᴏᴄᴋ."
+        )
+    else:
+        status_text = (
+            "🔓 <b>Cᴀʀᴅ Gᴀᴍᴇ Uɴʟᴏᴄᴋᴇᴅ!</b>\n\n"
+            "♠️ Pʟᴀʏᴇʀs ᴄᴀɴ sᴛᴀʀᴛ ɴᴇᴡ ɢᴀᴍᴇs ᴀɢᴀɪɴ."
+        )
+
+    await msg.reply_text(status_text, parse_mode="HTML")
+
+
+# ============================================================
+#  /cancelgames — STOP ALL GAMES & REFUND  (Owner only)
+# ============================================================
+async def cmd_cancelgames(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    /cancelgames  →  force-stops every active card game across ALL groups
+    and refunds every player their bet. Owner only.
+    """
+    msg  = update.message
+    user = update.effective_user
+
+    if user.id != OWNER_ID:
+        return await msg.reply_text("❌ Oᴡɴᴇʀ Oɴʟʏ.")
+
+    if not active_games:
+        return await msg.reply_text("✅ Nᴏ Aᴄᴛɪᴠᴇ Gᴀᴍᴇs Rɪɢʜᴛ Nᴏᴡ.")
+
+    total_refunded  = 0
+    players_refunded = 0
+    games_cancelled  = 0
+
+    for chat_id, game in list(active_games.items()):
+        # Cancel background tasks
+        for task_key in ("join_task", "remind_task"):
+            t = game.get(task_key)
+            if t:
+                t.cancel()
+
+        bet     = game["bet"]
+        players = game["players"]
+
+        # Refund every player
+        for uid in players:
+            u = users.find_one({"id": uid})
+            if u:
+                u["coins"] = u.get("coins", 0) + bet
+                save_user(u)
+                players_refunded += 1
+                total_refunded   += bet
+
+        # Notify the group
+        try:
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text=(
+                    "🛑 <b>Cᴀʀᴅ Gᴀᴍᴇ Sᴛᴏᴘᴘᴇᴅ Gʟᴏʙᴀʟʟʏ</b>\n\n"
+                    "💸 <b>Aʟʟ Cᴀʀᴅ Aᴍᴏᴜɴᴛs Hᴀᴠᴇ Bᴇᴇɴ Rᴇꜰᴜɴᴅᴇᴅ.</b>"
+                ),
+                parse_mode="HTML"
+            )
+        except Exception:
+            pass
+
+        # Delete tracked messages
+        await _delete_tracked(context, game)
+
+        games_cancelled += 1
+        active_games.pop(chat_id, None)
+
+    # Confirm to owner
+    await msg.reply_text(
+        f"✅ <b>Dᴏɴᴇ!</b>\n\n"
+        f"♠️ <b>Gᴀᴍᴇs Cᴀɴᴄᴇʟʟᴇᴅ:</b> <code>{games_cancelled}</code>\n"
+        f"👥 <b>Pʟᴀʏᴇʀs Rᴇꜰᴜɴᴅᴇᴅ:</b> <code>{players_refunded}</code>\n"
+        f"💰 <b>Tᴏᴛᴀʟ Rᴇꜰᴜɴᴅᴇᴅ:</b> <code>{total_refunded:,}$</code>",
+        parse_mode="HTML"
+    )
+
 
 # ============================================================
 #  HANDLER REGISTRATION
 # ============================================================
-# application.add_handler(CommandHandler("card",     cmd_card))
-# application.add_handler(CommandHandler("bet",      cmd_bet))
-# application.add_handler(CommandHandler("flip",     cmd_flip))
-# application.add_handler(CommandHandler("cardhelp", cmd_cardhelp))
-
+# application.add_handler(CommandHandler("card",        cmd_card))
+# application.add_handler(CommandHandler("bet",         cmd_bet))
+# application.add_handler(CommandHandler("flip",        cmd_flip))
+# application.add_handler(CommandHandler("cardhelp",    cmd_cardhelp))
+# application.add_handler(CommandHandler("close",       cmd_close))        # admin only
+# application.add_handler(CommandHandler("cancelgames", cmd_cancelgames))  # owner only
 
 #===============
 
