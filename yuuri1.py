@@ -1670,13 +1670,13 @@ async def _finish_game(context, chat_id: int):
     active_games.pop(chat_id, None)
 
 # ============================================================
-#  /close — LOCK / UNLOCK CARD GAME  (+ Economy if no args)
+#  /cardlock — LOCK / UNLOCK CARD GAME ONLY  (Admin only)
+#  Does NOT touch your existing /close economy command at all.
 # ============================================================
-async def cmd_close(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def cmd_cardlock(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
-    /close          → toggles card game lock for this group
-    /close all      → closes BOTH card game AND economy for this group
-    Admin / Owner only.
+    /cardlock  →  toggles card game lock on/off for this group.
+    Admin / Owner only. Completely separate from /close economy.
     """
     msg  = update.message
     chat = update.effective_chat
@@ -1685,50 +1685,29 @@ async def cmd_close(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if chat.type == "private":
         return await msg.reply_text("❌ Gʀᴏᴜᴘ Oɴʟʏ.")
 
-    # ── Permission check (admin or bot owner) ─────────────────
+    # ── Permission check ──────────────────────────────────────
     chat_member = await chat.get_member(user.id)
     is_admin = chat_member.status in ("administrator", "creator")
     if not is_admin and user.id != OWNER_ID:
         return await msg.reply_text("❌ Aᴅᴍɪɴs Oɴʟʏ.")
 
     chat_id = chat.id
-    arg     = (context.args[0].lower() if context.args else "")
-
-    # ── /close all  →  lock card game + disable economy ───────
-    if arg == "all":
-        card_game_locked[chat_id] = True
-
-        # Disable economy using whatever your project's helper is.
-        # Adjust the call below to match your actual economy-disable function.
-        try:
-            await disable_economy(chat_id)        # ← your existing helper
-        except Exception:
-            pass
-
-        return await msg.reply_text(
-            "🔒 <b>Aʟʟ Sʏsᴛᴇᴍs Cʟᴏsᴇᴅ!</b>\n\n"
-            "♠️ Cᴀʀᴅ Gᴀᴍᴇ  ➜  <b>Lᴏᴄᴋᴇᴅ</b>\n"
-            "💰 Eᴄᴏɴᴏᴍʏ     ➜  <b>Dɪsᴀʙʟᴇᴅ</b>",
-            parse_mode="HTML"
-        )
-
-    # ── /close  →  toggle card game lock only ─────────────────
     current = card_game_locked.get(chat_id, False)
     card_game_locked[chat_id] = not current
 
     if card_game_locked[chat_id]:
-        status_text = (
+        await msg.reply_text(
             "🔒 <b>Cᴀʀᴅ Gᴀᴍᴇ Lᴏᴄᴋᴇᴅ!</b>\n\n"
             "♠️ Nᴏ ɴᴇᴡ ɢᴀᴍᴇs ᴄᴀɴ ʙᴇ sᴛᴀʀᴛᴇᴅ.\n"
-            "💡 Usᴇ /close ᴀɢᴀɪɴ ᴛᴏ ᴜɴʟᴏᴄᴋ."
+            "💡 Usᴇ /cardlock ᴀɢᴀɪɴ ᴛᴏ ᴜɴʟᴏᴄᴋ.",
+            parse_mode="HTML"
         )
     else:
-        status_text = (
+        await msg.reply_text(
             "🔓 <b>Cᴀʀᴅ Gᴀᴍᴇ Uɴʟᴏᴄᴋᴇᴅ!</b>\n\n"
-            "♠️ Pʟᴀʏᴇʀs ᴄᴀɴ sᴛᴀʀᴛ ɴᴇᴡ ɢᴀᴍᴇs ᴀɢᴀɪɴ."
+            "♠️ Pʟᴀʏᴇʀs ᴄᴀɴ sᴛᴀʀᴛ ɴᴇᴡ ɢᴀᴍᴇs ᴀɢᴀɪɴ.",
+            parse_mode="HTML"
         )
-
-    await msg.reply_text(status_text, parse_mode="HTML")
 
 
 # ============================================================
@@ -1792,10 +1771,9 @@ async def cmd_cancelgames(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Confirm to owner
     await msg.reply_text(
-        f"✅ <b>Dᴏɴᴇ!</b>\n\n"
-        f"♠️ <b>Gᴀᴍᴇs Cᴀɴᴄᴇʟʟᴇᴅ:</b> <code>{games_cancelled}</code>\n"
-        f"👥 <b>Pʟᴀʏᴇʀs Rᴇꜰᴜɴᴅᴇᴅ:</b> <code>{players_refunded}</code>\n"
-        f"💰 <b>Tᴏᴛᴀʟ Rᴇꜰᴜɴᴅᴇᴅ:</b> <code>{total_refunded:,}$</code>",
+        f"✅ <b>Gʟᴏʙᴀʟ Cᴀɴᴄᴇʟ Sᴜᴄᴄᴇssꜰᴜʟ</b>\n\n"
+        f"♠️ <b>Cᴀʀᴅ Gʀᴏᴜᴘs Cʟᴇᴀʀᴇᴅ:</b> <code>{games_cancelled}</code>\n"
+        f"💣 <b>Bᴏᴍʙ Gʀᴏᴜᴘs Cʟᴇᴀʀᴇᴅ:</b> <code>0</code>",
         parse_mode="HTML"
     )
 
@@ -1807,8 +1785,9 @@ async def cmd_cancelgames(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # application.add_handler(CommandHandler("bet",         cmd_bet))
 # application.add_handler(CommandHandler("flip",        cmd_flip))
 # application.add_handler(CommandHandler("cardhelp",    cmd_cardhelp))
-# application.add_handler(CommandHandler("close",       cmd_close))        # admin only
-# application.add_handler(CommandHandler("cancelgames", cmd_cancelgames))  # owner only
+# application.add_handler(CommandHandler("cardlock",    cmd_cardlock))    # admin only — toggles card game lock
+# application.add_handler(CommandHandler("cancelgames", cmd_cancelgames)) # owner only
+
 
 #===============
 
@@ -7217,6 +7196,8 @@ application.add_handler(CommandHandler("card", cmd_card))
 application.add_handler(CommandHandler("bet", cmd_bet))
 application.add_handler(CommandHandler("flip", cmd_flip))
 application.add_handler(CommandHandler("cardhelp", cmd_cardhelp))
+application.add_handler(CommandHandler("cardlock",    cmd_cardlock))
+application.add_handler(CommandHandler("cancelgames", cmd_cancelgames))
 
 # Message Handlers
 application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
