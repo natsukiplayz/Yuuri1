@@ -823,12 +823,15 @@ from telegram.constants import ChatAction
 MIN_BET        = 500
 JOIN_WINDOW    = 120
 REMIND_EVERY   = 15
-FLIP_TIMEOUT   = 60   # updated to 60s to match prompt text
+FLIP_TIMEOUT   = 60
 MAX_ROUNDS     = 4
 TAX_NORMAL     = 0.10
 TAX_PREMIUM    = 0.05
 XP_PER_WIN     = 180
-POINTS_PER_WIN = 26
+
+# Points = card value x 2
+def card_points(val: int) -> int:
+    return val * 2
 
 # ── Small-caps helper ────────────────────────────────────────
 SC_MAP = {
@@ -839,7 +842,6 @@ SC_MAP = {
 }
 
 def sc(text: str) -> str:
-    """Uppercase stays, lowercase → small-caps unicode."""
     return ''.join(SC_MAP[c] if c in SC_MAP else c for c in text)
 
 # ============================================================
@@ -848,26 +850,100 @@ def sc(text: str) -> str:
 active_games: dict = {}
 CARD_SLOTS = ['a', 'b', 'c', 'd']
 
-def deal_cards() -> dict:
-    return {slot: random.randint(1, 10) for slot in CARD_SLOTS}
+# ── Equal-sum card dealing ────────────────────────────────────
+def deal_equal_sum_cards(num_players: int) -> list:
+    """Deal 4 cards to each player such that all players have the same card sum."""
+    while True:
+        first_hand = [random.randint(1, 10) for _ in range(4)]
+        target = sum(first_hand)
+        all_hands = [first_hand]
+        success = True
+        for _ in range(num_players - 1):
+            hand = _generate_hand_with_sum(target)
+            if hand is None:
+                success = False
+                break
+            all_hands.append(hand)
+        if success:
+            break
+    return [
+        {slot: hand[i] for i, slot in enumerate(CARD_SLOTS)}
+        for hand in all_hands
+    ]
+
+def _generate_hand_with_sum(target: int, attempts: int = 300) -> list | None:
+    for _ in range(attempts):
+        cards = []
+        remaining = target
+        for i in range(3):
+            slots_left = 3 - i
+            lo = max(1, remaining - slots_left * 10)
+            hi = min(10, remaining - slots_left)
+            if lo > hi:
+                break
+            c = random.randint(lo, hi)
+            cards.append(c)
+            remaining -= c
+        else:
+            if 1 <= remaining <= 10:
+                cards.append(remaining)
+                return cards
+    return None
 
 # ============================================================
-#  CARD TEXT BUILDER  (reused everywhere)
+#  CARD TEXT BUILDER
 # ============================================================
 def _build_cards_text(pdata: dict, played_slot: str | None = None, played_val: int | None = None) -> str:
-    lines = "\n".join(f"  {s.upper()} ➜ {v if v is not None else '—'}" for s, v in pdata["cards"].items())
+    lines = []
+    for s, v in pdata["cards"].items():
+        if v is None:
+            lines.append(f"  {s.upper()} ➜ ✖️ {sc('used')}")
+        else:
+            lines.append(f"  {s.upper()} ➜ {v}")
 
     header = ""
     if played_slot and played_val is not None:
-        header = f"✅ {sc('Played')} {played_slot.upper()} ➜ <b>{played_val}</b>\n\n"
+        pts = card_points(played_val)
+        header = f"✅ {sc('Played')} {played_slot.upper()} ➜ <b>{played_val}</b>  (+{pts} {sc('pts')})\n\n"
 
-    slots_left = ", ".join(s.upper() for s, v in pdata["cards"].items() if v is not None) or sc("None")
+    available = [s for s, v in pdata["cards"].items() if v is not None]
+    slots_left = ", ".join(s.upper() for s in available) or sc("None")
+    flip_hint  = " / ".join(available) if available else sc("none left")
+
     footer = (
-        f"\n\n🧮 {sc('Points')}: <b>{pdata['points']}</b>\n"
-        f"🎴 {sc('Left')}: {slots_left}\n"
-        f"📌 /flip {' / '.join(s for s, v in pdata['cards'].items() if v is not None) or '—'}"
+        f"\n\n🧮 {sc('Total Points')}: <b>{pdata['points']}</b>\n"
+        f"🎴 {sc('Available')}: {slots_left}\n"
+        f"📌 /flip {flip_hint}"
     )
-    return f"{header}🃏 {sc('Your Cards')}:\n{lines}{footer}"
+    return f"{header}🃏 {sc('Your Cards')}:\n" + "\n".join(lines) + footer
+
+# ============================================================
+#  GAME INFO — /cardhelp
+# ============================================================
+GAME_INFO = (
+    "👑 <b>Yuuri Mɪɴɪ Gᴀᴍᴇꜱ Uꜱɪɴɢ Eᴀʀɴᴇᴅ Eᴄᴏɴᴏᴍʏ Bᴀʟᴀɴᴄᴇ</b> 👑\n\n"
+    "🎮 <b>Yuuri Cᴀʀᴅ Gᴀᴍᴇ</b> 🎮\n\n"
+    "❤️‍🔥 Eᴀᴄʜ ᴘʟᴀʏᴇʀ ɢᴇᴛꜱ <b>4 ʜɪᴅᴅᴇɴ ᴄᴀʀᴅꜱ</b> ʟᴀʙᴇʟᴇᴅ A, B, C, D.\n"
+    "❤️‍🔥 Iɴ ᴇᴠᴇʀʏ ʀᴏᴜɴᴅ, ᴀʟʟ ᴘʟᴀʏᴇʀꜱ ᴄʜᴏᴏꜱᴇ ᴏɴᴇ ᴄᴀʀᴅ ᴛᴏ ꜰʟɪᴘ — ᴛʜᴇ ʜɪɢʜᴇꜱᴛ ᴡɪɴꜱ ᴛʜᴇ ʀᴏᴜɴᴅ.\n"
+    "❤️‍🔥 Tʜᴇ ɢᴀᴍᴇ ʟᴀꜱᴛꜱ <b>4 ʀᴏᴜɴᴅꜱ</b> — ʜɪɢʜᴇꜱᴛ ᴛᴏᴛᴀʟ ꜱᴄᴏʀᴇ ᴡɪɴꜱ 🏆\n"
+    "❤️‍🔥 Aʟʟ ᴘʟᴀʏᴇʀꜱ ɢᴇᴛ ᴇǫᴜᴀʟ ᴄᴀʀᴅ ꜱᴜᴍꜱ — ꜰᴀɪʀ ꜰᴏʀ ᴇᴠᴇʀʏᴏɴᴇ!\n\n"
+    "📊 <b>Pᴏɪɴᴛꜱ Sʏꜱᴛᴇᴍ</b> (Cᴀʀᴅ × 2)\n"
+    "  1➜2  2➜4  3➜6  4➜8  5➜10\n"
+    "  6➜12  7➜14  8➜16  9➜18  10➜20\n\n"
+    "👼👼 <b>Cᴏᴍᴍᴀɴᴅꜱ</b>\n"
+    "/card &lt;amount&gt; — Sᴛᴀʀᴛ ᴀ ɴᴇᴡ ɢᴀᴍᴇ\n"
+    "/bet &lt;amount&gt; — Jᴏɪɴ ᴛʜᴇ ɢᴀᴍᴇ\n"
+    "/flip a/b/c/d — Pʟᴀʏ ʏᴏᴜʀ ᴍᴏᴠᴇ\n\n"
+    "😀 <b>Nᴏᴛᴇꜱ & Iɴꜱᴛʀᴜᴄᴛɪᴏɴꜱ</b>\n"
+    "✅ Eᴀᴄʜ ᴛᴜʀɴ ʜᴀꜱ ᴀ <b>60-ꜱᴇᴄᴏɴᴅ</b> ᴛɪᴍᴇ ʟɪᴍɪᴛ\n"
+    "✅ Aᴜᴛᴏ-ᴘʟᴀʏ ᴀᴄᴛɪᴠᴀᴛᴇꜱ ɪꜰ ʏᴏᴜ ᴅᴏɴ'ᴛ ʀᴇꜱᴘᴏɴᴅ ɪɴ ᴛɪᴍᴇ\n"
+    "✅ Eᴀᴄʜ ᴄᴀʀᴅ ᴄᴀɴ ʙᴇ ᴜꜱᴇᴅ ᴏɴʟʏ ᴏɴᴄᴇ ᴘᴇʀ ɢᴀᴍᴇ\n"
+    "✅ Tʜᴇ ꜰɪɴᴀʟ ᴡɪɴɴᴇʀ ɢᴇᴛꜱ ᴛʜᴇ ʀᴇᴡᴀʀᴅ\n"
+    "✅ Iɴ ᴄᴀꜱᴇ ᴏꜰ ᴀ ᴛɪᴇ, ᴀ ʀᴀɴᴅᴏᴍ ᴡɪɴɴᴇʀ ɪꜱ ꜱᴇʟᴇᴄᴛᴇᴅ"
+)
+
+async def cmd_cardhelp(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(GAME_INFO, parse_mode="HTML")
 
 # ============================================================
 #  /card <amount>
@@ -918,7 +994,7 @@ async def cmd_card(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "players": {
             user.id: {
                 "name":       user.first_name,
-                "cards":      deal_cards(),
+                "cards":      {},
                 "points":     0,
                 "premium":    is_premium(host_data, context),
                 "dm_msg_id":  None,
@@ -933,7 +1009,6 @@ async def cmd_card(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "remind_task":  None,
     }
 
-    # ── /card start message ───────────────────────────────────
     await msg.reply_text(
         f"♠️ <b>{sc('Card Game Started.')}</b>\n\n"
         f"💰 {sc('Entry Fee')}: <b>{bet}</b>\n"
@@ -957,11 +1032,11 @@ async def _remind_loop(context, chat_id: int, bet: int):
             return
         remaining = JOIN_WINDOW - elapsed
         count     = len(game["players"])
-        # ── Reminder message ──────────────────────────────────
         await context.bot.send_message(
             chat_id=chat_id,
             text=(
-                f"⏳ <b>{remaining} {sc('sec Left.')}</b> {sc('Use')} /bet &lt;{sc('amount')}&gt;\n"
+                f"⏳ <b>{remaining} {sc('sec Left.')}</b> "
+                f"{sc('Use')} /bet &lt;{sc('amount')}&gt;\n"
                 f"👥 {sc('Joined')}: <b>{count}</b>"
             ),
             parse_mode="HTML"
@@ -992,11 +1067,15 @@ async def _join_countdown(context, chat_id: int):
         active_games.pop(chat_id, None)
         return
 
+    # ── Deal equal-sum cards ──────────────────────────────────
+    hands = deal_equal_sum_cards(len(players))
+    for i, (uid, pdata) in enumerate(players.items()):
+        pdata["cards"] = hands[i]
+
     game["phase"]      = "playing"
     game["turn_order"] = list(players.keys())
     random.shuffle(game["turn_order"])
 
-    # ── Game started message ──────────────────────────────────
     await context.bot.send_message(
         chat_id=chat_id,
         text=(
@@ -1068,13 +1147,16 @@ async def cmd_bet(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     game["players"][user.id] = {
         "name":      user.first_name,
-        "cards":     deal_cards(),
+        "cards":     {},
         "points":    0,
         "premium":   is_premium(user_data, context),
         "dm_msg_id": None,
     }
 
-    await msg.reply_text(f"🧚 <b>{user.first_name}</b> {sc('joined.')}  👥 {len(game['players'])}", parse_mode="HTML")
+    await msg.reply_text(
+        f"🧚 <b>{user.first_name}</b> {sc('joined.')}  👥 {len(game['players'])}",
+        parse_mode="HTML"
+    )
 
 # ============================================================
 #  DM: SEND or EDIT cards message
@@ -1102,6 +1184,8 @@ async def _start_round(context, chat_id: int):
         return
     game["round_plays"]  = {}
     game["current_turn"] = 0
+    # Reshuffle turn order each round so different player goes first
+    random.shuffle(game["turn_order"])
     await _prompt_next_player(context, chat_id)
 
 async def _prompt_next_player(context, chat_id: int):
@@ -1113,6 +1197,7 @@ async def _prompt_next_player(context, chat_id: int):
     order      = game["turn_order"]
     turn_index = game["current_turn"]
 
+    # All players done this round
     if turn_index >= len(order):
         await _finish_round(context, chat_id)
         return
@@ -1122,6 +1207,8 @@ async def _prompt_next_player(context, chat_id: int):
     name  = pdata["name"]
 
     remaining = {s: v for s, v in pdata["cards"].items() if v is not None}
+
+    # Skip if no cards left (edge case)
     if not remaining:
         game["current_turn"] += 1
         await _prompt_next_player(context, chat_id)
@@ -1129,7 +1216,6 @@ async def _prompt_next_player(context, chat_id: int):
 
     slots = " / ".join(s for s in remaining)
 
-    # ── Turn prompt message ───────────────────────────────────
     await context.bot.send_message(
         chat_id=chat_id,
         text=(
@@ -1157,13 +1243,18 @@ async def _auto_flip(context, chat_id: int, uid: int, rnd: int):
 
     slot, val = random.choice(list(remaining.items()))
     pdata["cards"][slot] = None
-    game["round_plays"][uid] = val
+    pts = card_points(val)
+    game["round_plays"][uid] = (val, pts)
+    pdata["points"] += pts
 
     await _send_cards_dm(context, uid, pdata, played_slot=slot, played_val=val)
 
     await context.bot.send_message(
         chat_id=chat_id,
-        text=f"⏰ <b>{pdata['name']}</b> {sc('auto-played')} {slot.upper()} ➜ <b>{val}</b>",
+        text=(
+            f"⏰ <b>{pdata['name']}</b> {sc('auto-played')} "
+            f"{slot.upper()} ➜ <b>{val}</b>  (+{pts} {sc('pts')})"
+        ),
         parse_mode="HTML"
     )
 
@@ -1221,16 +1312,17 @@ async def cmd_flip(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     val = pdata["cards"][raw_slot]
     pdata["cards"][raw_slot] = None
-    game["round_plays"][uid] = val
+    pts = card_points(val)
+    game["round_plays"][uid] = (val, pts)
+    pdata["points"] += pts
 
     await _send_cards_dm(context, uid, pdata, played_slot=raw_slot, played_val=val)
 
-    # ── Flip result in group ──────────────────────────────────
     await context.bot.send_message(
         chat_id=target_chat_id,
         text=(
             f"🏆 {sc(f'Round {rnd}')}\n\n"
-            f"• <b>{pdata['name']}</b> ➜ <b>{val}</b>"
+            f"• <b>{pdata['name']}</b> ➜ <b>{val}</b>  (+{pts} {sc('pts')})"
         ),
         parse_mode="HTML"
     )
@@ -1247,26 +1339,29 @@ async def _finish_round(context, chat_id: int):
         return
 
     rnd     = game["round"]
-    plays   = game["round_plays"]
+    plays   = game["round_plays"]   # {uid: (val, pts)}
     players = game["players"]
 
-    sorted_plays = sorted(plays.items(), key=lambda x: x[1])
-    lines = "\n".join(f"• <b>{players[uid]['name']}</b> ➜ {val}" for uid, val in sorted_plays)
-
     if plays:
-        max_val = max(plays.values())
-        winners = [uid for uid, val in plays.items() if val == max_val]
-        for uid in winners:
-            players[uid]["points"] += POINTS_PER_WIN
-        winner_names = ", ".join(players[uid]["name"] for uid in winners)
+        sorted_plays = sorted(plays.items(), key=lambda x: x[1][0], reverse=True)
+        lines = "\n".join(
+            f"• <b>{players[uid]['name']}</b> ➜ {val}  (+{pts} {sc('pts')})"
+            for uid, (val, pts) in sorted_plays
+        )
 
-        # ── Round result message ──────────────────────────────
+        max_val   = max(v for v, _ in plays.values())
+        r_winners = [uid for uid, (v, _) in plays.items() if v == max_val]
+        winner_names = ", ".join(players[uid]["name"] for uid in r_winners)
+        pts_each  = card_points(max_val)
+
         await context.bot.send_message(
             chat_id=chat_id,
             text=(
+                f"🎯 {sc(f'Round {rnd} Result')}\n\n"
+                f"{lines}\n\n"
                 f"🏆 {sc(f'Round {rnd} Winner(s)')}: <b>{winner_names}</b>\n"
                 f"🎴 {sc('Highest Card')}: <b>{max_val}</b>\n"
-                f"💰 {sc('Points Gained (Each)')}: <b>{POINTS_PER_WIN}</b>"
+                f"💰 {sc('Points Gained (Each)')}: <b>{pts_each}</b>"
             ),
             parse_mode="HTML"
         )
@@ -1278,10 +1373,8 @@ async def _finish_round(context, chat_id: int):
     game["round"] += 1
     game["round_plays"]  = {}
     game["current_turn"] = 0
-    random.shuffle(game["turn_order"])
 
     next_rnd = game["round"]
-    # ── Next round start message ──────────────────────────────
     await context.bot.send_message(
         chat_id=chat_id,
         text=f"✅ {sc(f'Round {next_rnd} Started.')}",
@@ -1291,7 +1384,7 @@ async def _finish_round(context, chat_id: int):
     await _start_round(context, chat_id)
 
 # ============================================================
-#  FINISH GAME  (with winner profile photo)
+#  FINISH GAME
 # ============================================================
 async def _finish_game(context, chat_id: int):
     game = active_games.get(chat_id)
@@ -1303,43 +1396,54 @@ async def _finish_game(context, chat_id: int):
     bet           = game["bet"]
     total_pot     = bet * len(players)
 
-    # ── Determine winner ──────────────────────────────────────
+    # ── Determine winner — tie-break by random ─────────────────
     max_points = max(p["points"] for p in players.values())
     winners    = [uid for uid, p in players.items() if p["points"] == max_points]
+    if len(winners) > 1:
+        winners = [random.choice(winners)]
 
-    # ── Tax & payout ──────────────────────────────────────────
-    share = total_pot // len(winners)
-    for uid in winners:
-        tax  = TAX_PREMIUM if players[uid]["premium"] else TAX_NORMAL
-        net  = int(share * (1 - tax))
-        u    = users.find_one({"id": uid})
-        if u:
-            u["coins"]   = u.get("coins", 0) + net
-            u["xp"]      = u.get("xp", 0) + XP_PER_WIN
-            save_user(u)
+    winner_uid   = winners[0]
+    winner_pdata = players[winner_uid]
+    tax_rate     = TAX_PREMIUM if winner_pdata["premium"] else TAX_NORMAL
+    tax_label    = "5%" if winner_pdata["premium"] else "10%"
+    net_each     = int(total_pot * (1 - tax_rate))
+    winner_name  = winner_pdata["name"]
+    total_points = winner_pdata["points"]
+    xp_gained    = XP_PER_WIN + (total_points * 3)
 
-    winner_uid    = winners[0]
-    winner_pdata  = players[winner_uid]
-    tax_rate      = TAX_PREMIUM if winner_pdata["premium"] else TAX_NORMAL
-    tax_label     = "5%" if winner_pdata["premium"] else "10%"
-    net_each      = int(share * (1 - tax_rate))
-    winner_name   = winner_pdata["name"]
-    total_points  = winner_pdata["points"]
+    # ── Pay winner ────────────────────────────────────────────
+    u = users.find_one({"id": winner_uid})
+    if u:
+        u["coins"] = u.get("coins", 0) + net_each
+        u["xp"]    = u.get("xp", 0) + xp_gained
+        save_user(u)
 
-    # ── Dynamic XP: base + bonus per point scored ─────────────
-    xp_gained = XP_PER_WIN + (total_points * 5)
+    # ── Leaderboard ───────────────────────────────────────────
+    sorted_players = sorted(players.items(), key=lambda x: x[1]["points"], reverse=True)
+    medals = ["🥇", "🥈", "🥉"]
+    board_lines = []
+    for i, (uid, pdata) in enumerate(sorted_players):
+        medal = medals[i] if i < 3 else "▪️"
+        crown = " 👑" if uid == winner_uid else ""
+        board_lines.append(
+            f"{medal} <b>{pdata['name']}</b>{crown}  —  {pdata['points']} {sc('pts')}"
+        )
+    board = "\n".join(board_lines)
 
-    # ── Final game caption ────────────────────────────────────
+    # ── Group caption ─────────────────────────────────────────
     caption = (
+        f"🏆 {sc('Game Over!')}\n\n"
+        f"{board}\n\n"
+        f"━━━━━━━━━━━━━━━\n"
         f"👑 {sc('Final Winner')} 👑\n\n"
         f"💀 <b>{winner_name}</b>\n"
         f"🎯 {sc('Total Points')}: <b>{total_points}</b>\n"
-        f"💰 {sc('Won')}: <b>{net_each}</b> (💓 {tax_label} {sc('Fee')})\n"
+        f"💰 {sc('Won')}: <b>{net_each}</b>  (💓 {tax_label} {sc('Fee')})\n"
         f"⚡ {sc('XP Gained')}: +<b>{xp_gained}</b>\n\n"
         f"👉 {sc('Play Again Using')} : /card &lt;{sc('Amount')}&gt;"
     )
 
-    # ── Try to send winner's profile photo ───────────────────
+    # ── Send to group with winner's profile photo ─────────────
     sent_photo = False
     try:
         photos = await context.bot.get_user_profile_photos(winner_uid, limit=1)
@@ -1357,6 +1461,39 @@ async def _finish_game(context, chat_id: int):
 
     if not sent_photo:
         await context.bot.send_message(chat_id=chat_id, text=caption, parse_mode="HTML")
+
+    # ── DM all players with final result ──────────────────────
+    dm_result = (
+        f"🏆 {sc('Final Winner')}: <b>{winner_name}</b> 👑\n\n"
+        f"{board}\n\n"
+        f"🎯 {sc('Winner Points')}: <b>{total_points}</b>\n"
+        f"💰 {sc('Won')}: <b>{net_each}</b>  (💓 {tax_label} {sc('Fee')})\n"
+        f"⚡ {sc('XP Gained')}: +<b>{xp_gained}</b>\n\n"
+        f"👉 /card &lt;{sc('Amount')}&gt; {sc('to play again!')}"
+    )
+
+    for uid, pdata in players.items():
+        # Show final card state (all used = ✖️) + result
+        final_card_text = _build_cards_text(pdata)
+        full_dm = f"{final_card_text}\n\n━━━━━━━━━━━━\n{dm_result}"
+        try:
+            mid = pdata.get("dm_msg_id")
+            if mid:
+                await context.bot.edit_message_text(
+                    chat_id=uid, message_id=mid,
+                    text=full_dm, parse_mode="HTML"
+                )
+            else:
+                await context.bot.send_message(
+                    chat_id=uid, text=full_dm, parse_mode="HTML"
+                )
+        except Exception:
+            try:
+                await context.bot.send_message(
+                    chat_id=uid, text=dm_result, parse_mode="HTML"
+                )
+            except Exception:
+                pass
 
     active_games.pop(chat_id, None)
 
