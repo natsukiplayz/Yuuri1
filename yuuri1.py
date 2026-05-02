@@ -905,7 +905,11 @@ def _generate_hand_with_sum(target: int, attempts: int = 300) -> list | None:
 # ============================================================
 #  CARD TEXT BUILDER
 # ============================================================
-def _build_cards_text(pdata: dict, played_slot: str | None = None, played_val: int | None = None) -> str:
+def _build_cards_text(
+    pdata: dict,
+    played_slot: str | None = None,
+    played_val: int | None = None
+) -> str:
     lines = []
     for s, v in pdata["cards"].items():
         if v is None:
@@ -916,13 +920,15 @@ def _build_cards_text(pdata: dict, played_slot: str | None = None, played_val: i
     header = ""
     if played_slot and played_val is not None:
         pts = card_points(played_val)
-        header = f"✅ {sc('Played')} {played_slot.upper()} ➜ <b>{played_val}</b>  (+{pts} {sc('pts')})\n\n"
+        header = (
+            f"✅ {sc('Played')} {played_slot.upper()} ➜ "
+            f"<b>{played_val}</b>  (+{pts} {sc('pts')})\n\n"
+        )
 
-    available = [s for s, v in pdata["cards"].items() if v is not None]
+    available  = [s for s, v in pdata["cards"].items() if v is not None]
     slots_left = ", ".join(s.upper() for s in available) or sc("None")
     flip_hint  = " / ".join(available) if available else sc("none left")
 
-    # NOTE: Points deliberately NOT shown here — revealed only after each round ends
     footer = (
         f"\n\n🎴 {sc('Available')}: {slots_left}\n"
         f"📌 /flip {flip_hint}"
@@ -933,9 +939,10 @@ def _build_cards_text(pdata: dict, played_slot: str | None = None, played_val: i
 def _build_cards_text_with_points(pdata: dict) -> str:
     """Shown in DM after game ends — all slots used, full points revealed."""
     lines = [f"  {s.upper()} ➜ ✖️ {sc('used')}" for s in CARD_SLOTS]
+    total_pts_label = sc("Total Points")
     return (
         "🃏 " + sc("Your Cards") + ":\n" + "\n".join(lines) +
-        f"\n\n🧮 {sc('Total Points')}: <b>{pdata['points']}</b>"
+        f"\n\n🧮 {total_pts_label}: <b>{pdata['points']}</b>"
     )
 
 # ============================================================
@@ -960,7 +967,7 @@ GAME_INFO = (
     "✅ Aᴜᴛᴏ-ᴘʟᴀʏ ᴀᴄᴛɪᴠᴀᴛᴇꜱ ɪꜰ ʏᴏᴜ ᴅᴏɴ'ᴛ ʀᴇꜱᴘᴏɴᴅ ɪɴ ᴛɪᴍᴇ\n"
     "✅ Eᴀᴄʜ ᴄᴀʀᴅ ᴄᴀɴ ʙᴇ ᴜꜱᴇᴅ ᴏɴʟʏ ᴏɴᴄᴇ ᴘᴇʀ ɢᴀᴍᴇ\n"
     "✅ Tʜᴇ ꜰɪɴᴀʟ ᴡɪɴɴᴇʀ ɢᴇᴛꜱ ᴛʜᴇ ʀᴇᴡᴀʀᴅ\n"
-    "✅ Iɴ ᴄᴀꜱᴇ ᴏꜰ ᴀ ᴛɪᴇ, ᴀ ʀᴀɴᴅᴏᴍ ᴡɪɴɴᴇʀ ɪꜱ ꜱᴇʟᴇᴄᴛᴇᴅ"
+    "✅ Iɴ ᴄᴀꜱᴇ ᴏꜰ ᴀ ᴛɪᴇ, ᴘʀᴇᴍɪᴜᴍ ᴜꜱᴇʀ ɢᴇᴛꜱ ᴘʀɪᴏʀɪᴛʏ 👑"
 )
 
 async def cmd_cardhelp(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1049,7 +1056,6 @@ async def cmd_card(update: Update, context: ContextTypes.DEFAULT_TYPE):
     }
     active_games[chat_id] = game
 
-    # Track /card command
     game["tracked_msgs"].append((chat_id, msg.message_id))
 
     sent = await msg.reply_text(
@@ -1158,14 +1164,15 @@ async def cmd_bet(update: Update, context: ContextTypes.DEFAULT_TYPE):
     game    = active_games.get(chat_id)
 
     if not game or game["phase"] == "done":
-        await msg.reply_text(f"{sc('No game running.')}  /card &lt;{sc('amount')}&gt;")
+        await msg.reply_text(
+            f"{sc('No game running.')}  /card &lt;{sc('amount')}&gt;"
+        )
         return
 
     if game["phase"] != "joining":
         await msg.reply_text(sc("Game already started."))
         return
 
-    # Track /bet command message
     game["tracked_msgs"].append((chat_id, msg.message_id))
 
     bet = game["bet"]
@@ -1185,7 +1192,9 @@ async def cmd_bet(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if user.id in game["players"]:
-        await msg.reply_text(f"🙅 {sc('Already joined.')}  👥 {len(game['players'])}")
+        await msg.reply_text(
+            f"🙅 {sc('Already joined.')}  👥 {len(game['players'])}"
+        )
         return
 
     user_data = get_user(user)
@@ -1214,16 +1223,22 @@ async def cmd_bet(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ============================================================
 #  DM: SEND or EDIT cards message
 # ============================================================
-async def _send_cards_dm(context, uid: int, pdata: dict, played_slot=None, played_val=None):
+async def _send_cards_dm(
+    context, uid: int, pdata: dict,
+    played_slot=None, played_val=None
+):
     text = _build_cards_text(pdata, played_slot, played_val)
     try:
         mid = pdata.get("dm_msg_id")
         if mid:
             await context.bot.edit_message_text(
-                chat_id=uid, message_id=mid, text=text, parse_mode="HTML"
+                chat_id=uid, message_id=mid,
+                text=text, parse_mode="HTML"
             )
         else:
-            sent = await context.bot.send_message(chat_id=uid, text=text, parse_mode="HTML")
+            sent = await context.bot.send_message(
+                chat_id=uid, text=text, parse_mode="HTML"
+            )
             pdata["dm_msg_id"] = sent.message_id
     except Exception:
         pass
@@ -1265,9 +1280,7 @@ async def _prompt_next_player(context, chat_id: int):
         await _prompt_next_player(context, chat_id)
         return
 
-    slots = " / ".join(s for s in remaining)
-
-    # Clickable name via tg://user?id= — works without a username
+    slots          = " / ".join(s for s in remaining)
     clickable_name = f'<a href="tg://user?id={uid}">{name}</a>'
 
     sent = await context.bot.send_message(
@@ -1281,12 +1294,11 @@ async def _prompt_next_player(context, chat_id: int):
     )
     _track_bot_msg(game, chat_id, sent)
 
-    # Notify the active player in DM
     try:
         await context.bot.send_message(
             chat_id=uid,
             text=(
-                f"🔔 {sc('Its your turn!')} — {sc(f'Round {rnd}')}\n"
+                f"🔔 {sc('Its your turn!')} — {sc('Round')} {rnd}\n"
                 f"🎴 {sc('Flip')} /flip <code>{slots}</code> {sc('in the group.')}"
             ),
             parse_mode="HTML"
@@ -1313,7 +1325,6 @@ async def _auto_flip(context, chat_id: int, uid: int, rnd: int):
     slot, val = random.choice(list(remaining.items()))
     pdata["cards"][slot] = None
     pts = card_points(val)
-    # Store play — points added after round ends
     game["round_plays"][uid] = (val, pts)
 
     await _send_cards_dm(context, uid, pdata, played_slot=slot, played_val=val)
@@ -1343,7 +1354,7 @@ async def cmd_flip(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.reply_text(f"🚫 {sc('Use in group.')}  /flip a / b / c / d")
         return
 
-    uid = user.id
+    uid            = user.id
     target_chat_id = None
     for cid, g in active_games.items():
         if uid in g["players"] and g["phase"] == "playing":
@@ -1355,8 +1366,6 @@ async def cmd_flip(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     game = active_games[target_chat_id]
-
-    # Track /flip command
     game["tracked_msgs"].append((chat.id, msg.message_id))
 
     rnd   = game["round"]
@@ -1371,7 +1380,10 @@ async def cmd_flip(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if not context.args:
-        await msg.reply_text(f"<b>{sc('Usage')}:</b> /flip a / b / c / d", parse_mode="HTML")
+        await msg.reply_text(
+            f"<b>{sc('Usage')}:</b> /flip a / b / c / d",
+            parse_mode="HTML"
+        )
         return
 
     raw_slot = context.args[0].lower().strip()
@@ -1387,7 +1399,6 @@ async def cmd_flip(update: Update, context: ContextTypes.DEFAULT_TYPE):
     val = pdata["cards"][raw_slot]
     pdata["cards"][raw_slot] = None
     pts = card_points(val)
-    # Store play — points added after round ends
     game["round_plays"][uid] = (val, pts)
 
     await _send_cards_dm(context, uid, pdata, played_slot=raw_slot, played_val=val)
@@ -1395,7 +1406,7 @@ async def cmd_flip(update: Update, context: ContextTypes.DEFAULT_TYPE):
     sent = await context.bot.send_message(
         chat_id=target_chat_id,
         text=(
-            f"🏆 {sc(f'Round {rnd}')}\n\n"
+            f"🏆 {sc('Round')} {rnd}\n\n"
             f"• <b>{pdata['name']}</b> ➜ <b>{val}</b>"
         ),
         parse_mode="HTML"
@@ -1421,15 +1432,14 @@ async def _finish_round(context, chat_id: int):
         max_val   = max(v for v, _ in plays.values())
         r_winners = [uid for uid, (v, _) in plays.items() if v == max_val]
 
-        # Total points of ALL players this round
+        # All players' points this round go to EACH round winner (no split)
         round_total_pts = sum(pts for _, pts in plays.values())
-
-        # Each round winner gets the FULL total (no split between tied winners)
         for uid in r_winners:
             players[uid]["points"] += round_total_pts
 
-        # Reveal pts now that the round has ended
-        sorted_plays = sorted(plays.items(), key=lambda x: x[1][0], reverse=True)
+        sorted_plays = sorted(
+            plays.items(), key=lambda x: x[1][0], reverse=True
+        )
         lines = "\n".join(
             f"• <b>{players[uid]['name']}</b> ➜ {val}  (+{pts} {sc('pts')})"
             for uid, (val, pts) in sorted_plays
@@ -1439,9 +1449,9 @@ async def _finish_round(context, chat_id: int):
         sent = await context.bot.send_message(
             chat_id=chat_id,
             text=(
-                f"🎯 {sc(f'Round {rnd} Result')}\n\n"
+                f"🎯 {sc('Round')} {rnd} {sc('Result')}\n\n"
                 f"{lines}\n\n"
-                f"🏆 {sc(f'Round {rnd} Winner(s)')}: <b>{winner_names}</b>\n"
+                f"🏆 {sc('Round')} {rnd} {sc('Winner(s)')}: <b>{winner_names}</b>\n"
                 f"🎴 {sc('Highest Card')}: <b>{max_val}</b>\n"
                 f"💰 {sc('Points Awarded (Each Winner)')}: <b>{round_total_pts}</b>"
             ),
@@ -1460,12 +1470,38 @@ async def _finish_round(context, chat_id: int):
     next_rnd = game["round"]
     sent = await context.bot.send_message(
         chat_id=chat_id,
-        text=f"✅ {sc(f'Round {next_rnd} Started.')}",
+        text=f"✅ {sc('Round')} {next_rnd} {sc('Started.')}",
         parse_mode="HTML"
     )
     _track_bot_msg(game, chat_id, sent)
 
     await _start_round(context, chat_id)
+
+# ============================================================
+#  TIE-BREAK HELPER
+# ============================================================
+def _resolve_tie(tied_uids: list, players: dict) -> tuple[int, bool]:
+    """
+    Break a tie among tied_uids.
+
+    Priority order:
+      1. Premium users — if any tied player is premium, only they compete.
+      2. If still multiple (all premium or none), pick at random.
+
+    Returns (winner_uid, premium_priority_used).
+    """
+    premium_tied = [uid for uid in tied_uids if players[uid].get("premium")]
+
+    if premium_tied and len(premium_tied) < len(tied_uids):
+        # At least one premium vs non-premium → premium wins
+        pool                 = premium_tied
+        premium_priority_used = True
+    else:
+        # All premium or no premium — random among remaining pool
+        pool                 = premium_tied if premium_tied else tied_uids
+        premium_priority_used = False
+
+    return random.choice(pool), premium_priority_used
 
 # ============================================================
 #  FINISH GAME
@@ -1484,20 +1520,23 @@ async def _finish_game(context, chat_id: int):
     for pdata in players.values():
         pdata["points"] += pdata.get("_point_noise", 0)
 
-    # ── Determine overall winner ───────────────────────────────
-    max_points = max(p["points"] for p in players.values())
-    winners    = [uid for uid, p in players.items() if p["points"] == max_points]
-    if len(winners) > 1:
-        winners = [random.choice(winners)]
+    # ── Determine overall winner with premium tie-break ────────
+    max_points           = max(p["points"] for p in players.values())
+    tied_uids            = [uid for uid, p in players.items() if p["points"] == max_points]
+    premium_priority_used = False
 
-    winner_uid   = winners[0]
+    if len(tied_uids) > 1:
+        winner_uid, premium_priority_used = _resolve_tie(tied_uids, players)
+    else:
+        winner_uid = tied_uids[0]
+
     winner_pdata = players[winner_uid]
     tax_rate     = TAX_PREMIUM if winner_pdata["premium"] else TAX_NORMAL
     tax_label    = "5%" if winner_pdata["premium"] else "10%"
     net_each     = int(total_pot * (1 - tax_rate))
     winner_name  = winner_pdata["name"]
     total_points = winner_pdata["points"]
-    xp_gained    = random.randint(10, 300)   # rare random XP
+    xp_gained    = random.randint(10, 300)
 
     # ── Pay winner & update streak ─────────────────────────────
     u = users.find_one({"id": winner_uid})
@@ -1511,10 +1550,10 @@ async def _finish_game(context, chat_id: int):
         streak = 1
 
     # ── Per-player game-over DM ────────────────────────────────
+    winners_pts_label = sc("Winner's Points")
     for uid, pdata in players.items():
         is_winner = (uid == winner_uid)
         try:
-            # Update DM card message to show used cards + their points
             mid = pdata.get("dm_msg_id")
             if mid:
                 try:
@@ -1538,18 +1577,20 @@ async def _finish_game(context, chat_id: int):
                 dm_text = (
                     f"🏁 <b>{sc('Game Over!')}</b>\n\n"
                     f"🧮 {sc('Your Total Points')}: <b>{pdata['points']}</b>\n"
-                    f"🏆 {sc(\"Winner's Points\")}: <b>{total_points}</b>\n"
+                    f"🏆 {winners_pts_label}: <b>{total_points}</b>\n"
                     f"👑 {sc('Final Winner')}: <b>{winner_name}</b>\n"
                     f"💰 {sc('Winning Amount')}: <b>{net_each}</b>"
                 )
-            await context.bot.send_message(chat_id=uid, text=dm_text, parse_mode="HTML")
+            await context.bot.send_message(
+                chat_id=uid, text=dm_text, parse_mode="HTML"
+            )
         except Exception:
             pass
 
-    # ── Delete ALL tracked messages (card/bet/flip + bot msgs) ─
+    # ── Delete ALL tracked messages ────────────────────────────
     await _delete_tracked(context, game)
 
-    # ── Winner announcement card in group ──────────────────────
+    # ── Fetch winner profile photo ─────────────────────────────
     winner_photo_file = None
     try:
         photos = await context.bot.get_user_profile_photos(winner_uid, limit=1)
@@ -1561,7 +1602,13 @@ async def _finish_game(context, chat_id: int):
     clickable_winner = f'<a href="tg://user?id={winner_uid}">{winner_name}</a>'
     fee_emoji        = "💓" if winner_pdata["premium"] else "💔"
 
+    # ── Build tie notice (shown above announcement if premium decided) ─
+    tie_notice = ""
+    if premium_priority_used:
+        tie_notice = f"💸 <b>{sc('Tie detected! Premium priority.')}</b>\n\n"
+
     announcement = (
+        f"{tie_notice}"
         f"👑 <b>Fɪɴᴀʟ Wɪɴɴᴇʀ</b> 👑\n\n"
         f"🌺 {clickable_winner}\n"
         f"🎯 {sc('Total Points')}: <b>{total_points}</b>\n"
@@ -1571,6 +1618,7 @@ async def _finish_game(context, chat_id: int):
         f"👉 {sc('Play Again Using')} : /card {sc('Amount')}"
     )
 
+    # ── Send announcement (photo if available, else text) ──────
     if winner_photo_file:
         await context.bot.send_photo(
             chat_id=chat_id,
