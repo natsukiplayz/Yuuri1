@@ -7429,6 +7429,8 @@ application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, auto_rep
 # This ensures game logic is checked before the help menu logic
 application.add_handler(CallbackQueryHandler(heist_choice, pattern="^heist_"))
 
+application.add_handler(CallbackQueryHandler(cb_topcarder, pattern="^topcarder_"))
+
 # 2. Handle Menu/Help clicks second
 # Added 'help_' as a prefix to catch 'help_main', 'help_manage', 'help_eco', etc.
 # Added 'back_to_start' to handle the return button
