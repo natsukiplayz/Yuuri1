@@ -1788,12 +1788,10 @@ async def cmd_topcarder(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     msg  = update.message
 
-    # Sort by total coins won from card games (card_wins_total)
-    # Falls back to card_streak if you don't track total winnings separately
     top_list = list(
         users.find(
             {"card_wins_total": {"$exists": True, "$gt": 0}},
-            {"id": 1, "name": 1, "card_wins_total": 1, "card_streak": 1}
+            {"id": 1, "name": 1, "card_wins_total": 1, "card_streak": 1, "custom_icon": 1, "premium": 1}
         ).sort("card_wins_total", -1).limit(10)
     )
 
@@ -1803,32 +1801,131 @@ async def cmd_topcarder(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="HTML"
         )
 
-    text = "♠️ <b>Tᴏᴘ 10 Cᴀʀᴅ Gᴀᴍᴇ Pʟᴀʏᴇʀs</b> ♠️\n\n"
+    def build_text(show_streak: bool) -> str:
+        if show_streak:
+            header = "♠️ <b>Tᴏᴘ 10 Cᴀʀᴅ Gᴀᴍᴇ Pʟᴀʏᴇʀs — Sᴛʀᴇᴀᴋs</b> ♠️\n\n"
+        else:
+            header = "♠️ <b>Tᴏᴘ 10 Cᴀʀᴅ Gᴀᴍᴇ Pʟᴀʏᴇʀs</b> ♠️\n\n"
 
-    rank_icons = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
+        lines = ""
+        for i, u in enumerate(top_list, start=1):
+            user_id   = u.get("id")
+            safe_name = html.escape(str(u.get("name", "Unknown")))
+            clickable = f'<a href="tg://user?id={user_id}">{safe_name}</a>'
+            total_won = u.get("card_wins_total", 0)
+            streak    = u.get("card_streak", 0)
 
-    for i, user in enumerate(top_list):
-        user_id    = user.get("id")
-        safe_name  = html.escape(str(user.get("name", "Unknown")))
-        icon       = get_leaderboard_icon(user, context)  # your existing icon helper
-        clickable  = f'<a href="tg://user?id={user_id}">{safe_name}</a>'
-        total_won  = user.get("card_wins_total", 0)
-        streak     = user.get("card_streak", 0)
-        rank       = rank_icons[i] if i < len(rank_icons) else f"{i+1}."
+            # ── Icon resolution ──────────────────────────────
+            custom_icon = u.get("custom_icon", "").strip()
+            is_premium  = u.get("premium", False)
 
-        text += (
-            f"{rank} {icon} {clickable}\n"
-            f"    💰 <code>{total_won:,}</code> {sc('earned')}  "
-            f"🔥 {sc('Streak')}: <b>{streak}</b>\n\n"
+            if custom_icon:
+                icon = custom_icon
+            elif is_premium:
+                icon = "💓"
+            else:
+                icon = "👤"
+
+            if show_streak:
+                lines += (
+                    f"<b>{i}.</b> {icon} {clickable}\n"
+                    f"     🔥 {sc('Streak')}: <b>{streak}</b>\n\n"
+                )
+            else:
+                lines += (
+                    f"<b>{i}.</b> {icon} {clickable} "
+                    f"— <code>{total_won:,}</code> 💰\n"
+                )
+
+        footer = (
+            "\n\n✨ = Cᴜsᴛᴏᴍ • 💓 = Pʀᴇᴍɪᴜᴍ • 👤 = Nᴏʀᴍᴀʟ\n"
+            "<i>♠️ Pʟᴀʏ ᴍᴏʀᴇ ᴡɪᴛʜ /card &lt;ᴀᴍᴏᴜɴᴛ&gt;</i>"
+        )
+        return header + lines + footer
+
+    keyboard = InlineKeyboardMarkup([[
+        InlineKeyboardButton("🔥 " + sc("View Streaks"), callback_data="topcarder_streak"),
+        InlineKeyboardButton("💰 " + sc("View Earnings"), callback_data="topcarder_earnings"),
+    ]])
+
+    await msg.reply_text(
+        build_text(show_streak=False),
+        parse_mode=ParseMode.HTML,
+        reply_markup=keyboard
+    )
+
+
+# ============================================================
+#  CALLBACK — inline button handler for /topcarder
+# ============================================================
+async def cb_topcarder(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    top_list = list(
+        users.find(
+            {"card_wins_total": {"$exists": True, "$gt": 0}},
+            {"id": 1, "name": 1, "card_wins_total": 1, "card_streak": 1, "custom_icon": 1, "premium": 1}
+        ).sort("card_wins_total", -1).limit(10)
+    )
+
+    if not top_list:
+        return await query.edit_message_text(
+            f"📭 {sc('No card game winners yet.')}",
+            parse_mode="HTML"
         )
 
-    text += (
-        "✨ = Cᴜsᴛᴏᴍ • 💓 = Pʀᴇᴍɪᴜᴍ • 👤 = Nᴏʀᴍᴀʟ\n\n"
+    show_streak = query.data == "topcarder_streak"
+
+    if show_streak:
+        header = "♠️ <b>Tᴏᴘ 10 Cᴀʀᴅ Gᴀᴍᴇ Pʟᴀʏᴇʀs — Sᴛʀᴇᴀᴋs</b> ♠️\n\n"
+    else:
+        header = "♠️ <b>Tᴏᴘ 10 Cᴀʀᴅ Gᴀᴍᴇ Pʟᴀʏᴇʀs</b> ♠️\n\n"
+
+    lines = ""
+    for i, u in enumerate(top_list, start=1):
+        user_id   = u.get("id")
+        safe_name = html.escape(str(u.get("name", "Unknown")))
+        clickable = f'<a href="tg://user?id={user_id}">{safe_name}</a>'
+        total_won = u.get("card_wins_total", 0)
+        streak    = u.get("card_streak", 0)
+
+        custom_icon = u.get("custom_icon", "").strip()
+        is_premium  = u.get("premium", False)
+
+        if custom_icon:
+            icon = custom_icon
+        elif is_premium:
+            icon = "💓"
+        else:
+            icon = "👤"
+
+        if show_streak:
+            lines += (
+                f"<b>{i}.</b> {icon} {clickable}\n"
+                f"     🔥 {sc('Streak')}: <b>{streak}</b>\n\n"
+            )
+        else:
+            lines += (
+                f"<b>{i}.</b> {icon} {clickable} "
+                f"— <code>{total_won:,}</code> 💰\n"
+            )
+
+    footer = (
+        "\n\n✨ = Cᴜsᴛᴏᴍ • 💓 = Pʀᴇᴍɪᴜᴍ • 👤 = Nᴏʀᴍᴀʟ\n"
         "<i>♠️ Pʟᴀʏ ᴍᴏʀᴇ ᴡɪᴛʜ /card &lt;ᴀᴍᴏᴜɴᴛ&gt;</i>"
     )
 
-    await msg.reply_text(text, parse_mode=ParseMode.HTML)
+    keyboard = InlineKeyboardMarkup([[
+        InlineKeyboardButton("🔥 " + sc("View Streaks"),  callback_data="topcarder_streak"),
+        InlineKeyboardButton("💰 " + sc("View Earnings"), callback_data="topcarder_earnings"),
+    ]])
 
+    await query.edit_message_text(
+        header + lines + footer,
+        parse_mode=ParseMode.HTML,
+        reply_markup=keyboard
+    )
 
 # ============================================================
 #  /activecards — Show all running card games  (Owner only)
