@@ -5285,60 +5285,103 @@ async def rullrank(update: Update, context: ContextTypes.DEFAULT_TYPE):
 #--
 import asyncio
 import time
-import json
-import os
+import random
+import string
 from telegram import Update
-from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
+from telegram.constants import ParseMode
 
-HISTORY_FILE = "broadcast_history.json"
-
+# ============================================================
+#  HELPERS
+# ============================================================
 def is_owner(user_id):
     if 'OWNER_ID' in globals():
         owners = OWNER_ID if isinstance(OWNER_ID, list) else [OWNER_ID]
         return user_id in owners
     return False
 
-def load_history():
-    if os.path.exists(HISTORY_FILE):
-        with open(HISTORY_FILE, "r") as f:
-            try:
-                return json.load(f)
-            except:
-                return {"private": [], "groups": []}
-    return {"private": [], "groups": []}
+def gen_batch_id() -> str:
+    """Generate a unique batch ID like BC_38472916"""
+    digits = ''.join(random.choices(string.digits, k=8))
+    return f"BC_{digits}"
 
-def save_history(data):
-    with open(HISTORY_FILE, "w") as f:
-        json.dump(data, f, indent=4)
+# ── MongoDB collections ──────────────────────────────────────
+# db["broadcasts"] — stores each saved batch
+# Schema: { batch_id, type ("group"|"private"), messages: [{c, m}], created_at }
 
 broadcast_control = {"running": False, "cancel": False}
 
-async def perform_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE, target_chats, is_group=False, mode="forward"):
+# ============================================================
+#  /send_gro [copy|forward] [save|none]
+#  /send_pri [copy|forward] [save|none]
+# ============================================================
+async def send_gro(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_owner(update.effective_user.id):
-        return await update.message.reply_text("❌ Uɴᴀᴜᴛʜᴏʀɪᴢᴇᴅ")
+        return await update.message.reply_text("❌ Oᴡɴᴇʀ Oɴʟʏ.")
+    all_groups = list(db["chats"].find({"type": {"$in": ["group", "supergroup"]}}))
+    await _perform_broadcast(update, context, all_groups, bc_type="group")
+
+async def send_pri(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_owner(update.effective_user.id):
+        return await update.message.reply_text("❌ Oᴡɴᴇʀ Oɴʟʏ.")
+    all_privates = list(db["chats"].find({"type": "private"}))
+    await _perform_broadcast(update, context, all_privates, bc_type="private")
+
+# ============================================================
+#  CORE BROADCAST
+# ============================================================
+async def _perform_broadcast(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    target_chats: list,
+    bc_type: str,          # "group" | "private"
+):
+    msg = update.message
 
     if broadcast_control["running"]:
-        return await update.message.reply_text("⚠️ Aɴᴏᴛʜᴇʀ ʙʀᴏᴀᴅᴄᴀsᴛ ɪs ᴄᴜʀʀᴇɴᴛʟʏ ʀᴜɴɴɪɴɢ!")
+        return await msg.reply_text("⚠️ Aɴᴏᴛʜᴇʀ ʙʀᴏᴀᴅᴄᴀsᴛ ɪs ᴄᴜʀʀᴇɴᴛʟʏ ʀᴜɴɴɪɴɢ!")
 
-    if not update.message.reply_to_message:
-        return await update.message.reply_text("❌ Rᴇᴘʟʏ ᴛᴏ ᴀ ᴍᴇssᴀɢᴇ ᴛᴏ ʙʀᴏᴀᴅᴄᴀsᴛ.")
+    if not msg.reply_to_message:
+        return await msg.reply_text(
+            "❌ Rᴇᴘʟʏ ᴛᴏ ᴀ ᴍᴇssᴀɢᴇ ᴛᴏ ʙʀᴏᴀᴅᴄᴀsᴛ.\n\n"
+            "📌 <b>Usage:</b> /send_gro [copy|forward] [save|none]\n"
+            "📌 <b>Usage:</b> /send_pri [copy|forward] [save|none]",
+            parse_mode=ParseMode.HTML
+        )
 
-    target_msg_id = update.message.reply_to_message.message_id
+    # ── Parse args ────────────────────────────────────────────
+    args    = context.args or []
+    mode    = "forward"
+    do_save = False
+
+    for arg in args:
+        a = arg.lower().strip()
+        if a in ("copy", "forward"):
+            mode = a
+        elif a == "save":
+            do_save = True
+
+    total        = len(target_chats)
     from_chat_id = update.effective_chat.id
-    total = len(target_chats)
+    target_msg   = msg.reply_to_message.message_id
+    label        = "Gʀᴏᴜᴘ" if bc_type == "group" else "Pʀɪᴠᴀᴛᴇ"
+    save_note    = "\n💾 <b>Sᴀᴠɪɴɢ ᴅᴀᴛᴀ...</b>" if do_save else ""
 
     if total == 0:
-        return await update.message.reply_text("❌ Nᴏ ᴄʜᴀᴛs ꜰᴏᴜɴᴅ.")
+        return await msg.reply_text("❌ Nᴏ ᴄʜᴀᴛs ꜰᴏᴜɴᴅ.")
 
     broadcast_control["running"] = True
-    broadcast_control["cancel"] = False
-    
-    current_results = []
-    success, failed = 0, 0
-    start_time = time.time()
-    label = "Gʀᴏᴜᴘ" if is_group else "Pʀɪᴠᴀᴛᴇ"
-    progress_msg = await update.message.reply_text(f"🚀 Sᴛᴀʀᴛɪɴɢ {label} ({mode}) Bʀᴏᴀᴅᴄᴀsᴛ...")
+    broadcast_control["cancel"]  = False
+
+    progress_msg = await msg.reply_text(
+        f"📢 <b>Bʀᴏᴀᴅᴄᴀsᴛɪɴɢ ᴏɴ {total} {label}s</b> [{mode}]{save_note}",
+        parse_mode=ParseMode.HTML
+    )
+
+    success       = 0
+    failed        = 0
+    saved_records = []
+    start_time    = time.time()
 
     for i, chat in enumerate(target_chats, start=1):
         if broadcast_control["cancel"]:
@@ -5349,104 +5392,177 @@ async def perform_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE, 
                 sent = await context.bot.forward_message(
                     chat_id=chat["id"],
                     from_chat_id=from_chat_id,
-                    message_id=target_msg_id
+                    message_id=target_msg
                 )
             else:
                 sent = await context.bot.copy_message(
                     chat_id=chat["id"],
                     from_chat_id=from_chat_id,
-                    message_id=target_msg_id
+                    message_id=target_msg
                 )
-            
-            current_results.append({"c": chat["id"], "m": sent.message_id})
-            
-            if is_group:
+
+            if do_save:
+                saved_records.append({"c": chat["id"], "m": sent.message_id})
+
+            if bc_type == "group":
                 try:
-                    await context.bot.pin_chat_message(chat_id=chat["id"], message_id=sent.message_id)
-                except: pass
-                
+                    await context.bot.pin_chat_message(
+                        chat_id=chat["id"],
+                        message_id=sent.message_id
+                    )
+                except Exception:
+                    pass
+
             success += 1
+
         except Exception:
             failed += 1
 
+        # ── Progress update every 10 ──────────────────────────
         if i % 10 == 0 or i == total:
             percent = int((i / total) * 100)
-            bar = "█" * (percent // 10) + "░" * (10 - (percent // 10))
+            bar     = "█" * (percent // 10) + "░" * (10 - percent // 10)
             try:
                 await progress_msg.edit_text(
                     f"📊 <b>{label} Bʀᴏᴀᴅᴄᴀsᴛɪɴɢ...</b>\n\n"
                     f"<code>[{bar}]</code> {percent}%\n"
-                    f"✅ Sᴜᴄᴄᴇss: {success}\n"
-                    f"❌ Fᴀɪʟᴇᴅ: {failed}\n"
-                    f"📦 Tᴏᴛᴀʟ: {total}",
+                    f"✅ Sᴜᴄᴄᴇss: <b>{success}</b>\n"
+                    f"❌ Fᴀɪʟᴇᴅ: <b>{failed}</b>\n"
+                    f"📦 Tᴏᴛᴀʟ: <b>{total}</b>",
                     parse_mode=ParseMode.HTML
                 )
-            except: pass
+            except Exception:
+                pass
+
         await asyncio.sleep(0.08)
 
-    history = load_history()
-    history["groups" if is_group else "private"].append(current_results)
-    save_history(history)
-
     broadcast_control["running"] = False
-    status = "🛑 Sᴛᴏᴘᴘᴇᴅ" if broadcast_control["cancel"] else "✅ Cᴏᴍᴘʟᴇᴛᴇᴅ"
+
+    # ── Save batch to MongoDB ─────────────────────────────────
+    batch_id   = None
+    batch_line = ""
+
+    if do_save and saved_records:
+        batch_id = gen_batch_id()
+        db["broadcasts"].insert_one({
+            "batch_id":   batch_id,
+            "type":       bc_type,
+            "messages":   saved_records,
+            "created_at": time.time(),
+        })
+        batch_line = f"\n📦 <b>Bᴀᴛᴄʜ Sᴀᴠᴇᴅ:</b> <code>{batch_id}</code>"
+
+    status = "🛑 Sᴛᴏᴘᴘᴇᴅ" if broadcast_control["cancel"] else "✅ Dᴏɴᴇ"
+    elapsed = round(time.time() - start_time, 2)
 
     await progress_msg.edit_text(
         f"📢 <b>{label} Bʀᴏᴀᴅᴄᴀsᴛ {status}</b>\n\n"
-        f"✅ Sᴇɴᴛ: {success}\n"
-        f"❌ Fᴀɪʟᴇᴅ: {failed}\n"
-        f"⏱ Tɪᴍᴇ: {round(time.time() - start_time, 2)}s",
+        f"✅ <b>Sᴇɴᴛ ʙʀᴏᴀᴅᴄᴀsᴛ ᴛᴏ {success} {label}s</b>\n"
+        f"❌ Fᴀɪʟᴇᴅ: <b>{failed}</b>\n"
+        f"⏱ Tɪᴍᴇ: <b>{elapsed}s</b>"
+        f"{batch_line}",
         parse_mode=ParseMode.HTML
     )
 
-async def broad_c(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    mode = "forward"
-    if context.args and context.args[0].lower() == "normal":
-        mode = "normal"
-    all_privates = list(db["chats"].find({"type": "private"}))
-    await perform_broadcast(update, context, all_privates, is_group=False, mode=mode)
-
-async def broad_gc(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    mode = "forward"
-    if context.args and context.args[0].lower() == "normal":
-        mode = "normal"
-    all_groups = list(db["chats"].find({"type": {"$in": ["group", "supergroup"]}}))
-    await perform_broadcast(update, context, all_groups, is_group=True, mode=mode)
-
+# ============================================================
+#  /stop_broad — cancel running broadcast
+# ============================================================
 async def stop_broad(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_owner(update.effective_user.id): return
+    if not is_owner(update.effective_user.id):
+        return
     broadcast_control["cancel"] = True
     await update.message.reply_text("🛑 Sᴛᴏᴘ ʀᴇǫᴜᴇsᴛ sᴇɴᴛ.")
 
+# ============================================================
+#  /del_broad [group|private]  — list batches or delete one
+#
+#  /del_broad group            → show saved group batches
+#  /del_broad private          → show saved private batches
+#  /del_broad group 1          → delete batch #1 from group list
+# ============================================================
 async def del_broad(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_owner(update.effective_user.id): return
-    if len(context.args) < 2:
-        return await update.message.reply_text("❌ Usᴀɢᴇ: /del_broad [private|groups] [number]")
+    if not is_owner(update.effective_user.id):
+        return
 
-    target_type = context.args[0].lower()
+    msg  = update.message
+    args = context.args or []
+
+    if not args:
+        return await msg.reply_text(
+            "📌 <b>Usage:</b>\n"
+            "/del_broad group — Lɪsᴛ ɢʀᴏᴜᴘ ʙᴀᴛᴄʜᴇs\n"
+            "/del_broad private — Lɪsᴛ ᴘʀɪᴠᴀᴛᴇ ʙᴀᴛᴄʜᴇs\n"
+            "/del_broad group 1 — Dᴇʟᴇᴛᴇ ɢʀᴏᴜᴘ ʙᴀᴛᴄʜ #1",
+            parse_mode=ParseMode.HTML
+        )
+
+    bc_type = args[0].lower()
+    if bc_type not in ("group", "private"):
+        return await msg.reply_text("❌ Tʏᴘᴇ ᴍᴜsᴛ ʙᴇ <b>group</b> ᴏʀ <b>private</b>.", parse_mode=ParseMode.HTML)
+
+    # ── LIST mode ─────────────────────────────────────────────
+    if len(args) == 1:
+        batches = list(
+            db["broadcasts"]
+            .find({"type": bc_type})
+            .sort("created_at", 1)
+        )
+
+        if not batches:
+            return await msg.reply_text(f"📭 Nᴏ sᴀᴠᴇᴅ {bc_type} ʙᴀᴛᴄʜᴇs.")
+
+        lines = f"📦 <b>Sᴀᴠᴇᴅ {bc_type.capitalize()} Bᴀᴛᴄʜᴇs:</b>\n\n"
+        for i, batch in enumerate(batches, start=1):
+            count     = len(batch.get("messages", []))
+            batch_id  = batch["batch_id"]
+            ts        = batch.get("created_at", 0)
+            from datetime import datetime
+            date_str  = datetime.utcfromtimestamp(ts).strftime("%d %b %Y")
+            lines += f"{i}. <code>{batch_id}</code> — {count} ᴍsɢs — {date_str}\n"
+
+        lines += f"\n💡 /del_broad {bc_type} [number] ᴛᴏ ᴅᴇʟᴇᴛᴇ"
+        return await msg.reply_text(lines, parse_mode=ParseMode.HTML)
+
+    # ── DELETE mode ───────────────────────────────────────────
     try:
-        index = int(context.args[1]) - 1
-    except:
-        return await update.message.reply_text("❌ Pʟᴇᴀsᴇ ᴘʀᴏᴠɪᴅᴇ ᴀ ᴠᴀʟɪᴅ ɴᴜᴍʙᴇʀ.")
+        index = int(args[1]) - 1
+    except ValueError:
+        return await msg.reply_text("❌ Pʟᴇᴀsᴇ ᴘʀᴏᴠɪᴅᴇ ᴀ ᴠᴀʟɪᴅ ɴᴜᴍʙᴇʀ.")
 
-    history = load_history()
-    if target_type not in history or index < 0 or index >= len(history[target_type]):
-        return await update.message.reply_text(f"❌ Bʀᴏᴀᴅᴄᴀsᴛ #{index + 1} ɴᴏᴛ ғᴏᴜɴᴅ.")
+    batches = list(
+        db["broadcasts"]
+        .find({"type": bc_type})
+        .sort("created_at", 1)
+    )
 
-    target_data = history[target_type][index]
-    status_msg = await update.message.reply_text(f"🗑️ Dᴇʟᴇᴛɪɴɢ ʙʀᴏᴀᴅᴄᴀsᴛ #{index + 1}...")
-    
+    if index < 0 or index >= len(batches):
+        return await msg.reply_text(f"❌ Bᴀᴛᴄʜ #{index + 1} ɴᴏᴛ ꜰᴏᴜɴᴅ.")
+
+    target_batch = batches[index]
+    batch_id     = target_batch["batch_id"]
+    records      = target_batch.get("messages", [])
+
+    status_msg = await msg.reply_text(
+        f"🗑️ <b>Dᴇʟᴇᴛɪɴɢ</b> <code>{batch_id}</code>...",
+        parse_mode=ParseMode.HTML
+    )
+
     deleted = 0
-    for item in target_data:
+    for item in records:
         try:
             await context.bot.delete_message(chat_id=item["c"], message_id=item["m"])
             deleted += 1
-        except: pass
+        except Exception:
+            pass
         await asyncio.sleep(0.05)
 
-    history[target_type].pop(index)
-    save_history(history)
-    await status_msg.edit_text(f"✅ Dᴇʟᴇᴛᴇᴅ {deleted} ᴍᴇssᴀɢᴇs ꜰʀᴏᴍ ʙʀᴏᴀᴅᴄᴀsᴛ #{index + 1}.")
+    db["broadcasts"].delete_one({"batch_id": batch_id})
+
+    await status_msg.edit_text(
+        f"✅ <b>Dᴇʟᴇᴛᴇᴅ <code>{batch_id}</code></b>\n\n"
+        f"🗑️ Mᴇssᴀɢᴇs Rᴇᴍᴏᴠᴇᴅ: <b>{deleted}</b>",
+        parse_mode=ParseMode.HTML
+    )
 
 #===============Mini_Upgrades===============
 #--
@@ -7363,10 +7479,10 @@ application.add_handler(CommandHandler("personal", send_personal))
 application.add_handler(CommandHandler("q", quote))
 application.add_handler(CommandHandler("obt", save_sticker))
 application.add_handler(CommandHandler("groups", groups_command))
-application.add_handler(CommandHandler("broad_c", broad_c))
-application.add_handler(CommandHandler("broad_gc", broad_gc))
+application.add_handler(CommandHandler("send_gro",   send_gro))
+application.add_handler(CommandHandler("send_pri",   send_pri))
 application.add_handler(CommandHandler("stop_broad", stop_broad))
-application.add_handler(CommandHandler("del_broad", del_broad))
+application.add_handler(CommandHandler("del_broad",  del_broad))
 application.add_handler(CommandHandler("block", block_cmd))
 application.add_handler(CommandHandler("unblock", unblock_cmd))
 application.add_handler(CommandHandler("ping", ping))
