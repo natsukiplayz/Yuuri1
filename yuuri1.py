@@ -1569,6 +1569,7 @@ async def _finish_game(context, chat_id: int):
         u["xp"]          = u.get("xp", 0) + xp_gained
         streak           = u.get("card_streak", 0) + 1
         u["card_streak"] = streak
+        u["card_wins_total"] = u.get("card_wins_total", 0) + net_each
         save_user(u)
     else:
         streak = 1
@@ -1777,6 +1778,124 @@ async def cmd_cancelgames(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="HTML"
     )
 
+import html
+from telegram.constants import ParseMode
+
+# ============================================================
+#  /topcarder — Top 10 Card Game Winners
+# ============================================================
+async def cmd_topcarder(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat = update.effective_chat
+    msg  = update.message
+
+    # Sort by total coins won from card games (card_wins_total)
+    # Falls back to card_streak if you don't track total winnings separately
+    top_list = list(
+        users.find(
+            {"card_wins_total": {"$exists": True, "$gt": 0}},
+            {"id": 1, "name": 1, "card_wins_total": 1, "card_streak": 1}
+        ).sort("card_wins_total", -1).limit(10)
+    )
+
+    if not top_list:
+        return await msg.reply_text(
+            f"📭 {sc('No card game winners yet.')}",
+            parse_mode="HTML"
+        )
+
+    text = "♠️ <b>Tᴏᴘ 10 Cᴀʀᴅ Gᴀᴍᴇ Pʟᴀʏᴇʀs</b> ♠️\n\n"
+
+    rank_icons = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
+
+    for i, user in enumerate(top_list):
+        user_id    = user.get("id")
+        safe_name  = html.escape(str(user.get("name", "Unknown")))
+        icon       = get_leaderboard_icon(user, context)  # your existing icon helper
+        clickable  = f'<a href="tg://user?id={user_id}">{safe_name}</a>'
+        total_won  = user.get("card_wins_total", 0)
+        streak     = user.get("card_streak", 0)
+        rank       = rank_icons[i] if i < len(rank_icons) else f"{i+1}."
+
+        text += (
+            f"{rank} {icon} {clickable}\n"
+            f"    💰 <code>{total_won:,}</code> {sc('earned')}  "
+            f"🔥 {sc('Streak')}: <b>{streak}</b>\n\n"
+        )
+
+    text += (
+        "✨ = Cᴜsᴛᴏᴍ • 💓 = Pʀᴇᴍɪᴜᴍ • 👤 = Nᴏʀᴍᴀʟ\n\n"
+        "<i>♠️ Pʟᴀʏ ᴍᴏʀᴇ ᴡɪᴛʜ /card &lt;ᴀᴍᴏᴜɴᴛ&gt;</i>"
+    )
+
+    await msg.reply_text(text, parse_mode=ParseMode.HTML)
+
+
+# ============================================================
+#  /activecards — Show all running card games  (Owner only)
+# ============================================================
+async def cmd_activecards(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg  = update.message
+    user = update.effective_user
+
+    if user.id != OWNER_ID:
+        return await msg.reply_text("❌ Oᴡɴᴇʀ Oɴʟʏ.")
+
+    if not active_games:
+        return await msg.reply_text(
+            "✅ <b>Nᴏ Aᴄᴛɪᴠᴇ Cᴀʀᴅ Gᴀᴍᴇs Rɪɢʜᴛ Nᴏᴡ.</b>",
+            parse_mode="HTML"
+        )
+
+    text  = "♠️ <b>Aᴄᴛɪᴠᴇ Cᴀʀᴅ Gᴀᴍᴇs</b> ♠️\n\n"
+    count = 0
+
+    for chat_id, game in active_games.items():
+        count += 1
+        phase   = game.get("phase", "unknown")
+        bet     = game.get("bet", 0)
+        players = game.get("players", {})
+        rnd     = game.get("round", 1)
+        host_id = game.get("host_id")
+
+        # Try to get the group name
+        try:
+            chat_obj   = await context.bot.get_chat(chat_id)
+            group_name = html.escape(chat_obj.title or str(chat_id))
+        except Exception:
+            group_name = str(chat_id)
+
+        # Host name
+        host_name = "Unknown"
+        if host_id and host_id in players:
+            host_name = html.escape(players[host_id].get("name", "Unknown"))
+
+        # Player list (first 5 shown)
+        player_names = [html.escape(p.get("name", "?")) for p in players.values()]
+        shown        = player_names[:5]
+        extra        = len(player_names) - 5
+        players_line = ", ".join(shown)
+        if extra > 0:
+            players_line += f" +{extra} {sc('more')}"
+
+        phase_icon = {
+            "joining":  "⏳",
+            "playing":  "🎮",
+            "done":     "✅",
+        }.get(phase, "❓")
+
+        text += (
+            f"{count}. 🏠 <b>{group_name}</b>\n"
+            f"    🆔 <code>{chat_id}</code>\n"
+            f"    {phase_icon} {sc('Phase')}: <b>{phase.upper()}</b>\n"
+            f"    💰 {sc('Bet')}: <b>{bet:,}</b>\n"
+            f"    👥 {sc('Players')} ({len(players)}): {players_line}\n"
+            f"    🔄 {sc('Round')}: <b>{rnd}/{MAX_ROUNDS}</b>\n"
+            f"    👑 {sc('Host')}: <b>{host_name}</b>\n\n"
+        )
+
+    text += f"📊 {sc('Total Active Games')}: <b>{count}</b>"
+
+    await msg.reply_text(text, parse_mode=ParseMode.HTML)
 
 # ============================================================
 #  HANDLER REGISTRATION
@@ -7198,6 +7317,8 @@ application.add_handler(CommandHandler("flip", cmd_flip))
 application.add_handler(CommandHandler("cardhelp", cmd_cardhelp))
 application.add_handler(CommandHandler("cardlock",    cmd_cardlock))
 application.add_handler(CommandHandler("cancelgames", cmd_cancelgames))
+application.add_handler(CommandHandler("topcarder",   cmd_topcarder))
+application.add_handler(CommandHandler("activecards", cmd_activecards))  # owner only
 
 # Message Handlers
 application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
