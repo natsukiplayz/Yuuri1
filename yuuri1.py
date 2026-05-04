@@ -1427,11 +1427,25 @@ async def cmd_flip(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await _send_cards_dm(context, uid, pdata, played_slot=raw_slot, played_val=val)
 
+plays_so_far = game["round_plays"]
+    order        = game["turn_order"]
+    played_lines = "\n".join(
+        f"• <b>{game['players'][uid]['name']}</b> ➜ <b>{plays_so_far[uid][0]}</b>"
+        for uid in order if uid in plays_so_far
+    )
+    waiting_uids  = [uid for uid in order if uid not in plays_so_far]
+    waiting_names = ", ".join(
+        f'<a href="tg://user?id={uid}">{game["players"][uid]["name"]}</a>'
+        for uid in waiting_uids
+    )
+    waiting_line = f"\n⏳ {sc('Waiting')}: {waiting_names}" if waiting_uids else ""
+
     sent = await context.bot.send_message(
         chat_id=target_chat_id,
         text=(
-            f"🏆 {sc('Round')} {rnd}\n\n"
-            f"• <b>{pdata['name']}</b> ➜ <b>{val}</b>"
+            f"🃏 <b>{sc('Round')} {rnd} — {sc('Flips So Far')}</b>\n\n"
+            f"{played_lines}"
+            f"{waiting_line}"
         ),
         parse_mode="HTML"
     )
@@ -1449,14 +1463,13 @@ async def _finish_round(context, chat_id: int):
         return
 
     rnd     = game["round"]
-    plays   = game["round_plays"]   # {uid: (val, pts)}
+    plays   = game["round_plays"]
     players = game["players"]
 
     if plays:
         max_val   = max(v for v, _ in plays.values())
         r_winners = [uid for uid, (v, _) in plays.items() if v == max_val]
 
-        # All players' points this round go to EACH round winner (no split)
         round_total_pts = sum(pts for _, pts in plays.values())
         for uid in r_winners:
             players[uid]["points"] += round_total_pts
@@ -1464,20 +1477,22 @@ async def _finish_round(context, chat_id: int):
         sorted_plays = sorted(
             plays.items(), key=lambda x: x[1][0], reverse=True
         )
+
+        # ── Build combined flip result ────────────────────────
         lines = "\n".join(
-            f"• <b>{players[uid]['name']}</b> ➜ {val}  (+{pts} {sc('pts')})"
+            f"{'🏆' if uid in r_winners else '•'} <b>{players[uid]['name']}</b> ➜ <b>{val}</b>  (+{pts} {sc('pts')})"
             for uid, (val, pts) in sorted_plays
         )
-        winner_names = ", ".join(players[uid]["name"] for uid in r_winners)
+        winner_names = ", ".join(f"<b>{players[uid]['name']}</b>" for uid in r_winners)
 
         sent = await context.bot.send_message(
             chat_id=chat_id,
             text=(
-                f"🎯 {sc('Round')} {rnd} {sc('Result')}\n\n"
+                f"🎯 <b>{sc('Round')} {rnd} {sc('Result')}</b>\n\n"
                 f"{lines}\n\n"
-                f"🏆 {sc('Round')} {rnd} {sc('Winner(s)')}: <b>{winner_names}</b>\n"
+                f"🏆 {sc('Winner')}: {winner_names}\n"
                 f"🎴 {sc('Highest Card')}: <b>{max_val}</b>\n"
-                f"💰 {sc('Points Awarded (Each Winner)')}: <b>{round_total_pts}</b>"
+                f"💰 {sc('Points Awarded')}: <b>{round_total_pts}</b>"
             ),
             parse_mode="HTML"
         )
@@ -1491,14 +1506,12 @@ async def _finish_round(context, chat_id: int):
     game["round_plays"]  = {}
     game["current_turn"] = 0
 
-    next_rnd = game["round"]
     sent = await context.bot.send_message(
         chat_id=chat_id,
-        text=f"✅ {sc('Round')} {next_rnd} {sc('Started.')}",
+        text=f"✅ {sc('Round')} {game['round']} {sc('Started.')}",
         parse_mode="HTML"
     )
     _track_bot_msg(game, chat_id, sent)
-
     await _start_round(context, chat_id)
 
 # ============================================================
@@ -1993,6 +2006,422 @@ async def cmd_activecards(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text += f"📊 {sc('Total Active Games')}: <b>{count}</b>"
 
     await msg.reply_text(text, parse_mode=ParseMode.HTML)
+
+# ============================================================
+#  /card2 <amount> <@username|userid>  — invite 1 specific user
+#  /card3 <amount>  — host picks 2 users via DM
+#  /card4 <amount>  — host picks 3 users via DM
+#  /card5 <amount>  — host picks 4 users via DM
+# ============================================================
+
+async def _start_invite_game(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    max_players: int,          # total players including host
+    target_user=None,          # only for card2: pre-resolved User object
+):
+    chat = update.effective_chat
+    user = update.effective_user
+    msg  = update.message
+
+    if chat.type == "private":
+        return await msg.reply_text(sc("Group only."))
+
+    chat_id = chat.id
+
+    if is_card_locked(chat_id):
+        return await msg.reply_text(
+            "🔒 <b>Cᴀʀᴅ Gᴀᴍᴇ Iꜱ Cᴜʀʀᴇɴᴛʟʏ Lᴏᴄᴋᴇᴅ.</b>",
+            parse_mode="HTML"
+        )
+
+    if chat_id in active_games and active_games[chat_id]["phase"] != "done":
+        return await msg.reply_text(f"🚫 {sc('Game already running.')}")
+
+    if not context.args:
+        return await msg.reply_text(
+            f"<b>{sc('Usage')}:</b> /card{max_players} &lt;{sc('amount')}&gt;"
+            + (f" &lt;@{sc('username or id')}&gt;" if max_players == 2 else ""),
+            parse_mode="HTML"
+        )
+
+    try:
+        bet = int(context.args[0])
+    except ValueError:
+        return await msg.reply_text(sc("Invalid amount."))
+
+    if bet <= MIN_BET:
+        return await msg.reply_text(f"⚠️ {sc('Min bet is')} {MIN_BET}.")
+
+    host_data = get_user(user)
+    if not host_data or host_data.get("coins", 0) < bet:
+        return await msg.reply_text(sc("Insufficient coins."))
+
+    host_data["coins"] -= bet
+    save_user(host_data)
+
+    game = {
+        "host_id":      user.id,
+        "bet":          bet,
+        "max_players":  max_players,
+        "players": {
+            user.id: {
+                "name":         user.first_name,
+                "cards":        {},
+                "points":       0,
+                "_point_noise": 0,
+                "premium":      is_premium(host_data, context),
+                "dm_msg_id":    None,
+            }
+        },
+        "round":        1,
+        "turn_order":   [],
+        "current_turn": 0,
+        "round_plays":  {},
+        "phase":        "joining",
+        "join_task":    None,
+        "remind_task":  None,
+        "tracked_msgs": [],
+        "invite_mode":  True,
+        "invite_pending": max_players - 1,   # how many more needed
+    }
+    active_games[chat_id] = game
+    game["tracked_msgs"].append((chat_id, msg.message_id))
+
+    # ── card2: target already known ───────────────────────────
+    if max_players == 2 and target_user:
+        target_data = get_user(target_user)
+        if not target_data or target_data.get("coins", 0) < bet:
+            # Refund host and abort
+            host_data["coins"] += bet
+            save_user(host_data)
+            active_games.pop(chat_id, None)
+            return await msg.reply_text(
+                f"❌ <b>{target_user.first_name}</b> {sc('does not have enough coins.')}",
+                parse_mode="HTML"
+            )
+
+        target_data["coins"] -= bet
+        save_user(target_data)
+
+        game["players"][target_user.id] = {
+            "name":         target_user.first_name,
+            "cards":        {},
+            "points":       0,
+            "_point_noise": 0,
+            "premium":      is_premium(target_data, context),
+            "dm_msg_id":    None,
+        }
+
+        sent = await msg.reply_text(
+            f"♠️ <b>{sc('Private Card Game!')}</b>\n\n"
+            f"👥 {user.first_name} ᴠs {target_user.first_name}\n"
+            f"💰 {sc('Bet')}: <b>{bet}</b>\n\n"
+            f"🃏 {sc('Starting now...')}",
+            parse_mode="HTML"
+        )
+        _track_bot_msg(game, chat_id, sent)
+
+        # Notify invited player via DM
+        try:
+            await context.bot.send_message(
+                chat_id=target_user.id,
+                text=(
+                    f"♠️ <b>{sc('You have been invited to a card game!')}</b>\n\n"
+                    f"👑 {sc('Host')}: <b>{user.first_name}</b>\n"
+                    f"💰 {sc('Entry Fee')}: <b>{bet}</b> {sc('coins deducted.')}\n\n"
+                    f"🃏 {sc('Game is starting in the group!')}"
+                ),
+                parse_mode="HTML"
+            )
+        except Exception:
+            pass
+
+        # Start immediately
+        game["phase"] = "joining"
+        game["join_task"] = asyncio.create_task(_force_start_game(context, chat_id))
+        return
+
+    # ── card3/4/5: ask host via DM for usernames ──────────────
+    need = max_players - 1
+    sent = await msg.reply_text(
+        f"♠️ <b>{sc('Private Card Game Created!')}</b>\n\n"
+        f"💰 {sc('Bet')}: <b>{bet}</b>\n"
+        f"👥 {sc('Players needed')}: <b>{need}</b>\n\n"
+        f"📩 {sc('Check your DM — send me the usernames!')}",
+        parse_mode="HTML"
+    )
+    _track_bot_msg(game, chat_id, sent)
+
+    # DM the host
+    try:
+        await context.bot.send_message(
+            chat_id=user.id,
+            text=(
+                f"♠️ <b>{sc('Card Game Setup')}</b>\n\n"
+                f"📝 {sc('Send me')} <b>{need}</b> {sc('usernames or user IDs')}\n"
+                f"{sc('one per line or space-separated.')}\n\n"
+                f"💡 {sc('Example')}:\n"
+                f"<code>@player1 @player2</code>\n\n"
+                f"⏳ {sc('You have 60 seconds.')}"
+            ),
+            parse_mode="HTML"
+        )
+        # Store pending state so the DM reply handler can pick it up
+        context.bot_data.setdefault("pending_invite", {})[user.id] = {
+            "chat_id":    chat_id,
+            "need":       need,
+            "collected":  [],
+            "expires_at": asyncio.get_event_loop().time() + 60,
+        }
+        asyncio.create_task(_invite_dm_timeout(context, user.id, chat_id))
+    except Exception:
+        # Bot not started by host in DM
+        host_data["coins"] += bet
+        save_user(host_data)
+        active_games.pop(chat_id, None)
+        await msg.reply_text(
+            f"❌ {sc('Please start the bot in DM first, then try again.')}",
+            parse_mode="HTML"
+        )
+
+
+async def _force_start_game(context, chat_id: int):
+    """Instantly start the game (used by card2 after both players are set)."""
+    await asyncio.sleep(1)
+    game = active_games.get(chat_id)
+    if not game:
+        return
+
+    players = game["players"]
+    hands   = deal_equal_sum_cards(len(players))
+    for i, (uid, pdata) in enumerate(players.items()):
+        pdata["cards"]        = hands[i]["cards"]
+        pdata["_point_noise"] = hands[i]["_point_noise"]
+
+    game["phase"]      = "playing"
+    game["turn_order"] = list(players.keys())
+    random.shuffle(game["turn_order"])
+
+    sent = await context.bot.send_message(
+        chat_id=chat_id,
+        text=(
+            f"🃏 <b>{sc('Game Started!')}</b>\n\n"
+            f"👥 {sc('Players')}: <b>{len(players)}</b>\n\n"
+            f"📩 {sc('Check Your Cards In My DM.')}"
+        ),
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup([[
+            InlineKeyboardButton("📩 " + sc("View My Cards"), url="https://t.me/im_yuuribot")
+        ]])
+    )
+    _track_bot_msg(game, chat_id, sent)
+
+    for uid, pdata in players.items():
+        await _send_cards_dm(context, uid, pdata)
+
+    await _start_round(context, chat_id)
+
+
+async def _invite_dm_timeout(context, host_uid: int, chat_id: int):
+    """Cancel invite setup if host doesn't reply in time."""
+    await asyncio.sleep(62)
+    pending = context.bot_data.get("pending_invite", {})
+    if host_uid not in pending:
+        return  # already resolved
+
+    pending.pop(host_uid, None)
+    game = active_games.get(chat_id)
+    if game:
+        # Refund host
+        bet = game["bet"]
+        u   = users.find_one({"id": host_uid})
+        if u:
+            u["coins"] = u.get("coins", 0) + bet
+            save_user(u)
+        active_games.pop(chat_id, None)
+
+    try:
+        await context.bot.send_message(
+            chat_id=host_uid,
+            text=f"⏰ <b>{sc('Invite setup timed out. Game cancelled. Coins refunded.')}</b>",
+            parse_mode="HTML"
+        )
+    except Exception:
+        pass
+
+
+# ── DM message handler — collects invited usernames ──────────
+async def handle_invite_dm(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Handles private messages from the host during card3/4/5 setup.
+    Must be registered as a MessageHandler for private TEXT messages.
+    """
+    user = update.effective_user
+    msg  = update.message
+    chat = update.effective_chat
+
+    if chat.type != "private":
+        return
+
+    pending = context.bot_data.get("pending_invite", {})
+    if user.id not in pending:
+        return  # not in invite setup
+
+    state   = pending[user.id]
+    chat_id = state["chat_id"]
+    need    = state["need"]
+    game    = active_games.get(chat_id)
+
+    if not game:
+        pending.pop(user.id, None)
+        return
+
+    # Parse all @usernames and numeric IDs from the message
+    import re
+    raw_text  = msg.text or ""
+    mentions  = re.findall(r'@(\w+)', raw_text)
+    raw_ids   = re.findall(r'\b(\d{5,12})\b', raw_text)
+
+    resolved = []
+    bet      = game["bet"]
+
+    for username in mentions:
+        try:
+            chat_obj = await context.bot.get_chat(f"@{username}")
+            resolved.append(chat_obj)
+        except Exception:
+            await msg.reply_text(
+                f"❌ {sc('Could not find user')} @{username}. {sc('Skipping.')}",
+                parse_mode="HTML"
+            )
+
+    for uid_str in raw_ids:
+        try:
+            chat_obj = await context.bot.get_chat(int(uid_str))
+            resolved.append(chat_obj)
+        except Exception:
+            await msg.reply_text(
+                f"❌ {sc('Could not find user ID')} {uid_str}. {sc('Skipping.')}",
+                parse_mode="HTML"
+            )
+
+    added = 0
+    for target in resolved:
+        if target.id == user.id:
+            continue
+        if target.id in game["players"]:
+            continue
+        if len(game["players"]) >= need + 1:
+            break
+
+        target_data = users.find_one({"id": target.id})
+        if not target_data or target_data.get("coins", 0) < bet:
+            await msg.reply_text(
+                f"❌ <b>{target.first_name}</b> {sc('does not have enough coins. Skipping.')}",
+                parse_mode="HTML"
+            )
+            continue
+
+        target_data["coins"] -= bet
+        save_user(target_data)
+
+        game["players"][target.id] = {
+            "name":         target.first_name,
+            "cards":        {},
+            "points":       0,
+            "_point_noise": 0,
+            "premium":      is_premium(target_data, context),
+            "dm_msg_id":    None,
+        }
+        added += 1
+
+        # Notify invited player
+        try:
+            await context.bot.send_message(
+                chat_id=target.id,
+                text=(
+                    f"♠️ <b>{sc('You have been invited to a card game!')}</b>\n\n"
+                    f"👑 {sc('Host')}: <b>{user.first_name}</b>\n"
+                    f"💰 <b>{bet}</b> {sc('coins deducted from your balance.')}\n\n"
+                    f"🃏 {sc('Game is starting in the group!')}"
+                ),
+                parse_mode="HTML"
+            )
+        except Exception:
+            pass
+
+    total_players = len(game["players"])
+    still_need    = (need + 1) - total_players
+
+    if still_need <= 0:
+        # All players collected — start the game
+        pending.pop(user.id, None)
+        await msg.reply_text(
+            f"✅ <b>{sc('All players added! Starting game...')}</b>",
+            parse_mode="HTML"
+        )
+        try:
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text=(
+                    f"♠️ <b>{sc('Private Card Game Starting!')}</b>\n\n"
+                    f"👥 {sc('Players')}: <b>{total_players}</b>\n"
+                    f"💰 {sc('Bet')}: <b>{bet}</b>"
+                ),
+                parse_mode="HTML"
+            )
+        except Exception:
+            pass
+        await _force_start_game(context, chat_id)
+    else:
+        await msg.reply_text(
+            f"✅ <b>{added}</b> {sc('player(s) added.')}\n"
+            f"📝 {sc('Still need')} <b>{still_need}</b> {sc('more. Send their usernames.')}",
+            parse_mode="HTML"
+        )
+
+
+# ── /card2 /card3 /card4 /card5 entry points ─────────────────
+async def cmd_card2(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg  = update.message
+    user = update.effective_user
+
+    # Resolve the target user from args
+    if len(context.args) < 2:
+        return await msg.reply_text(
+            f"<b>{sc('Usage')}:</b> /card2 &lt;{sc('amount')}&gt; &lt;@{sc('username or id')}&gt;",
+            parse_mode="HTML"
+        )
+
+    target_raw = context.args[1].lstrip("@")
+    try:
+        target_id  = int(target_raw)
+        target_obj = await context.bot.get_chat(target_id)
+    except ValueError:
+        try:
+            target_obj = await context.bot.get_chat(f"@{target_raw}")
+        except Exception:
+            return await msg.reply_text(
+                f"❌ {sc('Could not find that user.')}",
+                parse_mode="HTML"
+            )
+    except Exception:
+        return await msg.reply_text(
+            f"❌ {sc('Could not find that user.')}",
+            parse_mode="HTML"
+        )
+
+    await _start_invite_game(update, context, max_players=2, target_user=target_obj)
+
+async def cmd_card3(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await _start_invite_game(update, context, max_players=3)
+
+async def cmd_card4(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await _start_invite_game(update, context, max_players=4)
+
+async def cmd_card5(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await _start_invite_game(update, context, max_players=5)
 
 # ============================================================
 #  HANDLER REGISTRATION
@@ -7755,6 +8184,15 @@ application.add_handler(CommandHandler("cardlock",    cmd_cardlock))
 application.add_handler(CommandHandler("cancelgames", cmd_cancelgames))
 application.add_handler(CommandHandler("topcarder",   cmd_topcarder))
 application.add_handler(CommandHandler("activecards", cmd_activecards))  # owner only
+application.add_handler(CommandHandler("card2", cmd_card2))
+application.add_handler(CommandHandler("card3", cmd_card3))
+application.add_handler(CommandHandler("card4", cmd_card4))
+application.add_handler(CommandHandler("card5", cmd_card5))
+
+application.add_handler(
+    MessageHandler(filters.TEXT & filters.ChatType.PRIVATE, handle_invite_dm),
+    group=0
+)
 
 # Message Handlers
 application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
