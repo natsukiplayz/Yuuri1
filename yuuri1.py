@@ -7757,15 +7757,6 @@ application.add_handler(CommandHandler("cardlock",    cmd_cardlock))
 application.add_handler(CommandHandler("cancelgames", cmd_cancelgames))
 application.add_handler(CommandHandler("topcarder",   cmd_topcarder))
 application.add_handler(CommandHandler("activecards", cmd_activecards))  # owner only
-application.add_handler(CommandHandler("card2", cmd_card2))
-application.add_handler(CommandHandler("card3", cmd_card3))
-application.add_handler(CommandHandler("card4", cmd_card4))
-application.add_handler(CommandHandler("card5", cmd_card5))
-
-application.add_handler(
-    MessageHandler(filters.TEXT & filters.ChatType.PRIVATE, handle_invite_dm),
-    group=0
-)
 
 # Message Handlers
 application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
