@@ -959,10 +959,10 @@ GAME_INFO = (
     "  1➜2  2➜4  3➜6  4➜8  5➜10\n"
     "  6➜12  7➜14  8➜16  9➜18  10➜20\n\n"
     "👼👼 <b>Cᴏᴍᴍᴀɴᴅꜱ</b>\n"
-    "/card &lt;amount&gt; — Sᴛᴀʀᴛ ᴀ ɴᴇᴡ ɢᴀᴍᴇ\n"
-    "/card2 &lt;amount&gt; &lt;@user&gt; — 1ᴠ1 ᴘʀɪᴠᴀᴛᴇ ɢᴀᴍᴇ\n"
-    "/card3-5 &lt;amount&gt; — ɪɴᴠɪᴛᴇ-ᴏɴʟʏ ɢᴀᴍᴇ\n"
-    "/bet &lt;amount&gt; — Jᴏɪɴ ᴛʜᴇ ɢᴀᴍᴇ\n"
+    "/card <amount> — Sᴛᴀʀᴛ ᴀ ɴᴇᴡ ɢᴀᴍᴇ\n"
+    "/card2 <amount> @user> — 1ᴠ1 ᴘʀɪᴠᴀᴛᴇ ɢᴀᴍᴇ\n"
+    "/card3-5 <amount> — ɪɴᴠɪᴛᴇ-ᴏɴʟʏ ɢᴀᴍᴇ\n"
+    "/bet <amount> — Jᴏɪɴ ᴛʜᴇ ɢᴀᴍᴇ\n"
     "/flip a/b/c/d — Pʟᴀʏ ʏᴏᴜʀ ᴍᴏᴠᴇ\n\n"
     "😀 <b>Nᴏᴛᴇꜱ & Iɴꜱᴛʀᴜᴄᴛɪᴏɴꜱ</b>\n"
     "✅ Eᴀᴄʜ ᴛᴜʀɴ ʜᴀꜱ ᴀ <b>60-ꜱᴇᴄᴏɴᴅ</b> ᴛɪᴍᴇ ʟɪᴍɪᴛ\n"
@@ -1012,7 +1012,7 @@ async def cmd_card(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if not context.args:
         await msg.reply_text(
-            f"<b>{sc('Usage')}:</b> /card &lt;{sc('amount')}&gt;",
+            f"<b>{sc('Usage')}:</b> /card <{sc('amount')}>",
             parse_mode="HTML"
         )
         return
@@ -1188,7 +1188,7 @@ async def cmd_bet(update: Update, context: ContextTypes.DEFAULT_TYPE):
     game = active_games.get(chat_id)
 
     if not game or game["phase"] == "done":
-        await msg.reply_text(f"{sc('No game running.')}  /card &lt;{sc('amount')}&gt;")
+        await msg.reply_text(f"{sc('No game running.')}  /card <{sc('amount')}>")
         return
 
     if game["phase"] != "joining":
