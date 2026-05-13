@@ -6347,20 +6347,47 @@ async def security_guard(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def allow_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """/allow <id> - Whitelist a user from security checks"""
-    if update.effective_user.id != OWNER_ID:
-        return
+    """/allow <id> - Whitelist a user from security checks (owner or group admins)"""
+    user_id = update.effective_user.id
+    chat_id = update.effective_chat.id
 
+    # --- PERMISSION CHECK: Allow bot owner OR group admins/owner ---
+    is_permitted = False
+    if user_id == OWNER_ID:
+        is_permitted = True
+    else:
+        try:
+            member = await context.bot.get_chat_member(chat_id, user_id)
+            if member.status in [ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER]:
+                is_permitted = True
+        except Exception:
+            pass
+
+    if not is_permitted:
+        return await update.message.reply_text("❌ Oɴʟʏ ᴀᴅᴍɪɴs ᴄᴀɴ ᴜsᴇ ᴛʜɪs ᴄᴏᴍᴍᴀɴᴅ.")
+
+    # --- RESOLVE TARGET USER ---
     target_id = None
     if update.message.reply_to_message:
         target_id = update.message.reply_to_message.from_user.id
     elif context.args:
-        try: target_id = int(context.args[0])
-        except ValueError: return await update.message.reply_text("❌ Gɪᴠᴇ ᴀ ᴠᴀʟɪᴅ Usᴇʀ ID.")
+        try:
+            target_id = int(context.args[0])
+        except ValueError:
+            return await update.message.reply_text("❌ Gɪᴠᴇ ᴀ ᴠᴀʟɪᴅ Usᴇʀ ID.")
 
-    if target_id:
-        allowed_collection.update_one({"user_id": target_id}, {"$set": {"allowed": True}}, upsert=True)
-        await update.message.reply_text(f"✅ Usᴇʀ `{target_id}` ɪs ɴᴏᴡ ᴀʟʟᴏᴡᴇᴅ ᴛᴏ ʙʏᴘᴀss sᴇᴄᴜʀɪᴛʏ.")
+    if not target_id:
+        return await update.message.reply_text("❌ Rᴇᴘʟʏ ᴛᴏ ᴀ ᴜsᴇʀ ᴏʀ ᴘʀᴏᴠɪᴅᴇ ᴀ Usᴇʀ ID.")
+
+    allowed_collection.update_one(
+        {"user_id": target_id},
+        {"$set": {"allowed": True}},
+        upsert=True
+    )
+    await update.message.reply_text(
+        f"✅ Usᴇʀ `{target_id}` ɪs ɴᴏᴡ ᴀʟʟᴏᴡᴇᴅ ᴛᴏ ʙʏᴘᴀss sᴇᴄᴜʀɪᴛʏ.",
+        parse_mode='Markdown'
+    )
 
 # ================= CONFIG ===============
 #---
