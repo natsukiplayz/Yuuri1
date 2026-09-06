@@ -1,0 +1,357 @@
+#!/usr/bin/env python3
+"""
+Yuuri Bot — main entrypoint.
+
+Run with:  uvicorn bot.main:app --host 0.0.0.0 --port 8000
+(Render just points at this file; RENDER_EXTERNAL_URL sets the webhook.)
+"""
+
+import os
+import asyncio
+import logging
+
+from fastapi import FastAPI, Request, UploadFile, File, Form, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from telegram import Update
+from telegram.ext import (
+    ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters,
+)
+from telegram.ext import ApplicationHandlerStop
+from telegram.constants import ChatAction
+
+import cloudinary.uploader
+
+from bot.config import BOT_TOKEN, OWNER_ID, db, users
+from bot.helpers import get_user
+
+# ---- feature modules ----
+from bot import economy, moderation, social, games_card, games_heist, games_roulette
+from bot import admin_tools, start_help, ai_chat
+from bot import captcha as captcha_mod
+
+# ================= FASTAPI APP =================
+app = FastAPI()
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+
+games_roulette.register_snake_routes(app)
+
+
+@app.post("/api/upload-design")
+async def upload_design(title: str = Form(...), file: UploadFile = File(...)):
+    try:
+        result = cloudinary.uploader.upload(file.file)
+        image_url = result.get("secure_url")
+        from bot.config import async_db
+        await async_db.designs.insert_one({"title": title, "image_url": image_url})
+        return {"status": "success", "url": image_url}
+    except Exception as e:
+        logging.error(f"Upload Error: {e}")
+        raise HTTPException(status_code=500, detail="Upload failed")
+
+
+@app.get("/api/get-designs")
+async def get_designs():
+    try:
+        from bot.config import async_db
+        cursor = async_db.designs.find().sort("_id", -1).limit(20)
+        designs = await cursor.to_list(length=20)
+        for d in designs:
+            d["_id"] = str(d["_id"])
+        return designs
+    except Exception:
+        return []
+
+
+# ================= AUTO SAVE CHAT + BLOCK GUARD =================
+
+async def save_chat_and_user(update: Update, context):
+    user = update.effective_user
+    message = update.effective_message
+    chat = update.effective_chat
+    if not user or not message or not chat:
+        return
+
+    user_db = get_user(user)
+
+    if user.id != OWNER_ID and user_db.get("blocked"):
+        is_private = chat.type == "private"
+        is_command = message.text and message.text.startswith("/")
+        if is_private or is_command:
+            await message.reply_text("Sᴏʀʀʏ Bᴜᴛ Yᴏᴜ'ʀᴇ Bʟᴏᴄᴋᴇᴅ 😒")
+        raise ApplicationHandlerStop
+
+    db["chats"].update_one({"id": chat.id}, {"$set": {"type": chat.type, "title": getattr(chat, "title", None)}}, upsert=True)
+    users.update_one({"id": user.id}, {"$set": {"name": user.first_name, "username": user.username.lower() if user.username else None}})
+
+
+async def error_handler(update, context) -> None:
+    print(f"⚠️ Telegram Error: {context.error}")
+    if "Timed out" in str(context.error) or "httpx" in str(context.error):
+        return
+
+
+async def auto_revive_free(context):
+    from bot.config import users_async
+    try:
+        result = await users_async.update_many({"dead": True}, {"$set": {"dead": False}})
+        print(f"✨ [AUTO-REVIVE] {result.modified_count} players resurrected.")
+    except Exception as e:
+        print(f"⚠️ Auto-revive error: {e}")
+
+
+async def auto_coin_gift(context):
+    from bot.config import users_async
+    try:
+        gift_amount = __import__("random").randint(100, 500)
+        result = await users_async.update_many({}, {"$inc": {"coins": gift_amount}})
+        print(f"💰 [AUTO-GIFT] Gave {gift_amount} coins to {result.modified_count} users.")
+        await context.bot.send_message(
+            chat_id=-1003562158604,
+            text=(f"🎁 <b>Gʟᴏʙᴀʟ Gɪғᴛ!</b>\n\nYuuri has dropped 💰 <b>{gift_amount} coins</b> into everyone's pockets!\n"
+                  "Check your /bal to see your new wealth!"),
+            parse_mode='HTML'
+        )
+    except Exception as e:
+        print(f"⚠️ Auto-gift error: {e}")
+
+
+async def keep_alive():
+    import httpx
+    while True:
+        await asyncio.sleep(600)
+        try:
+            async with httpx.AsyncClient() as c:
+                await c.get("https://yuuri1.onrender.com/")
+        except Exception:
+            pass
+
+
+# ================= TELEGRAM APPLICATION =================
+application = (
+    ApplicationBuilder()
+    .token(BOT_TOKEN)
+    .connect_timeout(60.0)
+    .read_timeout(60.0)
+    .write_timeout(60.0)
+    .pool_timeout(60.0)
+    .build()
+)
+
+# ---- pre-processing (block guard, chat/user save) ----
+application.add_handler(MessageHandler(filters.ALL, save_chat_and_user), group=-1)
+
+# ---- start / help / referral / pay / snake / captcha ----
+application.add_handler(CommandHandler("start", start_help.start_command))
+application.add_handler(CommandHandler("help", start_help.help_command))
+application.add_handler(CommandHandler("referral", start_help.referral))
+application.add_handler(CommandHandler("pay", start_help.pay))
+application.add_handler(CommandHandler("set", start_help.set_link))
+application.add_handler(CommandHandler("snake", games_roulette.cmd_snake))
+
+# ---- economy ----
+application.add_handler(CommandHandler("status", economy.profile))
+application.add_handler(CommandHandler("bal", economy.bal))
+application.add_handler(CommandHandler("give", economy.givee))
+application.add_handler(CommandHandler("rob", economy.robe))
+application.add_handler(CommandHandler("kill", economy.kill))
+application.add_handler(CommandHandler("bounty", economy.bounty))
+application.add_handler(CommandHandler("revive", economy.revive))
+application.add_handler(CommandHandler("protect", economy.protect))
+application.add_handler(CommandHandler("check", economy.check_protection))
+application.add_handler(CommandHandler("register", economy.register))
+application.add_handler(CommandHandler("daily", economy.daily))
+application.add_handler(CommandHandler("toprich", economy.richest))
+application.add_handler(CommandHandler("rankers", economy.rankers))
+application.add_handler(CommandHandler("topkills", economy.top_killers))
+application.add_handler(CommandHandler("shop", economy.shop))
+application.add_handler(CommandHandler("buy", economy.purchase))
+application.add_handler(CommandHandler("create", economy.create_redeem))
+application.add_handler(CommandHandler("redeem", economy.redeem))
+application.add_handler(CommandHandler("claim", economy.claim))
+application.add_handler(CommandHandler("close", admin_tools.close_economy))
+application.add_handler(CommandHandler("open", admin_tools.open_economy))
+
+# ---- moderation ----
+application.add_handler(CommandHandler("allow", moderation.allow_command))
+application.add_handler(CommandHandler("ban", moderation.ban))
+application.add_handler(CommandHandler("kick", moderation.kick_user))
+application.add_handler(CommandHandler("unban", moderation.unban))
+application.add_handler(CommandHandler("mute", moderation.mute))
+application.add_handler(CommandHandler("unmute", moderation.unmute))
+application.add_handler(CommandHandler("tmute", moderation.tmute))
+application.add_handler(CommandHandler("warn", moderation.warn))
+application.add_handler(CommandHandler("unwarn", moderation.unwarn))
+application.add_handler(CommandHandler("promote", moderation.promote_user))
+application.add_handler(CommandHandler("demote", moderation.demote_user))
+application.add_handler(CommandHandler("title", moderation.set_admin_title))
+application.add_handler(CommandHandler("pin", moderation.pin_message))
+application.add_handler(CommandHandler("unpin", moderation.unpin_message))
+application.add_handler(CommandHandler("dlt", moderation.purge))
+
+# ---- social / fun ----
+application.add_handler(CommandHandler("kiss", social.kiss))
+application.add_handler(CommandHandler("hug", social.hug))
+application.add_handler(CommandHandler("bite", social.bite))
+application.add_handler(CommandHandler("slap", social.slap))
+application.add_handler(CommandHandler("punch", social.punch))
+application.add_handler(CommandHandler("murder", social.murder))
+application.add_handler(CommandHandler("q", social.quote))
+application.add_handler(CommandHandler("obt", social.save_sticker))
+application.add_handler(CommandHandler("font", social.font_converter))
+application.add_handler(CommandHandler("voice", social.voice_msg_handler))
+
+# ---- card game ----
+application.add_handler(CommandHandler("card", games_card.cmd_card))
+application.add_handler(CommandHandler("bet", games_card.cmd_bet))
+application.add_handler(CommandHandler("flip", games_card.cmd_flip))
+application.add_handler(CommandHandler("cardhelp", games_card.cmd_cardhelp))
+application.add_handler(CommandHandler("cardlock", games_card.cmd_cardlock))
+application.add_handler(CommandHandler("cancelgames", games_card.cmd_cancelgames))
+application.add_handler(CommandHandler("topcarder", games_card.cmd_topcarder))
+application.add_handler(CommandHandler("activecards", games_card.cmd_activecards))
+application.add_handler(CommandHandler("card2", games_card.cmd_card2))
+application.add_handler(CommandHandler("card3", games_card.cmd_card3))
+application.add_handler(CommandHandler("card4", games_card.cmd_card4))
+application.add_handler(CommandHandler("card5", games_card.cmd_card5))
+application.add_handler(MessageHandler(filters.TEXT & filters.ChatType.PRIVATE, games_card.handle_invite_dm), group=0)
+
+# ---- heist ----
+application.add_handler(CommandHandler("heist", games_heist.heist))
+application.add_handler(CommandHandler("joinheist", games_heist.joinheist))
+application.add_handler(CommandHandler("stfast", games_heist.stfast))
+application.add_handler(CommandHandler("stopheist", games_heist.stopheist))
+
+# ---- roulette ----
+application.add_handler(CommandHandler("rullate", games_roulette.rullate))
+application.add_handler(CommandHandler("on", games_roulette.on))
+application.add_handler(CommandHandler("join", games_roulette.join))
+application.add_handler(CommandHandler("shot", games_roulette.shot))
+application.add_handler(CommandHandler("out", games_roulette.out))
+application.add_handler(CommandHandler("rullrank", games_roulette.rullrank))
+
+# ---- admin / owner tools ----
+application.add_handler(CommandHandler("reset", admin_tools.cmd_reset))
+application.add_handler(CommandHandler("resetlist", admin_tools.cmd_resetlist))
+application.add_handler(CommandHandler("block", admin_tools.block_cmd))
+application.add_handler(CommandHandler("unblock", admin_tools.unblock_cmd))
+application.add_handler(CommandHandler("activate", admin_tools.activate))
+application.add_handler(CommandHandler("deactivate", admin_tools.deactivate))
+application.add_handler(CommandHandler("seticon", admin_tools.set_icon))
+application.add_handler(CommandHandler("denyicon", admin_tools.deny_icon))
+application.add_handler(CommandHandler("setpng", admin_tools.set_png))
+application.add_handler(CommandHandler("leave", admin_tools.leave_group))
+application.add_handler(CommandHandler("personal", admin_tools.send_personal))
+application.add_handler(CommandHandler("feedback", admin_tools.feedback_command))
+application.add_handler(CommandHandler("stats", admin_tools.stats))
+application.add_handler(CommandHandler("ping", admin_tools.ping))
+application.add_handler(CommandHandler("cmds", admin_tools.owner_cmds))
+application.add_handler(CommandHandler("connect", admin_tools.connect_log_group))
+application.add_handler(CommandHandler("groups", admin_tools.groups_command))
+application.add_handler(CommandHandler("save", admin_tools.save_group))
+application.add_handler(CommandHandler("del", admin_tools.del_group))
+application.add_handler(CommandHandler("list", admin_tools.list_manager))
+application.add_handler(CommandHandler("id", admin_tools.user_command))
+application.add_handler(CommandHandler("data", admin_tools.inform_user))
+application.add_handler(CommandHandler("send_gro", admin_tools.send_gro))
+application.add_handler(CommandHandler("send_pri", admin_tools.send_pri))
+application.add_handler(CommandHandler("stop_broad", admin_tools.stop_broad))
+application.add_handler(CommandHandler("del_broad", admin_tools.del_broad))
+
+# ---- message handlers ----
+application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, start_help.welcome))
+application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, moderation.security_guard), group=1)
+application.add_handler(MessageHandler(filters.Sticker.ALL, social.reply_with_random_sticker), group=2)
+application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, ai_chat.auto_reply), group=2)
+
+# ---- callbacks ----
+application.add_handler(CallbackQueryHandler(games_heist.heist_choice, pattern="^heist_"))
+application.add_handler(CallbackQueryHandler(games_card.cb_topcarder, pattern="^topcarder_"))
+application.add_handler(CallbackQueryHandler(admin_tools.list_callback, pattern="^plist_"))
+application.add_handler(CallbackQueryHandler(start_help.handle_help_callbacks))
+
+# ---- errors ----
+application.add_error_handler(error_handler)
+
+
+# ================= WEBHOOK ROUTES =================
+
+@app.post("/webhook")
+async def webhook(request: Request):
+    json_str = await request.json()
+    update = Update.de_json(json_str, application.bot)
+    await application.process_update(update)
+    return {"status": "ok"}
+
+
+@app.post("/payment_webhook")
+async def premium_auto_activate(request: Request):
+    from datetime import datetime, timedelta
+    data = await request.json()
+    raw_note = data.get("note", "")
+
+    if "PREMIUM" not in raw_note:
+        return {"status": "ignored"}
+
+    try:
+        parts = raw_note.split("-")
+        days_to_add = int(parts[1])
+        target_id = int(parts[2])
+
+        prices = {7: (20.0, "1 Week"), 30: (49.0, "1 Month"), 60: (100.0, "2 Months")}
+        amount, label = prices.get(days_to_add, (0.0, f"{days_to_add} Days"))
+
+        now = datetime.utcnow()
+        from bot.config import users_async, async_db
+        target_data = await users_async.find_one({"id": target_id})
+        if not target_data:
+            return {"status": "user_not_found"}
+
+        current_expire_str = target_data.get("premium_until")
+        base_time = now
+        if current_expire_str:
+            current_expire = datetime.strptime(current_expire_str, "%Y-%m-%d %H:%M:%S")
+            base_time = max(current_expire, now)
+
+        new_expire_time = base_time + timedelta(days=days_to_add)
+        new_expire_str = new_expire_time.strftime("%Y-%m-%d %H:%M:%S")
+
+        await users_async.update_one({"id": target_id}, {"$set": {"premium": True, "premium_until": new_expire_str}})
+
+        log_config = await async_db.settings.find_one({"config": "log_group"})
+        target_chat = log_config["group_id"] if log_config else OWNER_ID
+
+        log_text = (
+            "💰 <b>Nᴇᴡ Pᴀʏᴍᴇɴᴛ Rᴇᴄᴇɪᴠᴇᴅ!</b>\n\n"
+            f"👤 <b>User ID:</b> <code>{target_id}</code>\n💵 <b>Amount:</b> ₹{amount}\n"
+            f"⏳ <b>Premium Added:</b> {label}\n📅 <b>Expiry:</b> <code>{new_expire_str}</code>\n"
+            f"🔗 <b>User Link:</b> <a href='tg://user?id={target_id}'>Profile</a>"
+        )
+        await application.bot.send_message(target_chat, log_text, parse_mode="HTML")
+        await application.bot.send_message(target_id, "🎉 <b>Yᴏᴜʀ Pʀᴇᴍɪᴜᴍ ʜᴀs ʙᴇᴇɴ ᴀᴄᴛɪᴠᴀᴛᴇᴅ!</b>")
+
+        return {"status": "success"}
+    except Exception as e:
+        print(f"Payment Webhook Error: {e}")
+        return {"status": "error"}
+
+
+@app.on_event("startup")
+async def on_startup():
+    base_url = os.getenv("RENDER_EXTERNAL_URL")
+    webhook_url = f"{base_url}/webhook"
+
+    await application.bot.set_webhook(url=webhook_url, drop_pending_updates=True)
+    await application.initialize()
+    await application.start()
+
+    application.job_queue.run_repeating(auto_revive_free, interval=21600, first=10)
+    application.job_queue.run_repeating(auto_coin_gift, interval=86400, first=60)
+
+    asyncio.create_task(keep_alive())
+    print(f"🚀 Webhook set to {webhook_url}")
+
+
+@app.on_event("shutdown")
+async def on_shutdown():
+    await application.stop()
+    await application.shutdown()
